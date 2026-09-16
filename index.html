@@ -37,8 +37,10 @@
       <input id="chatId" inputmode="text" autocomplete="off" placeholder="-1001234567890" />
       <p class="small">L’ID peut être celui du supergroupe (<code>-100…</code>). La PWA le résout d’abord via les dialogs pour récupérer l’access hash.</p>
 
+      <button id="listDialogs" class="secondary">Lister les dialogs visibles</button>
       <button id="read">Lire les 20 derniers messages</button>
       <pre id="readStatus" class="status">Prêt.</pre>
+      <div id="dialogs"></div>
     </section>
 
     <section>

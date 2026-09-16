@@ -102,6 +102,87 @@ $('logout').addEventListener('click', async () => {
   }
 })
 
+
+function peerKind(peer) {
+  return peer?.type
+    || peer?.constructor?.name
+    || peer?.raw?.className
+    || 'peer'
+}
+
+function peerDisplayName(peer) {
+  return peer?.displayName
+    || peer?.title
+    || peer?.username
+    || peer?.firstName
+    || ''
+}
+
+function peerIdValue(peer) {
+  const v = peer?.id
+  if (typeof v === 'bigint') return v.toString()
+  if (v && typeof v === 'object' && 'value' in v) return String(v.value)
+  return String(v ?? '')
+}
+
+$('listDialogs').addEventListener('click', async () => {
+  try {
+    const client = await ensureLogin()
+    status('readStatus', 'Lecture des dialogs Telegram…')
+
+    const out = $('dialogs')
+    out.innerHTML = ''
+
+    const dialogs = []
+    for await (const dialog of client.iterDialogs({ limit: 100 })) {
+      dialogs.push(dialog)
+    }
+
+    if (!dialogs.length) {
+      out.innerHTML = '<p>Aucun dialog trouvé.</p>'
+      status('readStatus', 'Aucun dialog trouvé.', false)
+      return
+    }
+
+    const table = document.createElement('div')
+    table.className = 'thread'
+
+    for (const d of dialogs) {
+      const peer = d.peer
+      const card = document.createElement('div')
+      card.className = 'message'
+      const id = peerIdValue(peer)
+      const title = peerDisplayName(peer) || '(sans titre)'
+      const kind = peerKind(peer)
+      const username = peer?.username ? `@${peer.username}` : ''
+
+      card.innerHTML = `
+        <div class="badges">
+          <span>ID ${escapeHtml(id)}</span>
+          <span>${escapeHtml(kind)}</span>
+          ${username ? `<span>${escapeHtml(username)}</span>` : ''}
+        </div>
+        <div class="author">${escapeHtml(title)}</div>
+      `
+      table.appendChild(card)
+    }
+
+    out.appendChild(table)
+    status('readStatus', `${dialogs.length} dialog(s) listé(s).`, true)
+
+    debug(dialogs.map((d) => ({
+      id: peerIdValue(d.peer),
+      title: peerDisplayName(d.peer),
+      kind: peerKind(d.peer),
+      username: d.peer?.username || null,
+    })))
+  } catch (e) {
+    console.error(e)
+    debug(e?.stack || e?.message || String(e))
+    status('readStatus', `Erreur dialogs : ${e?.message || e}`, false)
+  }
+})
+
 function msgText(m) {
   return m?.text ?? m?.caption ?? m?.message ?? ''
 }

@@ -71,3 +71,16 @@ await client.getHistory(dialog.peer, { limit: 20 })
 
 `findDialogs` parcourt les dialogs de l'utilisateur et permet à mtcute de récupérer / mettre en cache
 l'`access_hash` du groupe.
+
+
+## Diagnostic des dialogs
+
+Cette version ajoute **Lister les dialogs visibles**.
+
+Elle affiche pour chaque dialog :
+- titre ;
+- ID mtcute ;
+- type de peer ;
+- username éventuel.
+
+Le but est de vérifier exactement quel ID mtcute associe au groupe familial avant d'appeler `findDialogs()` / `getHistory()`.
