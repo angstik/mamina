@@ -1,130 +1,62 @@
 <!doctype html>
 <html lang="fr">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="color-scheme" content="light dark">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<title>Mamina — Bot + lecture Telegram</title>
-<style>
-:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-body{max-width:900px;margin:0 auto;padding:18px 14px 50px;line-height:1.4}
-h1{font-size:1.55rem}
-fieldset{border:1px solid #8885;border-radius:14px;padding:14px;margin:14px 0}
-legend{font-weight:700;padding:0 6px}
-label{display:block;font-weight:600;margin:10px 0 5px}
-input,textarea,select,button{width:100%;box-sizing:border-box;font:inherit;padding:10px;border-radius:10px}
-input,textarea,select{border:1px solid #8888;background:transparent}
-textarea{min-height:76px}
-button{border:0;margin-top:9px;font-weight:700;background:#168acd;color:#fff}
-button.secondary{background:#666} button:disabled{opacity:.5}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.status{white-space:pre-wrap;padding:10px;border-radius:10px;background:#8882;margin-top:9px}
-.ok{color:#188038}.err{color:#c62828}.hint{opacity:.72;font-size:.9rem}
-.card{border:1px solid #8885;border-radius:12px;padding:10px;margin:8px 0}.reply{margin-left:18px}
-.badge{display:inline-block;padding:2px 6px;border-radius:999px;background:#8883;font-size:.78rem;margin-right:4px}
-img{max-width:100%;max-height:220px;display:none;border-radius:10px;margin-top:8px}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.82rem;overflow-wrap:anywhere}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Mamina — mtcute test</title>
 </head>
 <body>
-<h1>Mamina V3.3</h1>
-<p class="hint">Bot API pour générer du flux + MTProto utilisateur pour reconstruire les discussions.</p>
+  <main>
+    <h1>Mamina — lecture Telegram</h1>
+    <p class="lead">
+      Prototype minimal mtcute : connexion utilisateur, session IndexedDB, lecture des 20 derniers messages
+      et identification du parent/racine de chaque discussion.
+    </p>
 
-<fieldset>
-<legend>A. Bot API — génération de flux</legend>
-<form autocomplete="on" onsubmit="return false;">
-<label>Identifiant</label><input id="botUser" name="username" autocomplete="username" value="telegram-bot">
-<label>Token du bot</label><input id="token" name="password" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false">
-</form>
-<button id="testBot">Tester le bot</button><div id="botStatus" class="status">Pas encore testé.</div>
+    <section>
+      <h2>1. Application Telegram</h2>
 
-<label>Groupe Forum</label><select id="chat"><option value="">— aucun groupe —</option></select>
-<div class="row"><button id="detectChats">Détecter</button><button id="saveChat" class="secondary">Mémoriser</button></div>
-<button id="checkForum" class="secondary">Vérifier Forum</button><div id="chatStatus" class="status">Aucun groupe sélectionné.</div>
+      <label for="apiId">api_id</label>
+      <input id="apiId" inputmode="numeric" autocomplete="off" placeholder="12345678" />
 
-<label>Image de test</label><input id="photo" type="file" accept="image/*"><img id="preview" alt="aperçu">
+      <label for="apiHash">api_hash</label>
+      <input id="apiHash" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" />
 
-<div class="row"><div><label>Topics à créer</label><select id="topicCount"><option>1</option><option selected>3</option><option>5</option></select></div>
-<div><label>Préfixe</label><input id="prefix" value="TEST MAMINA"></div></div>
-<button id="createFlow">Créer Topics + posts racines</button><div id="flowStatus" class="status">Prêt.</div>
+      <button id="connect">Connexion Telegram</button>
+      <button id="logout" class="secondary">Déconnecter cette session</button>
 
-<label>Sujet cible pour messages additionnels</label><select id="targetTopic"><option value="">— crée d’abord du flux —</option></select>
-<label>Messages additionnels</label><select id="extraCount"><option>2</option><option selected>4</option><option>8</option></select>
-<button id="addExtras">Publier des réponses/messages additionnels</button><div id="extraStatus" class="status">Prêt.</div>
-</fieldset>
+      <pre id="loginStatus" class="status">Non connecté.</pre>
+    </section>
 
-<fieldset>
-<legend>B. MTProto — lecture comme utilisateur</legend>
-<p class="hint">V3.3 ajoute le polyfill navigateur Buffer puis charge un seul bundle GramJS et prend TelegramClient + sessions.StringSession dans ce même module.</p>
-<label>api_id</label><input id="apiId" inputmode="numeric">
-<label>api_hash</label><input id="apiHash" type="password" autocomplete="off" autocapitalize="none" spellcheck="false">
-<label>Session MTProto existante (optionnel)</label><textarea id="session" class="mono"></textarea>
-<div class="row"><button id="mtLogin">Connexion / login</button><button id="saveSession" class="secondary">Sauver session localement</button></div>
-<div id="mtStatus" class="status">Non connecté.</div>
+    <section>
+      <h2>2. Groupe à lire</h2>
 
-<label>Groupe à lire</label><input id="entity" placeholder="ID -100… ou @username">
-<div class="row"><button id="useBotChat" class="secondary">Utiliser le groupe Bot</button><button id="read20">Lire 20 derniers messages</button></div>
-<div id="readStatus" class="status">Prêt.</div><div id="threadView"></div>
-</fieldset>
+      <label for="chatId">ID Telegram du groupe</label>
+      <input id="chatId" inputmode="text" autocomplete="off" placeholder="-1001234567890" />
 
-<script type="module">
-const $=id=>document.getElementById(id);
-const CHAT_KEY='mamina_chat_id',CHAT_TITLE_KEY='mamina_chat_title',SESSION_KEY='mamina_mt_session';
-const createdTopics=[];
-const token=()=>$('token').value.trim();
-function ep(m){if(!token())throw new Error('Token bot manquant.');return `https://api.telegram.org/bot${encodeURIComponent(token())}/${m}`}
-function show(el,msg,ok=null){el.textContent=msg;el.className='status'+(ok===true?' ok':ok===false?' err':'')}
-async function tg(m,o={}){const r=await fetch(ep(m),o);const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.description||`HTTP ${r.status}`);return d.result}
-async function form(m,obj){const b=new URLSearchParams();Object.entries(obj).forEach(([k,v])=>b.append(k,String(v)));return tg(m,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b})}
+      <button id="read">Lire les 20 derniers messages</button>
+      <pre id="readStatus" class="status">Prêt.</pre>
+    </section>
 
-$('testBot').onclick=async()=>{try{const me=await tg('getMe');show($('botStatus'),`OK @${me.username} — id ${me.id}`,true)}catch(e){show($('botStatus'),e.message,false)}};
-$('detectChats').onclick=async()=>{try{const ups=await tg('getUpdates?limit=100&timeout=0'),chats=new Map();for(const u of ups){const m=u.message||u.edited_message||u.channel_post||u.edited_channel_post;if(m?.chat&&(m.chat.type==='group'||m.chat.type==='supergroup'))chats.set(String(m.chat.id),m.chat)}$('chat').innerHTML='';for(const [id,c] of chats){const o=document.createElement('option');o.value=id;o.textContent=`${c.title||id} (${id})`;$('chat').appendChild(o)}const s=localStorage.getItem(CHAT_KEY);if(s&&[...$('chat').options].some(o=>o.value===s))$('chat').value=s;show($('chatStatus'),`${chats.size} groupe(s) trouvé(s).`,true)}catch(e){show($('chatStatus'),e.message,false)}};
-$('saveChat').onclick=()=>{const o=$('chat').selectedOptions[0];if(!o?.value)return;localStorage.setItem(CHAT_KEY,o.value);localStorage.setItem(CHAT_TITLE_KEY,o.textContent);show($('chatStatus'),`Mémorisé ${o.textContent}`,true)};
-$('checkForum').onclick=async()=>{try{const id=$('chat').value||localStorage.getItem(CHAT_KEY);const c=await form('getChat',{chat_id:id});show($('chatStatus'),c.is_forum?`OK — ${c.title} est un Forum.`:`${c.title} n'est pas en mode Sujets.`,!!c.is_forum)}catch(e){show($('chatStatus'),e.message,false)}};
-$('photo').onchange=()=>{const f=$('photo').files[0];if(!f){$('preview').style.display='none';return}$('preview').src=URL.createObjectURL(f);$('preview').style.display='block'};
+    <section>
+      <h2>3. Discussions reconstruites</h2>
+      <p class="small">
+        <strong>parent</strong> = message auquel Telegram répond directement.
+        <strong>racine</strong> = publication obtenue en remontant les parents.
+        Le prototype charge aussi un parent manquant hors de la fenêtre des 20 messages.
+      </p>
 
-async function createTopic(chatId,name){return form('createForumTopic',{chat_id:chatId,name})}
-async function sendPhoto(chatId,threadId,file,caption){const fd=new FormData();fd.append('chat_id',chatId);fd.append('message_thread_id',threadId);fd.append('photo',file,file.name||'photo.jpg');fd.append('caption',caption);fd.append('disable_notification','true');return tg('sendPhoto',{method:'POST',body:fd})}
-async function sendText(chatId,threadId,text,replyTo){const p={chat_id:chatId,message_thread_id:threadId,text,disable_notification:true,reply_parameters:JSON.stringify({message_id:replyTo})};return form('sendMessage',p)}
+      <div id="threads"></div>
+    </section>
 
-$('createFlow').onclick=async()=>{const chatId=$('chat').value||localStorage.getItem(CHAT_KEY),f=$('photo').files[0],n=+$('topicCount').value,p=$('prefix').value.trim()||'TEST MAMINA';if(!chatId||!f)return show($('flowStatus'),'Groupe ou image manquant.',false);createdTopics.length=0;$('targetTopic').innerHTML='';try{for(let i=1;i<=n;i++){const t=await createTopic(chatId,`${p} ${i}`);const root=await sendPhoto(chatId,t.message_thread_id,f,`Publication racine ${i}\n#MAMINA_ROOT_${i}`);createdTopics.push({threadId:t.message_thread_id,rootId:root.message_id,title:`${p} ${i}`});const o=document.createElement('option');o.value=t.message_thread_id;o.textContent=`${p} ${i} — root ${root.message_id}`;$('targetTopic').appendChild(o)}show($('flowStatus'),`${n} sujet(s) + publication(s) créés.`,true)}catch(e){show($('flowStatus'),e.message,false)}};
-$('addExtras').onclick=async()=>{const chatId=$('chat').value||localStorage.getItem(CHAT_KEY),threadId=+$('targetTopic').value,n=+$('extraCount').value,t=createdTopics.find(x=>x.threadId===threadId);if(!t)return show($('extraStatus'),'Sujet de cette session introuvable.',false);try{let last=t.rootId;for(let i=1;i<=n;i++){const parent=i%2?t.rootId:last;const m=await sendText(chatId,threadId,`Commentaire synthétique ${i}\n#MAMINA_REPLY_${i}`,parent);last=m.message_id}show($('extraStatus'),`${n} messages ajoutés.`,true)}catch(e){show($('extraStatus'),e.message,false)}};
+    <details>
+      <summary>Diagnostic</summary>
+      <pre id="debug" class="status"></pre>
+    </details>
+  </main>
 
-let TelegramClient=null,StringSession=null,client=null;
-async function loadGram(){
-  if(TelegramClient)return;
-  show($('mtStatus'),'Chargement des polyfills navigateur puis de GramJS…');
-
-  if(!globalThis.Buffer){
-    const bufferModule = await import('https://esm.sh/buffer@6.0.3?bundle');
-    globalThis.Buffer = bufferModule.Buffer;
-  }
-
-  const gram=await import('https://esm.sh/telegram@2.26.10?bundle');
-  TelegramClient=gram.TelegramClient;
-  StringSession=gram.sessions.StringSession;
-  if(!TelegramClient||!StringSession)throw new Error('Exports GramJS TelegramClient/StringSession introuvables.');
-}
-async function ensureClient(){
-  await loadGram();
-  const apiId=parseInt($('apiId').value,10),apiHash=$('apiHash').value.trim();
-  if(!apiId||!apiHash)throw new Error('api_id / api_hash manquants.');
-  const ss=$('session').value.trim()||localStorage.getItem(SESSION_KEY)||'';
-  const sessionObj=new StringSession(ss);
-  client=new TelegramClient(sessionObj,apiId,apiHash,{connectionRetries:5,useWSS:true});
-  return client;
-}
-$('mtLogin').onclick=async()=>{try{const c=await ensureClient();show($('mtStatus'),'Connexion…');await c.start({phoneNumber:async()=>prompt('Numéro Telegram (+33…)')||'',phoneCode:async()=>prompt('Code reçu')||'',password:async()=>prompt('Mot de passe 2FA si demandé')||'',onError:e=>console.error(e)});const s=c.session.save();$('session').value=s;const me=await c.getMe();show($('mtStatus'),`Connecté comme ${me.firstName||''} ${me.lastName||''} (@${me.username||'—'}).`,true)}catch(e){show($('mtStatus'),`Connexion MTProto : ${e.message}`,false)}};
-$('saveSession').onclick=()=>{const s=$('session').value.trim();if(!s)return show($('mtStatus'),'Aucune session.',false);localStorage.setItem(SESSION_KEY,s);show($('mtStatus'),'Session sauvegardée localement (prototype).',true)};
-$('useBotChat').onclick=()=>{$('entity').value=$('chat').value||localStorage.getItem(CHAT_KEY)||''};
-
-const num=x=>x==null?null:typeof x==='bigint'?Number(x):typeof x==='object'&&'value'in x?Number(x.value):Number(x);
-function ri(m){const r=m.replyTo||m.reply_to;if(!r)return{parent:null,top:null};return{parent:num(r.replyToMsgId??r.reply_to_msg_id),top:num(r.replyToTopId??r.reply_to_top_id)}}
-function render(ms){const by=new Map(ms.map(m=>[num(m.id),m]));function root(m){let c=m,seen=new Set();while(true){const id=num(c.id);if(seen.has(id))return id;seen.add(id);const p=ri(c).parent;if(!p||!by.has(p))return id;c=by.get(p)}}$('threadView').innerHTML='';for(const m of [...ms].sort((a,b)=>num(a.id)-num(b.id))){const id=num(m.id),r=ri(m),rt=root(m),d=document.createElement('div');d.className='card '+(r.parent?'reply':'');d.innerHTML=`<span class="badge">msg ${id}</span>${r.parent?`<span class="badge">reply→${r.parent}</span>`:'<span class="badge">racine</span>'}${r.top?`<span class="badge">topic ${r.top}</span>`:''}<span class="badge">file→${rt}</span><div>${(m.message||'').replace(/\n/g,' ').slice(0,220)||'<i>service/média</i>'}</div>`;$('threadView').appendChild(d)}}
-$('read20').onclick=async()=>{try{if(!client){await ensureClient();await client.connect()}const ent=$('entity').value.trim();if(!ent)throw new Error('Groupe manquant.');const ms=await client.getMessages(ent,{limit:20});render(ms);show($('readStatus'),`${ms.length} messages lus.`,true)}catch(e){show($('readStatus'),`Lecture : ${e.message}`,false)}};
-
-(()=>{const id=localStorage.getItem(CHAT_KEY),title=localStorage.getItem(CHAT_TITLE_KEY),sess=localStorage.getItem(SESSION_KEY);if(id){const o=document.createElement('option');o.value=id;o.textContent=title||id;$('chat').appendChild(o);$('chat').value=id}if(sess)$('session').value=sess})();
-</script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>
