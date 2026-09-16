@@ -52,3 +52,22 @@ Le prototype épingle `@mtcute/web` à `0.32.1`, version correspondant à la doc
 
 ## Correctif GitHub Actions
 Le cache npm a été retiré du workflow pour ne pas exiger de `package-lock.json` dans ce prototype.
+
+
+## Correctif peer / access hash
+
+Un ID `-100...` ne suffit pas toujours à MTProto lors du premier accès.
+Cette version appelle d'abord :
+
+```js
+const [dialog] = await client.findDialogs(chatId)
+```
+
+puis utilise :
+
+```js
+await client.getHistory(dialog.peer, { limit: 20 })
+```
+
+`findDialogs` parcourt les dialogs de l'utilisateur et permet à mtcute de récupérer / mettre en cache
+l'`access_hash` du groupe.
