@@ -1,18 +1,13 @@
-# Mamina V3.2
+# Mamina V3.3
 
-Correction MTProto: un seul bundle GramJS est chargé.
+Correction Safari/iOS : ajout du polyfill `Buffer` avant le chargement de GramJS.
 
-La V3/V3.1 chargeait TelegramClient et StringSession depuis des graphes de modules différents,
-ce qui cassait le test `instanceof Session` de GramJS.
+La V3.3 conserve :
+- Bot API et génération de flux ;
+- création de Topics ;
+- messages additionnels ;
+- login MTProto ;
+- lecture des derniers messages ;
+- reconstruction des files via `reply_to_msg_id`.
 
-V3.2 fait :
-
-```js
-const gram = await import('https://esm.sh/telegram@2.26.10?bundle');
-TelegramClient = gram.TelegramClient;
-StringSession = gram.sessions.StringSession;
-```
-
-Les deux classes proviennent donc de la même instance de GramJS.
-
-Déploiement GitHub Pages identique aux versions précédentes.
+Déploiement GitHub Pages identique.

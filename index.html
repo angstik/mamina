@@ -28,7 +28,7 @@ img{max-width:100%;max-height:220px;display:none;border-radius:10px;margin-top:8
 </style>
 </head>
 <body>
-<h1>Mamina V3.2</h1>
+<h1>Mamina V3.3</h1>
 <p class="hint">Bot API pour générer du flux + MTProto utilisateur pour reconstruire les discussions.</p>
 
 <fieldset>
@@ -56,7 +56,7 @@ img{max-width:100%;max-height:220px;display:none;border-radius:10px;margin-top:8
 
 <fieldset>
 <legend>B. MTProto — lecture comme utilisateur</legend>
-<p class="hint">V3.2 charge un seul bundle GramJS et prend TelegramClient + sessions.StringSession dans ce même module.</p>
+<p class="hint">V3.3 ajoute le polyfill navigateur Buffer puis charge un seul bundle GramJS et prend TelegramClient + sessions.StringSession dans ce même module.</p>
 <label>api_id</label><input id="apiId" inputmode="numeric">
 <label>api_hash</label><input id="apiHash" type="password" autocomplete="off" autocapitalize="none" spellcheck="false">
 <label>Session MTProto existante (optionnel)</label><textarea id="session" class="mono"></textarea>
@@ -94,7 +94,13 @@ $('addExtras').onclick=async()=>{const chatId=$('chat').value||localStorage.getI
 let TelegramClient=null,StringSession=null,client=null;
 async function loadGram(){
   if(TelegramClient)return;
-  show($('mtStatus'),'Chargement GramJS (bundle unique)…');
+  show($('mtStatus'),'Chargement des polyfills navigateur puis de GramJS…');
+
+  if(!globalThis.Buffer){
+    const bufferModule = await import('https://esm.sh/buffer@6.0.3?bundle');
+    globalThis.Buffer = bufferModule.Buffer;
+  }
+
   const gram=await import('https://esm.sh/telegram@2.26.10?bundle');
   TelegramClient=gram.TelegramClient;
   StringSession=gram.sessions.StringSession;
