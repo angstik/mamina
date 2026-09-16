@@ -1,38 +1,18 @@
-# Mamina V3 — Bot API + lecture MTProto
+# Mamina V3.2
 
-La V3 conserve le générateur Bot API et ajoute une lecture comme utilisateur via MTProto.
+Correction MTProto: un seul bundle GramJS est chargé.
 
-## Test de rattachement des discussions
+La V3/V3.1 chargeait TelegramClient et StringSession depuis des graphes de modules différents,
+ce qui cassait le test `instanceof Session` de GramJS.
 
-Dans un sujet Forum, plusieurs publications racines peuvent exister. Les commentaires sont rattachés en remontant `reply_to_msg_id` jusqu'à la racine. `reply_to_top_id` sert surtout à identifier le thread/topic Telegram.
+V3.2 fait :
 
-Le lecteur affiche :
-- `msg X` : message courant ;
-- `reply→Y` : parent immédiat ;
-- `topic Z` : sujet Telegram ;
-- `file→R` : racine calculée de la discussion.
+```js
+const gram = await import('https://esm.sh/telegram@2.26.10?bundle');
+TelegramClient = gram.TelegramClient;
+StringSession = gram.sessions.StringSession;
+```
 
-Le générateur crée aussi des messages additionnels qui alternent : réponse directe à la racine / réponse au commentaire précédent. Cela permet de tester la remontée d'ancêtres.
+Les deux classes proviennent donc de la même instance de GramJS.
 
-## Préparation MTProto
-
-Sur `my.telegram.org` → API development tools, créer une application et récupérer `api_id` et `api_hash`.
-
-Le prototype charge GramJS depuis `esm.sh`, pour éviter un build. Une version durable devra embarquer la dépendance dans le repo.
-
-## Sécurité
-
-La StringSession utilisateur est sensible. Le bouton de sauvegarde la met en `localStorage` uniquement pour ce prototype. Ne jamais publier `api_hash`, session ou token dans Git.
-
-## Test conseillé
-
-1. Créer 1 à 3 sujets de test.
-2. Ajouter 4 messages additionnels dans l'un d'eux.
-3. Se connecter via MTProto.
-4. Utiliser le même groupe.
-5. Lire les 20 derniers messages.
-6. Vérifier que les commentaires aboutissent à la même valeur `file→...` que leur publication racine.
-
-## GitHub Pages
-
-Déployer `index.html` et `.nojekyll` à la racine de `main`.
+Déploiement GitHub Pages identique aux versions précédentes.
