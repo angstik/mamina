@@ -48,3 +48,7 @@ npm run dev
 ## Version mtcute
 
 Le prototype épingle `@mtcute/web` à `0.32.1`, version correspondant à la documentation utilisée.
+
+
+## Correctif GitHub Actions
+Le cache npm a été retiré du workflow pour ne pas exiger de `package-lock.json` dans ce prototype.
