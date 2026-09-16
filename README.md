@@ -1,77 +1,38 @@
-# Mamina — V2 Topics Telegram
+# Mamina V3 — Bot API + lecture MTProto
 
-Prototype statique pour tester l'usage familial avant l'import PDF.
+La V3 conserve le générateur Bot API et ajoute une lecture comme utilisateur via MTProto.
 
-## Ce que fait cette version
+## Test de rattachement des discussions
 
-- vérifie le token du bot ;
-- détecte le groupe Telegram ;
-- vérifie que le groupe est en mode Forum / Topics ;
-- choisit une image de test ;
-- crée 3, 5, 8 ou 10 Topics en une seule action ;
-- publie dans chaque Topic l'image + un texte de démonstration différent.
+Dans un sujet Forum, plusieurs publications racines peuvent exister. Les commentaires sont rattachés en remontant `reply_to_msg_id` jusqu'à la racine. `reply_to_top_id` sert surtout à identifier le thread/topic Telegram.
 
-Le token du bot n'est jamais enregistré par la page.
-Le `chat_id` du groupe peut être mémorisé dans le `localStorage` de Safari.
+Le lecteur affiche :
+- `msg X` : message courant ;
+- `reply→Y` : parent immédiat ;
+- `topic Z` : sujet Telegram ;
+- `file→R` : racine calculée de la discussion.
 
-## Configuration Telegram
+Le générateur crée aussi des messages additionnels qui alternent : réponse directe à la racine / réponse au commentaire précédent. Cela permet de tester la remontée d'ancêtres.
 
-### 1. Activer les Topics dans le groupe
+## Préparation MTProto
 
-Dans le groupe Telegram de test :
+Sur `my.telegram.org` → API development tools, créer une application et récupérer `api_id` et `api_hash`.
 
-- ouvrir les informations / réglages du groupe ;
-- activer **Topics / Sujets / Forum**.
+Le prototype charge GramJS depuis `esm.sh`, pour éviter un build. Une version durable devra embarquer la dépendance dans le repo.
 
-Le groupe devient alors un supergroupe Forum.
+## Sécurité
 
-### 2. Donner les droits au bot
+La StringSession utilisateur est sensible. Le bouton de sauvegarde la met en `localStorage` uniquement pour ce prototype. Ne jamais publier `api_hash`, session ou token dans Git.
 
-Ajouter le bot comme **administrateur** avec au minimum le droit :
+## Test conseillé
 
-- **Manage Topics / Gérer les sujets**.
-
-Le bot doit aussi pouvoir envoyer des messages dans le groupe.
-
-### 3. Rendre le groupe détectable
-
-Envoyer dans le groupe :
-
-`/test@NomDuBot`
-
-Puis, dans Mamina :
-
-- **Tester le bot**
-- **Détecter les groupes récents**
-- sélectionner le groupe
-- **Vérifier Forum**
-- mémoriser le groupe si souhaité.
-
-## Test familial
-
-1. Choisir une image quelconque.
-2. Laisser `5` Topics pour le premier essai.
-3. Appuyer sur **Créer les Topics + publier**.
-4. Ouvrir Telegram avec les membres de la famille.
-5. Tester :
-   - navigation dans les Topics ;
-   - réactions sur les photos ;
-   - réponses dans chaque Topic ;
-   - notifications ;
-   - retour à la liste des Topics.
+1. Créer 1 à 3 sujets de test.
+2. Ajouter 4 messages additionnels dans l'un d'eux.
+3. Se connecter via MTProto.
+4. Utiliser le même groupe.
+5. Lire les 20 derniers messages.
+6. Vérifier que les commentaires aboutissent à la même valeur `file→...` que leur publication racine.
 
 ## GitHub Pages
 
 Déployer `index.html` et `.nojekyll` à la racine de `main`.
-
-Settings → Pages → Deploy from a branch → `main` → `/(root)`.
-
-## Suite prévue
-
-Après validation du test familial :
-
-1. upload du PDF Famileo ;
-2. extraction des ~28 publications ;
-3. écran de prévisualisation/correction ;
-4. création automatique des ~28 Topics ;
-5. envoi de chaque image + texte dans son Topic.
