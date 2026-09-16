@@ -1,39 +1,77 @@
-# mamina
+# Mamina — V2 Topics Telegram
 
-Prototype minimal : envoyer une image et une légende dans un groupe Telegram depuis Safari/iPhone, sans backend.
+Prototype statique pour tester l'usage familial avant l'import PDF.
 
-## Déploiement GitHub Pages
+## Ce que fait cette version
 
-1. Déposer à la racine de la branche `main` : `index.html`, `.nojekyll`, `README.md`.
-2. GitHub → **Settings** → **Pages**.
-3. **Build and deployment** → **Deploy from a branch**.
-4. Branch : **main** ; folder : **/(root)**.
-5. Sauvegarder.
+- vérifie le token du bot ;
+- détecte le groupe Telegram ;
+- vérifie que le groupe est en mode Forum / Topics ;
+- choisit une image de test ;
+- crée 3, 5, 8 ou 10 Topics en une seule action ;
+- publie dans chaque Topic l'image + un texte de démonstration différent.
 
-L’URL sera normalement de la forme :
-
-`https://<username>.github.io/mamina/`
+Le token du bot n'est jamais enregistré par la page.
+Le `chat_id` du groupe peut être mémorisé dans le `localStorage` de Safari.
 
 ## Configuration Telegram
 
-1. Créer un bot avec `@BotFather` via `/newbot`.
-2. Ajouter le bot au groupe Telegram privé de test.
-3. Envoyer dans le groupe `/test@NomDuBot`.
-4. Ouvrir la page Mamina.
-5. Saisir le token puis **Tester le token**.
-6. **Détecter les groupes récents**.
-7. Sélectionner / mémoriser le groupe.
-8. Choisir une image, saisir une légende puis envoyer.
+### 1. Activer les Topics dans le groupe
 
-## Token
+Dans le groupe Telegram de test :
 
-Le token n’est jamais enregistré par la page. Pour iOS Passwords / Safari AutoFill, créer une entrée liée au domaine GitHub Pages :
+- ouvrir les informations / réglages du groupe ;
+- activer **Topics / Sujets / Forum**.
 
-- utilisateur : `telegram-bot`
-- mot de passe : le token BotFather
+Le groupe devient alors un supergroupe Forum.
 
-Le `chat_id` peut être conservé dans `localStorage`.
+### 2. Donner les droits au bot
 
-## Étape suivante
+Ajouter le bot comme **administrateur** avec au minimum le droit :
 
-Une fois ce test validé : activation du mode Forum, création automatique de topics, puis traitement du PDF Famileo.
+- **Manage Topics / Gérer les sujets**.
+
+Le bot doit aussi pouvoir envoyer des messages dans le groupe.
+
+### 3. Rendre le groupe détectable
+
+Envoyer dans le groupe :
+
+`/test@NomDuBot`
+
+Puis, dans Mamina :
+
+- **Tester le bot**
+- **Détecter les groupes récents**
+- sélectionner le groupe
+- **Vérifier Forum**
+- mémoriser le groupe si souhaité.
+
+## Test familial
+
+1. Choisir une image quelconque.
+2. Laisser `5` Topics pour le premier essai.
+3. Appuyer sur **Créer les Topics + publier**.
+4. Ouvrir Telegram avec les membres de la famille.
+5. Tester :
+   - navigation dans les Topics ;
+   - réactions sur les photos ;
+   - réponses dans chaque Topic ;
+   - notifications ;
+   - retour à la liste des Topics.
+
+## GitHub Pages
+
+Déployer `index.html` et `.nojekyll` à la racine de `main`.
+
+Settings → Pages → Deploy from a branch → `main` → `/(root)`.
+
+## Suite prévue
+
+Après validation du test familial :
+
+1. upload du PDF Famileo ;
+2. extraction des ~28 publications ;
+3. écran de prévisualisation/correction ;
+4. création automatique des ~28 Topics ;
+5. envoi de chaque image + texte dans son Topic.

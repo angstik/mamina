@@ -4,248 +4,271 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
-  <title>Mamina — test Telegram</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Mamina — Telegram Topics</title>
   <style>
     :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    body { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; line-height: 1.4; }
-    h1 { font-size: 1.55rem; }
-    fieldset { border: 1px solid #9995; border-radius: 12px; padding: 16px; margin: 16px 0; }
-    legend { font-weight: 700; padding: 0 6px; }
-    label { display:block; font-weight:600; margin:12px 0 6px; }
-    input, textarea, select, button {
-      box-sizing:border-box; width:100%; font:inherit; border-radius:10px; padding:12px;
-    }
-    input, textarea, select { border:1px solid #9998; background:transparent; }
-    textarea { min-height:110px; resize:vertical; }
-    button { border:0; font-weight:700; margin-top:12px; cursor:pointer; background:#168acd; color:white; }
+    body { max-width: 760px; margin: 0 auto; padding: 22px 15px 50px; line-height: 1.4; }
+    h1 { font-size: 1.55rem; margin:.2rem 0; }
+    h2 { font-size:1.08rem; }
+    fieldset { border:1px solid #8885; border-radius:14px; padding:15px; margin:16px 0; }
+    legend { font-weight:700; padding:0 6px; }
+    label { display:block; font-weight:600; margin:11px 0 5px; }
+    input,textarea,select,button { width:100%; box-sizing:border-box; font:inherit; padding:11px; border-radius:10px; }
+    input,textarea,select { border:1px solid #8888; background:transparent; }
+    textarea { min-height:85px; resize:vertical; }
+    button { border:0; margin-top:10px; font-weight:700; background:#168acd; color:#fff; }
     button.secondary { background:#666; }
-    button:disabled { opacity:.5; cursor:default; }
-    .status { white-space:pre-wrap; padding:12px; border-radius:10px; background:#8882; min-height:24px; }
+    button.danger { background:#8d3535; }
+    button:disabled { opacity:.5; }
+    .hint { opacity:.72; font-size:.9rem; }
+    .status { white-space:pre-wrap; padding:11px; border-radius:10px; background:#8882; margin-top:10px; }
     .ok { color:#188038; }
     .err { color:#c62828; }
-    .hint { font-size:.9rem; opacity:.75; }
-    img { max-width:100%; max-height:280px; display:none; border-radius:10px; margin-top:10px; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .post { border:1px solid #8885; border-radius:12px; padding:12px; margin:10px 0; }
+    img { max-width:100%; max-height:240px; display:none; border-radius:10px; margin-top:10px; }
+    progress { width:100%; margin-top:10px; }
+    code { overflow-wrap:anywhere; }
   </style>
 </head>
 <body>
   <h1>Mamina → Telegram</h1>
-  <p>Cette page n'enregistre jamais le token Telegram. Le <code>chat_id</code> sélectionné peut être conservé localement sur cet appareil.</p>
+  <p class="hint">V2 de test familial : création automatique de Topics + publication image/texte.</p>
 
   <fieldset>
-    <legend>1. Bot Telegram</legend>
-
-    <!-- Le couple username/password aide Password AutoFill sur iOS/Safari. -->
-    <form id="credentials" autocomplete="on" onsubmit="return false;">
+    <legend>1. Bot</legend>
+    <form autocomplete="on" onsubmit="return false;">
       <label for="username">Identifiant</label>
-      <input id="username" name="username" type="text"
-             autocomplete="username" value="telegram-bot">
-
+      <input id="username" name="username" autocomplete="username" value="telegram-bot">
       <label for="token">Token du bot</label>
-      <input id="token" name="password" type="password"
-             autocomplete="current-password"
-             autocapitalize="none" spellcheck="false"
-             placeholder="123456789:AA...">
+      <input id="token" name="password" type="password" autocomplete="current-password"
+             autocapitalize="none" spellcheck="false" placeholder="123456789:AA...">
     </form>
-
-    <button id="testBot">Tester le token</button>
+    <button id="testBot">Tester le bot</button>
     <div id="botStatus" class="status">Pas encore testé.</div>
   </fieldset>
 
   <fieldset>
-    <legend>2. Groupe Telegram</legend>
+    <legend>2. Groupe Forum</legend>
     <p class="hint">
-      Ajoute le bot au groupe, puis envoie dans ce groupe une commande destinée au bot,
-      par exemple <code>/test</code> ou <code>/test@NomDuBot</code>. Ensuite touche « Détecter ».
+      Le groupe doit avoir les Topics activés. Le bot doit être administrateur avec le droit
+      « Gérer les sujets / Manage Topics ». Envoie ensuite <code>/test@NomDuBot</code> dans le groupe.
     </p>
-
     <button id="detectChats">Détecter les groupes récents</button>
 
     <label for="chat">Groupe cible</label>
-    <select id="chat">
-      <option value="">— aucun groupe détecté —</option>
-    </select>
+    <select id="chat"><option value="">— aucun groupe —</option></select>
 
-    <button id="saveChat" class="secondary">Mémoriser ce groupe sur l’iPhone</button>
+    <div class="row">
+      <button id="saveChat" class="secondary">Mémoriser</button>
+      <button id="checkForum" class="secondary">Vérifier Forum</button>
+    </div>
     <div id="chatStatus" class="status">Aucun groupe sélectionné.</div>
   </fieldset>
 
   <fieldset>
-    <legend>3. Publication test</legend>
-
-    <label for="photo">Image</label>
+    <legend>3. Contenu de démonstration</legend>
+    <label for="photo">Image utilisée pour les sujets de test</label>
     <input id="photo" type="file" accept="image/*">
     <img id="preview" alt="Aperçu">
 
-    <label for="caption">Texte associé</label>
-    <textarea id="caption">Test Gazette : une image et son texte associé.</textarea>
+    <label for="count">Nombre de Topics à créer</label>
+    <select id="count">
+      <option>3</option>
+      <option selected>5</option>
+      <option>8</option>
+      <option>10</option>
+    </select>
 
-    <button id="send">Envoyer dans Telegram</button>
-    <div id="sendStatus" class="status">Prêt.</div>
+    <label for="prefix">Préfixe des titres</label>
+    <input id="prefix" value="TEST FAMILLE">
+
+    <p class="hint">
+      La même image est utilisée pour tous les sujets, avec des titres et textes différents.
+      Le but est uniquement de tester l'usage familial avant le traitement PDF.
+    </p>
+  </fieldset>
+
+  <fieldset>
+    <legend>4. Publier le lot</legend>
+    <button id="publishBatch">Créer les Topics + publier</button>
+    <progress id="progress" value="0" max="1" style="display:none"></progress>
+    <div id="batchStatus" class="status">Prêt.</div>
+    <div id="results"></div>
   </fieldset>
 
 <script>
 const $ = id => document.getElementById(id);
-const TOKEN_KEY = null; // volontairement : jamais stocké
-const CHAT_KEY = 'telegram_gazette_chat_id';
-const CHAT_TITLE_KEY = 'telegram_gazette_chat_title';
+const CHAT_KEY = 'mamina_chat_id';
+const CHAT_TITLE_KEY = 'mamina_chat_title';
 
-function token() {
-  return $('token').value.trim();
-}
+const token = () => $('token').value.trim();
 
-function api(method) {
+function endpoint(method) {
   const t = token();
   if (!t) throw new Error("Token manquant.");
   return `https://api.telegram.org/bot${encodeURIComponent(t)}/${method}`;
 }
-
-async function jsonCall(method, options = {}) {
-  const r = await fetch(api(method), options);
+function show(el,msg,ok=null){
+  el.textContent=msg;
+  el.className='status'+(ok===true?' ok':ok===false?' err':'');
+}
+async function tg(method, options={}) {
+  let r;
+  try { r = await fetch(endpoint(method), options); }
+  catch(e) { throw new Error(`Échec réseau : ${e.message}`); }
   let data;
   try { data = await r.json(); }
   catch { throw new Error(`Réponse HTTP ${r.status} non JSON.`); }
-  if (!r.ok || !data.ok) {
-    throw new Error(data.description || `Erreur Telegram HTTP ${r.status}`);
-  }
+  if (!r.ok || !data.ok) throw new Error(data.description || `Erreur Telegram HTTP ${r.status}`);
   return data.result;
 }
-
-function show(el, msg, ok = null) {
-  el.textContent = msg;
-  el.className = 'status' + (ok === true ? ' ok' : ok === false ? ' err' : '');
+async function postForm(method, params) {
+  const body = new URLSearchParams();
+  for (const [k,v] of Object.entries(params)) body.append(k,String(v));
+  return tg(method, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body});
 }
 
-$('testBot').addEventListener('click', async () => {
-  show($('botStatus'), 'Test en cours…');
+$('testBot').onclick = async () => {
+  show($('botStatus'),'Test en cours…');
   try {
-    const me = await jsonCall('getMe');
-    show($('botStatus'), `OK — @${me.username} (${me.first_name || 'bot'})`, true);
-  } catch (e) {
-    show($('botStatus'), e.message, false);
-  }
-});
+    const me=await tg('getMe');
+    show($('botStatus'),`OK — @${me.username}\nBot ID : ${me.id}`,true);
+  } catch(e){ show($('botStatus'),e.message,false); }
+};
 
-$('detectChats').addEventListener('click', async () => {
-  show($('chatStatus'), 'Lecture des mises à jour récentes…');
+$('detectChats').onclick = async () => {
+  show($('chatStatus'),'Lecture des mises à jour…');
   try {
-    const updates = await jsonCall('getUpdates?limit=100&timeout=0');
-    const chats = new Map();
-
-    for (const u of updates) {
-      const msg = u.message || u.edited_message || u.channel_post || u.edited_channel_post;
-      if (!msg || !msg.chat) continue;
-      const c = msg.chat;
-      if (c.type === 'group' || c.type === 'supergroup') {
-        chats.set(String(c.id), {
-          id: String(c.id),
-          title: c.title || String(c.id),
-          type: c.type
-        });
-      }
+    const updates=await tg('getUpdates?limit=100&timeout=0');
+    const chats=new Map();
+    for(const u of updates){
+      const m=u.message||u.edited_message||u.channel_post||u.edited_channel_post;
+      if(!m?.chat) continue;
+      const c=m.chat;
+      if(c.type==='group'||c.type==='supergroup') chats.set(String(c.id),c);
     }
-
-    $('chat').innerHTML = '';
-    if (!chats.size) {
-      $('chat').innerHTML = '<option value="">— aucun groupe trouvé —</option>';
-      show(
-        $('chatStatus'),
-        "Aucun groupe trouvé. Dans Telegram, envoie /test au bot dans le groupe puis retouche « Détecter ».",
-        false
-      );
+    $('chat').innerHTML='';
+    if(!chats.size){
+      $('chat').innerHTML='<option value="">— aucun groupe trouvé —</option>';
+      show($('chatStatus'),'Aucun groupe trouvé. Envoie /test@NomDuBot dans le groupe puis recommence.',false);
       return;
     }
-
-    for (const c of chats.values()) {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = `${c.title} (${c.id})`;
-      $('chat').appendChild(opt);
+    for(const [id,c] of chats){
+      const o=document.createElement('option');
+      o.value=id; o.textContent=`${c.title||id} (${id})`;
+      $('chat').appendChild(o);
     }
+    const saved=localStorage.getItem(CHAT_KEY);
+    if(saved && [...$('chat').options].some(o=>o.value===saved)) $('chat').value=saved;
+    show($('chatStatus'),`${chats.size} groupe(s) trouvé(s).`,true);
+  } catch(e){ show($('chatStatus'),e.message,false); }
+};
 
-    const saved = localStorage.getItem(CHAT_KEY);
-    if (saved && [...$('chat').options].some(o => o.value === saved)) {
-      $('chat').value = saved;
+$('saveChat').onclick = () => {
+  const o=$('chat').selectedOptions[0];
+  if(!o?.value) return show($('chatStatus'),'Choisis un groupe.',false);
+  localStorage.setItem(CHAT_KEY,o.value);
+  localStorage.setItem(CHAT_TITLE_KEY,o.textContent);
+  show($('chatStatus'),`Mémorisé : ${o.textContent}`,true);
+};
+
+$('checkForum').onclick = async () => {
+  const id=$('chat').value||localStorage.getItem(CHAT_KEY);
+  if(!id) return show($('chatStatus'),'Aucun groupe cible.',false);
+  show($('chatStatus'),'Vérification…');
+  try {
+    const c=await postForm('getChat',{chat_id:id});
+    if(c.is_forum){
+      show($('chatStatus'),`OK — "${c.title}" est un Forum Telegram.`,true);
+    } else {
+      show($('chatStatus'),`"${c.title}" n'est pas encore en mode Forum / Topics.`,false);
     }
+  } catch(e){ show($('chatStatus'),e.message,false); }
+};
 
-    show($('chatStatus'), `${chats.size} groupe(s) trouvé(s).`, true);
-  } catch (e) {
-    show($('chatStatus'), e.message, false);
-  }
-});
+$('photo').onchange = () => {
+  const f=$('photo').files[0];
+  if(!f){ $('preview').style.display='none'; return; }
+  $('preview').src=URL.createObjectURL(f);
+  $('preview').style.display='block';
+};
 
-$('saveChat').addEventListener('click', () => {
-  const opt = $('chat').selectedOptions[0];
-  if (!opt || !opt.value) {
-    show($('chatStatus'), 'Sélectionne d’abord un groupe.', false);
-    return;
-  }
-  localStorage.setItem(CHAT_KEY, opt.value);
-  localStorage.setItem(CHAT_TITLE_KEY, opt.textContent);
-  show($('chatStatus'), `Groupe mémorisé : ${opt.textContent}`, true);
-});
+async function createTopic(chatId,name){
+  return postForm('createForumTopic',{chat_id:chatId,name});
+}
 
-$('photo').addEventListener('change', () => {
-  const f = $('photo').files[0];
-  if (!f) {
-    $('preview').style.display = 'none';
-    return;
-  }
-  const url = URL.createObjectURL(f);
-  $('preview').src = url;
-  $('preview').style.display = 'block';
-});
+async function sendPhoto(chatId,threadId,file,caption){
+  const fd=new FormData();
+  fd.append('chat_id',chatId);
+  fd.append('message_thread_id',threadId);
+  fd.append('photo',file,file.name||'photo.jpg');
+  fd.append('caption',caption);
+  return tg('sendPhoto',{method:'POST',body:fd});
+}
 
-$('send').addEventListener('click', async () => {
-  const chatId = $('chat').value || localStorage.getItem(CHAT_KEY);
-  const file = $('photo').files[0];
-  const caption = $('caption').value;
+$('publishBatch').onclick = async () => {
+  const chatId=$('chat').value||localStorage.getItem(CHAT_KEY);
+  const file=$('photo').files[0];
+  const count=parseInt($('count').value,10);
+  const prefix=$('prefix').value.trim()||'TEST FAMILLE';
 
-  if (!chatId) {
-    show($('sendStatus'), 'Aucun groupe cible.', false);
-    return;
-  }
-  if (!file) {
-    show($('sendStatus'), 'Choisis une image.', false);
-    return;
-  }
+  if(!chatId) return show($('batchStatus'),'Aucun groupe cible.',false);
+  if(!file) return show($('batchStatus'),'Choisis une image.',false);
 
-  show($('sendStatus'), 'Envoi en cours…');
-  $('send').disabled = true;
+  $('publishBatch').disabled=true;
+  $('results').innerHTML='';
+  $('progress').style.display='block';
+  $('progress').max=count*2; $('progress').value=0;
+
+  const stamp=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const demoTexts=[
+    "Première publication de démonstration. Répondez dans ce sujet et ajoutez une réaction.",
+    "Deuxième publication : testez une réponse, puis revenez à la liste des sujets.",
+    "Troisième publication : essayez une réaction ❤️ ou 👍 sur la photo.",
+    "Quatrième publication : test de navigation entre plusieurs discussions familiales.",
+    "Cinquième publication : ajoutez plusieurs réponses pour simuler une vraie conversation.",
+    "Publication supplémentaire pour tester un lot plus important.",
+    "Encore un sujet de démonstration.",
+    "Test de discussion familiale.",
+    "Test de réaction et réponse.",
+    "Dernier sujet du lot de démonstration."
+  ];
 
   try {
-    const fd = new FormData();
-    fd.append('chat_id', chatId);
-    fd.append('photo', file, file.name || 'photo.jpg');
-    fd.append('caption', caption);
+    for(let i=0;i<count;i++){
+      const n=i+1;
+      show($('batchStatus'),`Création ${n}/${count}…`);
+      const topic=await createTopic(chatId,`${prefix} ${n} · ${stamp}`);
+      $('progress').value++;
 
-    const result = await jsonCall('sendPhoto', {
-      method: 'POST',
-      body: fd
-    });
+      show($('batchStatus'),`Publication ${n}/${count}…`);
+      const caption=`${demoTexts[i]||demoTexts[5]}\n\n#MAMINA_TEST_${n}`;
+      const msg=await sendPhoto(chatId,topic.message_thread_id,file,caption);
+      $('progress').value++;
 
-    show(
-      $('sendStatus'),
-      `Envoyé ✓\nmessage_id : ${result.message_id}\nchat_id : ${result.chat.id}`,
-      true
-    );
-  } catch (e) {
-    show($('sendStatus'), e.message, false);
+      const d=document.createElement('div');
+      d.className='post';
+      d.textContent=`✓ Sujet ${n} — thread ${topic.message_thread_id} — message ${msg.message_id}`;
+      $('results').appendChild(d);
+    }
+    show($('batchStatus'),`${count} Topics créés et ${count} publications envoyées ✓\nLe groupe est prêt pour le test familial.`,true);
+  } catch(e){
+    show($('batchStatus'),`Arrêt : ${e.message}\n\nLes sujets déjà créés restent dans Telegram.`,false);
   } finally {
-    $('send').disabled = false;
+    $('publishBatch').disabled=false;
   }
-});
+};
 
-// Recharge le groupe mémorisé même avant getUpdates.
 (() => {
-  const id = localStorage.getItem(CHAT_KEY);
-  const title = localStorage.getItem(CHAT_TITLE_KEY);
-  if (id) {
-    const opt = document.createElement('option');
-    opt.value = id;
-    opt.textContent = title || id;
-    $('chat').appendChild(opt);
-    $('chat').value = id;
-    show($('chatStatus'), `Groupe mémorisé : ${opt.textContent}`, true);
+  const id=localStorage.getItem(CHAT_KEY);
+  const title=localStorage.getItem(CHAT_TITLE_KEY);
+  if(id){
+    const o=document.createElement('option');
+    o.value=id; o.textContent=title||id;
+    $('chat').appendChild(o); $('chat').value=id;
+    show($('chatStatus'),`Groupe mémorisé : ${o.textContent}`,true);
   }
 })();
 </script>
