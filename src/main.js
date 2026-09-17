@@ -6,6 +6,8 @@ const $ = (id) => document.getElementById(id)
 let tg = null
 let currentApiId = null
 let currentApiHash = null
+let loadedDialogs = []
+let selectedDialog = null
 
 function status(id, text, ok = null) {
   const el = $(id)
@@ -132,13 +134,14 @@ $('listDialogs').addEventListener('click', async () => {
 
     const out = $('dialogs')
     out.innerHTML = ''
+    loadedDialogs = []
+    selectedDialog = null
 
-    const dialogs = []
     for await (const dialog of client.iterDialogs({ limit: 100 })) {
-      dialogs.push(dialog)
+      loadedDialogs.push(dialog)
     }
 
-    if (!dialogs.length) {
+    if (!loadedDialogs.length) {
       out.innerHTML = '<p>Aucun dialog trouvé.</p>'
       status('readStatus', 'Aucun dialog trouvé.', false)
       return
@@ -147,10 +150,11 @@ $('listDialogs').addEventListener('click', async () => {
     const table = document.createElement('div')
     table.className = 'thread'
 
-    for (const d of dialogs) {
+    loadedDialogs.forEach((d, index) => {
       const peer = d.peer
       const card = document.createElement('div')
       card.className = 'message'
+
       const id = peerIdValue(peer)
       const title = peerDisplayName(peer) || '(sans titre)'
       const kind = peerKind(peer)
@@ -163,25 +167,46 @@ $('listDialogs').addEventListener('click', async () => {
           ${username ? `<span>${escapeHtml(username)}</span>` : ''}
         </div>
         <div class="author">${escapeHtml(title)}</div>
+        <button type="button" class="pick-dialog" data-index="${index}">
+          Sélectionner ce dialog
+        </button>
       `
       table.appendChild(card)
-    }
+    })
 
     out.appendChild(table)
-    status('readStatus', `${dialogs.length} dialog(s) listé(s).`, true)
 
-    debug(dialogs.map((d) => ({
-      id: peerIdValue(d.peer),
-      title: peerDisplayName(d.peer),
-      kind: peerKind(d.peer),
-      username: d.peer?.username || null,
-    })))
+    out.querySelectorAll('.pick-dialog').forEach((button) => {
+      button.addEventListener('click', () => {
+        const index = Number(button.dataset.index)
+        selectedDialog = loadedDialogs[index]
+
+        const peer = selectedDialog.peer
+        const title = peerDisplayName(peer) || '(sans titre)'
+        const id = peerIdValue(peer)
+
+        $('chatId').value = id
+        status(
+          'readStatus',
+          `Dialog sélectionné : ${title}\nID affiché : ${id}\nLa lecture utilisera directement l’objet peer déjà résolu.`,
+          true,
+        )
+
+        out.querySelectorAll('.pick-dialog').forEach((b) => {
+          b.textContent = 'Sélectionner ce dialog'
+        })
+        button.textContent = '✓ Dialog sélectionné'
+      })
+    })
+
+    status('readStatus', `${loadedDialogs.length} dialog(s) listé(s). Choisis le groupe à lire.`, true)
   } catch (e) {
     console.error(e)
     debug(e?.stack || e?.message || String(e))
     status('readStatus', `Erreur dialogs : ${e?.message || e}`, false)
   }
 })
+
 
 function msgText(m) {
   return m?.text ?? m?.caption ?? m?.message ?? ''
@@ -327,35 +352,28 @@ function escapeHtml(s) {
 $('read').addEventListener('click', async () => {
   try {
     const client = await ensureLogin()
-    const chatId = $('chatId').value.trim()
-    if (!chatId) throw new Error('ID du groupe manquant.')
 
-    status('readStatus', 'Lecture de l’historique…')
+    let resolvedPeer
 
-    // getHistory est l'API user prévue pour l'historique.
-    const history = await client.getHistory(chatId, { limit: 20 })
+    if (selectedDialog?.peer) {
+      resolvedPeer = selectedDialog.peer
+      status('readStatus', 'Lecture de l’historique du dialog sélectionné…')
+    } else {
+      throw new Error('Liste d’abord les dialogs puis sélectionne le groupe à lire.')
+    }
+
+    const history = await client.getHistory(resolvedPeer, { limit: 20 })
     const messages = Array.from(history)
 
     status('readStatus', `${messages.length} message(s) lus. Reconstruction des parents…`)
 
     const rows = await buildRows(client, messages)
-
     render(rows)
 
     status(
       'readStatus',
       `${messages.length} message(s) lus et ${new Set(rows.map((r) => r.rootId)).size} file(s) reconstruite(s).`,
       true,
-    )
-
-    debug(
-      rows.map((r) => ({
-        id: r.id,
-        parentId: r.parentId,
-        rootId: r.rootId,
-        topicId: r.topicId,
-        text: msgText(r.message).slice(0, 80),
-      })),
     )
   } catch (e) {
     console.error(e)

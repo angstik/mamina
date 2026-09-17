@@ -84,3 +84,10 @@ Elle affiche pour chaque dialog :
 - username éventuel.
 
 Le but est de vérifier exactement quel ID mtcute associe au groupe familial avant d'appeler `findDialogs()` / `getHistory()`.
+
+
+## Correctif lecture par dialog sélectionné
+
+La lecture n'utilise plus l'ID texte. Elle conserve directement `dialog.peer` obtenu par `iterDialogs()`
+et le passe à `getHistory()`. Cela évite la résolution ambiguë de l'ID en username et réutilise
+l'`inputPeer/access_hash` déjà connu de mtcute.
