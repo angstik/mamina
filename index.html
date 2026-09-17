@@ -2,65 +2,62 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="color-scheme" content="light dark" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>Mamina — mtcute test</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <title>Mamina</title>
 </head>
 <body>
-  <main>
-    <h1>Mamina — lecture Telegram</h1>
-    <p class="lead">
-      Prototype minimal mtcute : connexion utilisateur, session IndexedDB, lecture des 20 derniers messages
-      et identification du parent/racine de chaque discussion.
-    </p>
+<main>
+  <h1>Mamina</h1>
+  <p>Test Telegram : connexion, publication et synchronisation.</p>
 
-    <section>
-      <h2>1. Application Telegram</h2>
+  <section>
+    <h2>1. Connexion</h2>
+    <button id="connect">Se connecter</button>
+    <button id="logout" class="secondary">Déconnecter cette session</button>
+    <pre id="loginStatus" class="status">Non connecté.</pre>
+  </section>
 
-      <label for="apiId">api_id</label>
-      <input id="apiId" inputmode="numeric" autocomplete="off" placeholder="12345678" />
+  <section>
+    <h2>2. Dialog</h2>
+    <button id="loadDialogs">Charger les dialogs</button>
+    <label for="dialogSelect">Conversation</label>
+    <select id="dialogSelect"><option value="">— charger les dialogs —</option></select>
+    <pre id="dialogStatus" class="status">Aucun dialog sélectionné.</pre>
+  </section>
 
-      <label for="apiHash">api_hash</label>
-      <input id="apiHash" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" />
+  <section>
+    <h2>3. Publier</h2>
+    <label for="photo">Photo</label>
+    <input id="photo" type="file" accept="image/*" />
+    <img id="preview" alt="Aperçu">
+    <label for="text">Texte</label>
+    <textarea id="text" placeholder="Texte facultatif si une photo est choisie."></textarea>
+    <button id="send">Publier</button>
+    <div id="uploadWrap" hidden>
+      <progress id="uploadProgress" max="100" value="0"></progress>
+      <span id="uploadText"></span>
+    </div>
+    <pre id="sendStatus" class="status">Prêt.</pre>
+  </section>
 
-      <button id="connect">Connexion Telegram</button>
-      <button id="logout" class="secondary">Déconnecter cette session</button>
+  <section>
+    <div class="section-head">
+      <h2>4. Synchroniser</h2>
+      <button id="sync">Synchroniser</button>
+    </div>
+    <p class="hint">Premier appui : 50 derniers messages. Ensuite : uniquement les nouveaux.</p>
+    <pre id="syncStatus" class="status">Pas encore synchronisé.</pre>
+    <div id="messages"></div>
+  </section>
 
-      <pre id="loginStatus" class="status">Non connecté.</pre>
-    </section>
-
-    <section>
-      <h2>2. Groupe à lire</h2>
-
-      <label for="chatId">ID Telegram du groupe (informatif)</label>
-      <input id="chatId" inputmode="text" autocomplete="off" placeholder="-1001234567890" />
-      <p class="small">L’ID peut être celui du supergroupe (<code>-100…</code>). La PWA le résout d’abord via les dialogs pour récupérer l’access hash.</p>
-
-      <button id="listDialogs" class="secondary">Lister les dialogs visibles</button>
-      <p class="small"><strong>Recommandé :</strong> sélectionne directement le groupe dans la liste. La lecture réutilise alors le peer Telegram déjà résolu avec son access hash.</p>
-      <button id="read">Lire les 20 derniers messages</button>
-      <pre id="readStatus" class="status">Prêt.</pre>
-      <div id="dialogs"></div>
-    </section>
-
-    <section>
-      <h2>3. Discussions reconstruites</h2>
-      <p class="small">
-        <strong>parent</strong> = message auquel Telegram répond directement.
-        <strong>racine</strong> = publication obtenue en remontant les parents.
-        Le prototype charge aussi un parent manquant hors de la fenêtre des 20 messages.
-      </p>
-
-      <div id="threads"></div>
-    </section>
-
-    <details>
-      <summary>Diagnostic</summary>
-      <pre id="debug" class="status"></pre>
-    </details>
-  </main>
-
-  <script type="module" src="/src/main.js"></script>
+  <details>
+    <summary>Diagnostic</summary>
+    <pre id="debug" class="status"></pre>
+  </details>
+</main>
+<script type="module" src="/src/main.js"></script>
 </body>
 </html>
