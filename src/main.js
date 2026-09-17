@@ -1,134 +1,41 @@
-import { TelegramClient, InputMedia } from '@mtcute/web'
-import { TELEGRAM_CONFIG } from './config.js'
+import {TelegramClient,InputMedia} from '@mtcute/web'
+import {TELEGRAM_CONFIG} from './config.js'
 import './style.css'
-
-const $ = id => document.getElementById(id)
-const STORAGE_NAME='mamina-telegram-user'
-const LAST_DIALOG_KEY='mamina:last-dialog'
-const CURSOR_PREFIX='mamina:cursor:'
-let tg=null, dialogs=[], selectedDialog=null
-
-function status(id,text,ok=null){const el=$(id);el.textContent=text;el.className='status'+(ok===true?' ok':ok===false?' error':'')}
-function debug(v){$('debug').textContent += ($('debug').textContent?'\n':'') + (typeof v==='string'?v:JSON.stringify(v,(k,x)=>typeof x==='bigint'?x.toString():x,2))}
-function peerId(peer){const v=peer?.id;return typeof v==='bigint'?v.toString():v&&typeof v==='object'&&'value'in v?String(v.value):String(v??'')}
-function peerName(peer){return peer?.displayName||peer?.title||peer?.username||peer?.firstName||'(sans nom)'}
-function senderName(m){const s=m?.sender;return s?.displayName||s?.username||s?.firstName||'—'}
-function createClient(){if(!tg)tg=new TelegramClient({apiId:TELEGRAM_CONFIG.apiId,apiHash:TELEGRAM_CONFIG.apiHash,storage:STORAGE_NAME,logLevel:2});return tg}
-
-async function ensureLogin(){
-  const c=createClient(); status('loginStatus','Connexion à Telegram…')
-  const self=await c.start({
-    phone:async()=>{const v=prompt('Numéro Telegram (+33…)');if(!v)throw new Error('Connexion annulée.');return v.trim()},
-    code:async()=>{const v=prompt('Code reçu dans Telegram');if(!v)throw new Error('Code annulé.');return v.trim()},
-    password:async()=>{const v=prompt('Mot de passe Telegram 2FA');if(v===null)throw new Error('Connexion annulée.');return v}
-  })
-  status('loginStatus',`Connecté : ${self.displayName||''}${self.username?` (@${self.username})`:''}\nSession dans IndexedDB.`,true)
-  return c
-}
-
-$('connect').onclick=async()=>{try{await ensureLogin()}catch(e){debug(e?.stack||e?.message||String(e));status('loginStatus',`Erreur : ${e?.message||e}`,false)}}
-$('logout').onclick=async()=>{try{await createClient().logOut();tg=null;dialogs=[];selectedDialog=null;$('dialogSelect').innerHTML='<option value="">— charger les dialogs —</option>';status('loginStatus','Session révoquée.',true)}catch(e){status('loginStatus',`Erreur : ${e?.message||e}`,false)}}
-
-$('loadDialogs').onclick=async()=>{
-  try{
-    const c=await ensureLogin(); status('dialogStatus','Chargement des dialogs…'); dialogs=[]
-    for await(const d of c.iterDialogs({limit:200})) dialogs.push(d)
-    const select=$('dialogSelect'); select.innerHTML='<option value="">— choisir un dialog —</option>'
-    const lastId=localStorage.getItem(LAST_DIALOG_KEY)
-    dialogs.forEach((d,i)=>{const o=document.createElement('option');const id=peerId(d.peer);o.value=String(i);o.textContent=`${peerName(d.peer)} · ${id}`;if(lastId&&id===lastId)o.selected=true;select.appendChild(o)})
-    if(select.value!==''){selectedDialog=dialogs[Number(select.value)];status('dialogStatus',`Sélectionné : ${peerName(selectedDialog.peer)}`,true);renderStoredCursor()}
-    else{selectedDialog=null;status('dialogStatus',`${dialogs.length} dialog(s) disponibles.`,true)}
-  }catch(e){debug(e?.stack||e?.message||String(e));status('dialogStatus',`Erreur : ${e?.message||e}`,false)}
-}
-
-$('dialogSelect').onchange=()=>{
-  const v=$('dialogSelect').value
-  if(v===''){selectedDialog=null;status('dialogStatus','Aucun dialog sélectionné.');return}
-  selectedDialog=dialogs[Number(v)]
-  const id=peerId(selectedDialog.peer);localStorage.setItem(LAST_DIALOG_KEY,id)
-  status('dialogStatus',`Sélectionné : ${peerName(selectedDialog.peer)}\nID : ${id}`,true)
-  renderStoredCursor()
-}
-
-$('photo').onchange=()=>{
-  const f=$('photo').files?.[0]
-  if(!f){$('preview').style.display='none';return}
-  $('preview').src=URL.createObjectURL(f);$('preview').style.display='block'
-}
-
-function requireDialog(){if(!selectedDialog?.peer)throw new Error('Choisis d’abord un dialog.');return selectedDialog.peer}
-
-$('send').onclick=async()=>{
-  const btn=$('send')
-  try{
-    const c=await ensureLogin(), peer=requireDialog(), text=$('text').value.trim(), file=$('photo').files?.[0]||null
-    if(!text&&!file)throw new Error('Ajoute un texte et/ou une photo.')
-    btn.disabled=true;status('sendStatus','Publication…')
-    let sent
-    if(file){
-      $('uploadWrap').hidden=false;$('uploadProgress').value=0;$('uploadText').textContent='0 %'
-      sent=await c.sendMedia(peer,InputMedia.photo(file),{
-        caption:text||undefined,
-        progressCallback:(u,t)=>{const p=t?Math.round(u/t*100):0;$('uploadProgress').value=p;$('uploadText').textContent=`${p} %`}
-      })
-    }else sent=await c.sendText(peer,text)
-    status('sendStatus',`Publié ✓ — message #${sent.id}`,true)
-    $('text').value='';$('photo').value='';$('preview').style.display='none';$('uploadWrap').hidden=true
-  }catch(e){debug(e?.stack||e?.message||String(e));status('sendStatus',`Erreur : ${e?.message||e}`,false)}
-  finally{btn.disabled=false}
-}
-
-function cursorKey(){return CURSOR_PREFIX+peerId(requireDialog())}
-function getCursor(){const v=localStorage.getItem(cursorKey());return v?Number(v):0}
-function setCursor(id){localStorage.setItem(cursorKey(),String(id))}
-function renderStoredCursor(){const c=getCursor();status('syncStatus',c?`Dernier message synchronisé : #${c}`:'Aucune synchronisation précédente pour ce dialog.')}
-function messageText(m){return m?.text||m?.caption||m?.message||''}
-function hasMedia(m){return Boolean(m?.media||m?.photo||m?.document||m?.video||m?.animation)}
-
-async function parentInfo(c,m){
-  try{
-    const p=await c.getReplyTo(m)
-    if(!p)return null
-    return {id:Number(p.id),author:senderName(p),text:messageText(p).slice(0,120)}
-  }catch(e){debug(`getReplyTo(${m.id}) : ${e?.message||e}`);return null}
-}
-
-function formatDate(v){if(!v)return'';const d=v instanceof Date?v:new Date(v);if(Number.isNaN(d.getTime()))return'';return new Intl.DateTimeFormat('fr-FR',{dateStyle:'short',timeStyle:'short'}).format(d)}
-function esc(v){return String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;")}
-
-function renderMessages(items){
-  const c=$('messages');c.innerHTML=''
-  if(!items.length){c.innerHTML='<p class="hint">Aucun nouveau message.</p>';return}
-  for(const item of items){
-    const m=item.message,b=document.createElement('article');b.className='message'
-    const parent=item.parent?`<div class="reply-preview">↳ réponse à #${item.parent.id} · ${esc(item.parent.author)}${item.parent.text?`<br>${esc(item.parent.text)}`:''}</div>`:''
-    b.innerHTML=`<div class="message-meta"><span class="message-author">${esc(senderName(m))}</span><span class="badge">#${Number(m.id)}</span>${m.date?`<span>${esc(formatDate(m.date))}</span>`:''}</div>${parent}${messageText(m)?`<div class="message-text">${esc(messageText(m))}</div>`:''}${hasMedia(m)?'<div class="media-note">📎 média</div>':''}`
-    c.appendChild(b)
-  }
-}
-
-$('sync').onclick=async()=>{
-  const btn=$('sync')
-  try{
-    const c=await ensureLogin(),peer=requireDialog(),prev=getCursor(),messages=[]
-    btn.disabled=true
-    if(!prev){
-      status('syncStatus','Première synchronisation : lecture des 50 derniers messages…')
-      messages.push(...Array.from(await c.getHistory(peer,{limit:50})))
-    }else{
-      status('syncStatus',`Synchronisation après #${prev}…`)
-      for await(const m of c.iterHistory(peer,{minId:prev,limit:Infinity})) if(Number(m.id)>prev) messages.push(m)
-    }
-    messages.sort((a,b)=>Number(a.id)-Number(b.id))
-    const items=[];for(const m of messages)items.push({message:m,parent:await parentInfo(c,m)})
-    renderMessages(items)
-    if(messages.length){const max=Math.max(...messages.map(m=>Number(m.id)));setCursor(max);status('syncStatus',`${messages.length} message(s) synchronisé(s). Nouveau curseur : #${max}`,true)}
-    else status('syncStatus',`Aucun nouveau message depuis #${prev}.`,true)
-  }catch(e){debug(e?.stack||e?.message||String(e));status('syncStatus',`Erreur : ${e?.message||e}`,false)}
-  finally{btn.disabled=false}
-}
-
-window.addEventListener('load',()=>{
-  if(TELEGRAM_CONFIG.apiId===12345678||TELEGRAM_CONFIG.apiHash==='0123456789abcdef0123456789abcdef')
-    status('loginStatus','Configuration Telegram factice : remplace src/config.js avant le test.',false)
-})
+const $=id=>document.getElementById(id)
+const LAST='mamina:last-dialog',CUR='mamina:cursor:',DB='mamina-cache',STORE='messages'
+let tg=null,dialogs=[],selectedDialog=null,currentUser=null,replyTargetId=null,uploadLimitBytes=null
+const status=(id,t,ok=null)=>{const e=$(id);e.textContent=t;e.className='status'+(ok===true?' ok':ok===false?' error':'')}
+const debug=v=>$('debug').textContent+=($('debug').textContent?'\n':'')+(typeof v==='string'?v:JSON.stringify(v,(k,x)=>typeof x==='bigint'?x.toString():x,2))
+const peerId=p=>String(typeof p?.id==='bigint'?p.id:p?.id?.value??p?.id??'')
+const peerName=p=>p?.displayName||p?.title||p?.username||p?.firstName||'(sans nom)'
+const senderName=m=>m?.sender?.displayName||m?.sender?.username||m?.sender?.firstName||'—'
+function client(){if(!tg)tg=new TelegramClient({apiId:TELEGRAM_CONFIG.apiId,apiHash:TELEGRAM_CONFIG.apiHash,storage:'mamina-telegram-user',logLevel:2});return tg}
+async function login(){const c=client();currentUser=await c.start({phone:async()=>prompt('Numéro Telegram (+33…)')||'',code:async()=>prompt('Code reçu')||'',password:async()=>prompt('Mot de passe 2FA')||''});status('loginStatus',`Connecté : ${currentUser.displayName||''}`,true);await loadLimit(c);return c}
+async function loadLimit(c){try{let cfg=null;if(c.appConfig&&typeof c.appConfig.get==='function'){cfg={upload_max_fileparts_default:await c.appConfig.get('upload_max_fileparts_default'),upload_max_fileparts_premium:await c.appConfig.get('upload_max_fileparts_premium')}}if(!cfg?.upload_max_fileparts_default)cfg=decode(await c.call({_: 'help.getAppConfig',hash:0}));const n=Number(cfg?.upload_max_fileparts_default||0),p=Number(cfg?.upload_max_fileparts_premium||0),parts=(currentUser?.premium&&p)||n;uploadLimitBytes=parts?parts*524288:null;status('limitStatus',uploadLimitBytes?`Limite détectée : ${fmt(uploadLimitBytes)} (${currentUser?.premium?'Premium':'standard'})`:'Limite non déterminée.',!!uploadLimitBytes)}catch(e){debug(e.message);status('limitStatus','Limite non déterminée.',false)}}
+function decode(v){if(v==null||typeof v!=='object')return v;if(Array.isArray(v))return v.map(decode);const t=String(v._||'').toLowerCase();if(t.includes('jsonnull'))return null;if(t.includes('jsonbool')||t.includes('jsonnumber')||t.includes('jsonstring'))return v.value;if(t.includes('jsonarray'))return (v.value||[]).map(decode);if(t.includes('jsonobject')){const o={};for(const x of v.value||[])o[x.key]=decode(x.value);return o}for(const k in v){const d=decode(v[k]);if(d&&typeof d==='object'&&('upload_max_fileparts_default'in d||'upload_max_fileparts_premium'in d))return d}return v}
+$('connect').onclick=async()=>{try{await login()}catch(e){status('loginStatus','Erreur : '+e.message,false)}}
+$('logout').onclick=async()=>{try{await client().logOut();tg=null;status('loginStatus','Session révoquée.',true)}catch(e){status('loginStatus','Erreur : '+e.message,false)}}
+$('loadDialogs').onclick=async()=>{try{const c=await login();dialogs=[];for await(const d of c.iterDialogs({limit:200}))dialogs.push(d);const s=$('dialogSelect');s.innerHTML='<option value="">— choisir —</option>';const last=localStorage.getItem(LAST);dialogs.forEach((d,i)=>{const o=document.createElement('option');o.value=i;o.textContent=`${peerName(d.peer)} · ${peerId(d.peer)}`;if(last===peerId(d.peer))o.selected=true;s.appendChild(o)});if(s.value!==''){selectedDialog=dialogs[+s.value];await selected()}status('dialogStatus',`${dialogs.length} dialog(s)`,true)}catch(e){status('dialogStatus','Erreur : '+e.message,false)}}
+$('dialogSelect').onchange=async()=>{selectedDialog=$('dialogSelect').value===''?null:dialogs[+$('dialogSelect').value];if(selectedDialog)await selected()}
+async function selected(){localStorage.setItem(LAST,peerId(selectedDialog.peer));status('dialogStatus',`Sélectionné : ${peerName(selectedDialog.peer)}`,true);$('topicSelect').innerHTML='<option value="">— discussion générale —</option>';renderCursor();await renderCache()}
+function reqPeer(){if(!selectedDialog?.peer)throw new Error('Choisis un dialog.');return selectedDialog.peer}
+$('createTopic').onclick=async()=>{try{const title=$('topicTitle').value.trim();if(!title)throw new Error('Titre manquant.');const m=await (await login()).createForumTopic({chatId:reqPeer(),title});const tid=Number(m?.replyToMessage?.threadId||m?.threadId||m?.id);const o=document.createElement('option');o.value=tid;o.textContent=`${title} · ${tid}`;$('topicSelect').appendChild(o);$('topicSelect').value=tid;status('topicStatus',`Sujet créé : ${title}`,true);$('topicTitle').value=''}catch(e){status('topicStatus','Erreur : '+e.message,false)}}
+$('file').onchange=()=>{const f=$('file').files?.[0];$('preview').style.display='none';$('fileInfo').textContent='';if(!f)return;$('fileInfo').textContent=`${f.name} · ${fmt(f.size)} · ${f.type||'type inconnu'}`;if(f.type.startsWith('image/')){$('preview').src=URL.createObjectURL(f);$('preview').style.display='block'}if(uploadLimitBytes&&f.size>uploadLimitBytes)status('sendStatus',`Trop volumineux : ${fmt(f.size)} > ${fmt(uploadLimitBytes)}`,false)}
+function fmt(b){const u=['o','Ko','Mo','Go','To'];let n=+b,i=0;while(n>=1024&&i<u.length-1){n/=1024;i++}return `${n.toLocaleString('fr-FR',{maximumFractionDigits:i?1:0})} ${u[i]}`}
+const threadId=()=>$('topicSelect').value?+$('topicSelect').value:undefined
+function clearReply(){replyTargetId=null;$('replyBox').hidden=true}
+$('cancelReply').onclick=clearReply
+$('send').onclick=async()=>{const btn=$('send');try{const c=await login(),peer=reqPeer(),text=$('text').value.trim(),file=$('file').files?.[0];if(!text&&!file)throw new Error('Ajoute texte et/ou fichier.');if(file&&uploadLimitBytes&&file.size>uploadLimitBytes)throw new Error('Fichier trop volumineux.');btn.disabled=true;const common={threadId:threadId(),replyTo:replyTargetId||undefined};let sent;if(file){$('uploadWrap').hidden=false;const media=file.type.startsWith('image/')?InputMedia.photo(file):{type:'document',file,fileName:file.name,fileMime:file.type||'application/octet-stream',fileSize:file.size};sent=await c.sendMedia(peer,media,{...common,caption:text||undefined,progressCallback:(u,t)=>{const p=t?Math.round(u/t*100):0;$('uploadProgress').value=p;$('uploadText').textContent=p+' %'}})}else sent=await c.sendText(peer,text,common);status('sendStatus',`Publié ✓ #${sent.id}`,true);$('text').value='';$('file').value='';$('preview').style.display='none';$('fileInfo').textContent='';$('uploadWrap').hidden=true;clearReply()}catch(e){status('sendStatus','Erreur : '+e.message,false)}finally{btn.disabled=false}}
+const ckey=()=>CUR+peerId(reqPeer()),cursor=()=>+(localStorage.getItem(ckey())||0),setCursor=x=>localStorage.setItem(ckey(),x),renderCursor=()=>status('syncStatus',cursor()?`Dernier message synchronisé : #${cursor()}`:'Aucune synchronisation précédente.')
+const textOf=m=>m?.text||m?.caption||m?.message||'',hasMedia=m=>!!(m?.media||m?.photo||m?.document||m?.video||m?.animation)
+async function parentInfo(c,m){try{const p=await c.getReplyTo(m);return p?{id:+p.id,author:senderName(p),text:textOf(p).slice(0,160)}:null}catch{return null}}
+function openDb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(STORE)){const s=db.createObjectStore(STORE,{keyPath:'key'});s.createIndex('dialogId','dialogId')}};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function put(x){const db=await openDb();await new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(x);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});db.close()}
+async function rows(id){const db=await openDb();const a=await new Promise((res,rej)=>{const q=db.transaction(STORE).objectStore(STORE).index('dialogId').getAll(id);q.onsuccess=()=>res(q.result||[]);q.onerror=()=>rej(q.error)});db.close();return a.sort((a,b)=>a.id-b.id)}
+async function clearRows(id){const a=await rows(id),db=await openDb();await new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite'),s=tx.objectStore(STORE);for(const r of a)s.delete(r.key);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});db.close()}
+function serial(m,p){const d=peerId(reqPeer());return{key:`${d}:${+m.id}`,dialogId:d,id:+m.id,author:senderName(m),date:m.date?new Date(m.date).toISOString():null,text:textOf(m),hasMedia:hasMedia(m),parent:p,threadId:+(m.threadId||m.topicId||m.replyToMessage?.threadId||0)||null}}
+const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;")
+async function renderCache(){if(!selectedDialog)return;const a=await rows(peerId(reqPeer())),c=$('messages');c.innerHTML='';if(!a.length){c.innerHTML='<p class="hint">Cache vide.</p>';return}for(const x of a){const b=document.createElement('article');b.className='message';b.innerHTML=`<div class="message-meta"><b>${esc(x.author)}</b><span class="badge">#${x.id}</span>${x.threadId?`<span class="badge">topic ${x.threadId}</span>`:''}</div>${x.parent?`<div class="reply-preview">↳ réponse à #${x.parent.id} · ${esc(x.parent.author)}<br>${esc(x.parent.text||'')}</div>`:''}<div>${esc(x.text||'')}</div>${x.hasMedia?'<div>📎 média</div>':''}<div class="action-row"><button class="reply-action" data-id="${x.id}" data-p="${esc((x.text||'').slice(0,100))}">Répondre</button></div>`;c.appendChild(b)}c.querySelectorAll('.reply-action').forEach(btn=>btn.onclick=()=>{replyTargetId=+btn.dataset.id;$('replyId').textContent=replyTargetId;$('replyPreview').textContent=btn.dataset.p;$('replyBox').hidden=false;$('text').focus()})}
+$('sync').onclick=async()=>{const btn=$('sync');try{const c=await login(),peer=reqPeer(),prev=cursor(),msgs=[];btn.disabled=true;if(!prev)msgs.push(...Array.from(await c.getHistory(peer,{limit:50})));else for await(const m of c.iterHistory(peer,{minId:prev,limit:Infinity}))if(+m.id>prev)msgs.push(m);msgs.sort((a,b)=>+a.id-+b.id);for(const m of msgs)await put(serial(m,await parentInfo(c,m)));if(msgs.length)setCursor(Math.max(...msgs.map(m=>+m.id)));status('syncStatus',msgs.length?`${msgs.length} nouveau(x) message(s).`:`Aucun nouveau message depuis #${prev}.`,true);await renderCache()}catch(e){status('syncStatus','Erreur : '+e.message,false)}finally{btn.disabled=false}}
+$('clearCache').onclick=async()=>{try{await clearRows(peerId(reqPeer()));localStorage.removeItem(ckey());renderCursor();await renderCache()}catch(e){status('syncStatus','Erreur : '+e.message,false)}}
+window.addEventListener('load',()=>{if(TELEGRAM_CONFIG.apiId===12345678)status('loginStatus','Configuration factice : remplace src/config.js.',false)})

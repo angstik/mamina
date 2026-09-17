@@ -1,31 +1,25 @@
-# Mamina — prototype simple Telegram
+# Mamina — prototype complet
 
 Fonctions :
-- credentials Telegram App dans `src/config.js`
-- login utilisateur + session IndexedDB
-- liste des dialogs + dernier dialog mémorisé
-- publication texte seul, photo seule, photo + texte
-- progression d'upload
-- synchro incrémentale par `last_message_id` et par dialog
-- affichage simple des nouveaux messages
-- détection des réponses via `getReplyTo()` avec affichage du parent
+- config Telegram App dans `src/config.js`
+- session mtcute en IndexedDB
+- sélection du dialog
+- création d’un sujet mensuel
+- envoi texte, image ou PDF
+- limite d’upload lue dynamiquement depuis Telegram
+- publication dans le sujet sélectionné
+- réponse à un message synchronisé
+- synchronisation incrémentale
+- cache cumulatif IndexedDB par dialog
+- vidage du cache local
 
 ## Configuration
-
-Remplacer dans `src/config.js` :
-
-```js
-export const TELEGRAM_CONFIG = {
-  apiId: 12345678,
-  apiHash: '...',
-}
-```
+Remplacer `apiId` et `apiHash` dans `src/config.js`.
 
 ## Déploiement
+GitHub Pages → Source = GitHub Actions.
 
-GitHub → Settings → Pages → Source = GitHub Actions.
-
-## Limite volontaire du prototype
-
-La synchro suit les nouveaux messages. Elle ne détecte pas encore les éditions,
-suppressions ou changements de réactions sur d'anciens messages.
+## Notes
+La création de sujet demande le droit Telegram `manageTopics`.
+La limite d’upload est dérivée de `upload_max_fileparts_default/premium × 524288`.
+Les éditions/suppressions/réactions d’anciens messages ne sont pas encore resynchronisées.

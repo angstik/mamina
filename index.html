@@ -1,63 +1,19 @@
-<!doctype html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="color-scheme" content="light dark" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <link rel="manifest" href="./manifest.webmanifest" />
-  <title>Mamina</title>
-</head>
-<body>
-<main>
-  <h1>Mamina</h1>
-  <p>Test Telegram : connexion, publication et synchronisation.</p>
-
-  <section>
-    <h2>1. Connexion</h2>
-    <button id="connect">Se connecter</button>
-    <button id="logout" class="secondary">Déconnecter cette session</button>
-    <pre id="loginStatus" class="status">Non connecté.</pre>
-  </section>
-
-  <section>
-    <h2>2. Dialog</h2>
-    <button id="loadDialogs">Charger les dialogs</button>
-    <label for="dialogSelect">Conversation</label>
-    <select id="dialogSelect"><option value="">— charger les dialogs —</option></select>
-    <pre id="dialogStatus" class="status">Aucun dialog sélectionné.</pre>
-  </section>
-
-  <section>
-    <h2>3. Publier</h2>
-    <label for="photo">Photo</label>
-    <input id="photo" type="file" accept="image/*" />
-    <img id="preview" alt="Aperçu">
-    <label for="text">Texte</label>
-    <textarea id="text" placeholder="Texte facultatif si une photo est choisie."></textarea>
-    <button id="send">Publier</button>
-    <div id="uploadWrap" hidden>
-      <progress id="uploadProgress" max="100" value="0"></progress>
-      <span id="uploadText"></span>
-    </div>
-    <pre id="sendStatus" class="status">Prêt.</pre>
-  </section>
-
-  <section>
-    <div class="section-head">
-      <h2>4. Synchroniser</h2>
-      <button id="sync">Synchroniser</button>
-    </div>
-    <p class="hint">Premier appui : 50 derniers messages. Ensuite : uniquement les nouveaux.</p>
-    <pre id="syncStatus" class="status">Pas encore synchronisé.</pre>
-    <div id="messages"></div>
-  </section>
-
-  <details>
-    <summary>Diagnostic</summary>
-    <pre id="debug" class="status"></pre>
-  </details>
-</main>
-<script type="module" src="/src/main.js"></script>
-</body>
-</html>
+<!doctype html><html lang="fr"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark"><meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.webmanifest"><title>Mamina</title></head><body><main>
+<h1>Mamina</h1><p>Telegram familial — publication, sujets mensuels et synchronisation locale.</p>
+<section><h2>1. Connexion</h2><button id="connect">Se connecter</button><button id="logout" class="secondary">Déconnecter</button>
+<pre id="loginStatus" class="status">Non connecté.</pre><pre id="limitStatus" class="status">Limite d’upload inconnue.</pre></section>
+<section><h2>2. Groupe</h2><button id="loadDialogs">Charger les dialogs</button><label>Conversation</label>
+<select id="dialogSelect"><option value="">— charger les dialogs —</option></select><pre id="dialogStatus" class="status">Aucun dialog.</pre></section>
+<section><h2>3. Sujet mensuel</h2><label>Titre</label><input id="topicTitle" placeholder="Septembre 2026"><button id="createTopic">Créer le sujet</button>
+<label>Sujet d’envoi</label><select id="topicSelect"><option value="">— discussion générale —</option></select><pre id="topicStatus" class="status">Aucun sujet créé.</pre></section>
+<section><h2>4. Publier</h2><div id="replyBox" class="reply-box" hidden><strong>Réponse à #<span id="replyId"></span></strong><div id="replyPreview"></div><button id="cancelReply" class="secondary small-button">Annuler</button></div>
+<label>Image ou PDF</label><input id="file" type="file" accept="image/*,application/pdf"><img id="preview" alt="Aperçu"><div id="fileInfo" class="hint"></div>
+<label>Texte</label><textarea id="text"></textarea><button id="send">Publier</button>
+<div id="uploadWrap" hidden><progress id="uploadProgress" max="100" value="0"></progress><span id="uploadText"></span></div><pre id="sendStatus" class="status">Prêt.</pre></section>
+<section><div class="section-head"><h2>5. Synchroniser</h2><button id="sync">Synchroniser</button></div><p class="hint">Cache local cumulatif par dialog.</p>
+<pre id="syncStatus" class="status">Pas encore synchronisé.</pre><button id="clearCache" class="secondary">Vider le cache local</button><div id="messages"></div></section>
+<details><summary>Diagnostic</summary><pre id="debug" class="status"></pre></details>
+</main><script type="module" src="/src/main.js"></script></body></html>
