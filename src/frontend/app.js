@@ -16,14 +16,14 @@ $('loadDialogs').onclick=()=>run('telegramStatus',async()=>{
   s.innerHTML='<option value="">— groupe —</option>'
 
   const forums=document.createElement('optgroup')
-  forums.label='Groupes avec sujets'
+  forums.label='🧵 GROUPES AVEC SUJETS'
   const others=document.createElement('optgroup')
-  others.label='Autres dialogues'
+  others.label='— AUTRES DIALOGUES —'
 
   dialogs.forEach((d,i)=>{
     const o=document.createElement('option')
     o.value=i
-    o.textContent=(d.isForum?'🧵 ':'')+d.title
+    o.textContent=(d.isForum?'🧵 FORUM · ':'')+d.title
     ;(d.isForum?forums:others).appendChild(o)
   })
 
@@ -34,7 +34,58 @@ $('loadDialogs').onclick=()=>run('telegramStatus',async()=>{
 $('dialogs').onchange=async()=>{if($('dialogs').value==='')return;await service.selectDialog(dialogs[+$('dialogs').value]);$('topics').innerHTML='<option value="">— sujet —</option>';topics=[]}
 $('loadTopics').onclick=()=>run('topicStatus',async()=>{topics=await service.listTopics();const s=$('topics');s.innerHTML='<option value="">— sujet —</option>';topics.forEach((t,i)=>{const o=document.createElement('option');o.value=i;o.textContent=t.title||`Sujet ${t.id}`;s.appendChild(o)});status('topicStatus',`${topics.length} sujets chargés.`,true)})
 $('openTopic').onclick=()=>run('topicStatus',async()=>{if($('topics').value==='')throw new Error('Choisis un sujet.');await service.selectTopic(topics[+$('topics').value]);status('topicStatus','Téléchargement / parsing de la revue…');model=await service.loadMagazine();await renderModel();status('topicStatus','Revue chargée.',true)})
-$('createMagazine').onclick=()=>run('topicStatus',async()=>{const file=$('newPdf').files?.[0];if(!file)throw new Error('Choisis un PDF.');status('topicStatus','Analyse du PDF, création du sujet et upload…');const result=await service.createMagazineTopic(file);model={magazine:result.magazine,articles:result.articles.map(a=>({...a,comments:[],rootId:null,duplicateRootIds:[]}))};await renderModel();status('topicStatus',`Sujet créé. ${result.articles.length} articles détectés.`,true)})
+$('createMagazine').onclick=()=>run('topicStatus',async()=>{
+  const file=$('newPdf').files?.[0]
+  if(!file)throw new Error('Choisis un PDF.')
+  const trace=$('publishTrace')
+  trace.textContent=''
+  const stepLabels={
+    'magazine.validate':'Validation',
+    'magazine.pdf.read.start':'Lecture / analyse PDF…',
+    'magazine.pdf.read.done':'PDF analysé',
+    'magazine.topic.create.start':'Création du sujet Telegram…',
+    'magazine.topic.create.done':'Sujet Telegram créé',
+    'telegram.pdf.caption':'Construction des métadonnées PDF',
+    'telegram.pdf.prepareMedia':'Préparation du document Telegram',
+    'telegram.pdf.upload.start':'Upload Telegram…',
+    'telegram.pdf.upload.done':'Upload Telegram terminé',
+    'telegram.pdf.send.start':'Envoi du PDF dans le sujet…',
+    'telegram.pdf.send.done':'PDF envoyé dans le sujet',
+    'magazine.topic.resolve.start':'Résolution du sujet créé…',
+    'magazine.topic.resolve.done':'Sujet résolu',
+    'magazine.cachePdf.start':'Mise en cache locale du PDF…',
+    'magazine.cachePdf.done':'PDF mis en cache',
+    'magazine.done':'Création terminée',
+    'magazine.error':'ERREUR',
+  }
+  let lastProgress=-1
+  const onStep=(evt)=>{
+    if(evt.name==='telegram.pdf.upload.progress'){
+      const total=Number(evt.detail?.totalBytes||0),done=Number(evt.detail?.uploadedBytes||0)
+      const pct=total?Math.floor(done*100/total):0
+      if(pct===lastProgress)return
+      lastProgress=pct
+      status('topicStatus',`Upload PDF : ${pct} %`)
+      return
+    }
+    const label=stepLabels[evt.name]||evt.name
+    const detail=evt.detail&&Object.keys(evt.detail).length?' '+JSON.stringify(evt.detail):''
+    trace.textContent += `${new Date(evt.at).toLocaleTimeString()}  ${label}${detail}
+`
+    trace.scrollTop=trace.scrollHeight
+    if(evt.name==='magazine.error'&&evt.detail?.stack){
+      trace.textContent += `
+STACK COMPLET
+${evt.detail.stack}
+`
+    }
+  }
+  status('topicStatus','Démarrage…')
+  const result=await service.createMagazineTopic(file,{onStep})
+  model={magazine:result.magazine,articles:result.articles.map(a=>({...a,comments:[],rootId:null,duplicateRootIds:[]}))}
+  await renderModel()
+  status('topicStatus',`Sujet créé. ${result.articles.length} articles détectés.`,true)
+})
 $('sync').onclick=()=>run('topicStatus',async()=>{model=await service.refresh();await renderModel();status('topicStatus','Synchronisation terminée.',true)})
 
 async function renderModel(){

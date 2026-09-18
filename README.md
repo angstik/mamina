@@ -88,3 +88,11 @@ Le workflow est inclus.
 
 - Upload PDF navigateur : le `File` est converti en `Uint8Array` avant `InputMedia.document`, afin d'éviter le chemin `File.stream()` problématique sur certains Safari/iOS.
 - La liste des dialogs distingue maintenant les **Groupes avec sujets** (`peer.isForum`) des autres dialogues.
+
+## v1.2 — diagnostic publication PDF
+
+La publication admin est maintenant découpée en étapes explicitement tracées : analyse PDF, création du sujet, préparation du média, upload Telegram, envoi dans le sujet, résolution du sujet et cache local.
+
+L'upload et l'envoi sont séparés : `uploadMedia()` reçoit le `File` natif du navigateur, puis `sendMedia()` reçoit `uploaded.inputMedia`. Le front affiche le stack complet si une étape échoue.
+
+La liste des dialogs sépare visuellement les forums (`isForum`) des autres conversations.

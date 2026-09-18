@@ -24,18 +24,46 @@ export class MaminaService {
   async listTopics(){if(!this.dialog)throw new Error('Aucun groupe sélectionné.');return this.gateway.topics(this.dialog.peer)}
   async selectTopic(topic){this.topic=topic;this.pdf=null;await kv.set(`lastTopic:${idOfPeer(this.dialog.peer)}`,Number(topic.id))}
 
-  async createMagazineTopic(file){
-    if(!this.dialog)throw new Error('Aucun groupe sélectionné.')
-    const pdf=await FamileoPdf.load(file)
-    const m=pdf.magazine
-    const title=`${m.date?m.date.slice(0,7):'Revue'} — Famileo${m.issue?` N°${m.issue}`:''}`
-    const {topicId}=await this.gateway.createTopic(this.dialog.peer,title)
-    await this.gateway.postMagazinePdf(this.dialog.peer,topicId,file,m)
-    const topics=await this.listTopics()
-    this.topic=topics.find(t=>Number(t.id)===Number(topicId)) || {id:topicId,title}
-    this.pdf=pdf
-    await putFile(`pdf:${m.sha256}`,new Uint8Array(await file.arrayBuffer()))
-    return {topic:this.topic,magazine:m,articles:pdf.articles()}
+  async createMagazineTopic(file,{onStep,progressCallback}={}){
+    const step=(name,detail={})=>onStep?.({name,detail,at:new Date().toISOString()})
+    try{
+      step('magazine.validate')
+      if(!this.dialog)throw new Error('Aucun groupe sélectionné.')
+      if(!file)throw new Error('PDF manquant.')
+
+      step('magazine.pdf.read.start',{name:file.name,size:file.size,type:file.type})
+      const pdf=await FamileoPdf.load(file)
+      const m=pdf.magazine
+      const articles=pdf.articles()
+      step('magazine.pdf.read.done',{magazineId:m.magazineId,issue:m.issue,date:m.date,articles:articles.length})
+
+      const title=`${m.date?m.date.slice(0,7):'Revue'} — Famileo${m.issue?` N°${m.issue}`:''}`
+      step('magazine.topic.create.start',{title})
+      const {topicId}=await this.gateway.createTopic(this.dialog.peer,title)
+      step('magazine.topic.create.done',{topicId})
+
+      await this.gateway.postMagazinePdf(this.dialog.peer,topicId,file,m,{progressCallback,onStep})
+
+      step('magazine.topic.resolve.start',{topicId})
+      const topics=await this.listTopics()
+      this.topic=topics.find(t=>Number(t.id)===Number(topicId)) || {id:topicId,title}
+      step('magazine.topic.resolve.done',{found:Boolean(topics.find(t=>Number(t.id)===Number(topicId)))})
+
+      this.pdf=pdf
+      step('magazine.cachePdf.start')
+      await putFile(`pdf:${m.sha256}`,new Uint8Array(await file.arrayBuffer()))
+      step('magazine.cachePdf.done')
+
+      step('magazine.done',{topicId,articles:articles.length})
+      return {topic:this.topic,magazine:m,articles}
+    }catch(error){
+      onStep?.({
+        name:'magazine.error',
+        detail:{message:error?.message||String(error),stack:error?.stack||null},
+        at:new Date().toISOString(),
+      })
+      throw error
+    }
   }
 
   async syncTopic({full=false}={}){

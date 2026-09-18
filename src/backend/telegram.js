@@ -66,8 +66,11 @@ export class TelegramGateway {
     return out
   }
 
-  async postMagazinePdf(peer, topicId, file, meta, progressCallback) {
-    const caption = withMeta(`📄 ${meta.title || file.name}`, {
+  async postMagazinePdf(peer, topicId, file, meta, { progressCallback, onStep }={}) {
+    const step = (name, detail={}) => onStep?.({ name, detail, at: new Date().toISOString() })
+
+    step('telegram.pdf.caption')
+    const caption = withMeta(`📄 ${meta.title || file.name || 'Gazette Famileo'}`, {
       kind: 'pdf',
       magazineId: meta.magazineId,
       magazineKey: meta.magazineKey,
@@ -76,23 +79,53 @@ export class TelegramGateway {
       sha256: meta.sha256,
     })
 
-    // Safari/iOS: avoid relying on File.stream() in the upload pipeline.
-    // mtcute explicitly accepts Uint8Array as InputFileLike.
-    const bytes = file instanceof Uint8Array
-      ? file
-      : new Uint8Array(await file.arrayBuffer())
-
-    const media = InputMedia.document(bytes, {
-      fileName: file.name || 'gazette.pdf',
-      fileMime: file.type || 'application/pdf',
-      fileSize: bytes.byteLength,
+    // @mtcute/web 0.32.1 explicitly supports the browser File API as InputFileLike.
+    // Keep the native File object here instead of converting it ourselves.
+    step('telegram.pdf.prepareMedia', {
+      name: file?.name || null,
+      type: file?.type || null,
+      size: file?.size ?? null,
+      isFile: typeof File !== 'undefined' && file instanceof File,
+    })
+    const media = InputMedia.document(file, {
+      fileName: file?.name || 'gazette.pdf',
+      fileMime: file?.type || 'application/pdf',
+      fileSize: file?.size,
     })
 
-    return this.tg.sendMedia(peer, media, {
+    // Separate upload from sending on purpose. This gives us an exact failure
+    // boundary and avoids hiding an upload exception inside sendMedia().
+    step('telegram.pdf.upload.start', { topicId })
+    const uploaded = await this.tg.uploadMedia(media, {
+      peer,
+      progressCallback: (uploadedBytes, totalBytes) => {
+        progressCallback?.(uploadedBytes, totalBytes)
+        onStep?.({
+          name: 'telegram.pdf.upload.progress',
+          detail: { uploadedBytes, totalBytes },
+          at: new Date().toISOString(),
+        })
+      },
+    })
+    step('telegram.pdf.upload.done', {
+      mediaType: uploaded?.type || null,
+      fileName: uploaded?.fileName || null,
+      fileSize: uploaded?.fileSize ?? null,
+      hasInputMedia: Boolean(uploaded?.inputMedia),
+      hasFileId: Boolean(uploaded?.fileId),
+    })
+
+    if (!uploaded?.inputMedia) {
+      throw new Error('Upload Telegram terminé mais inputMedia est absent.')
+    }
+
+    step('telegram.pdf.send.start', { topicId })
+    const sent = await this.tg.sendMedia(peer, uploaded.inputMedia, {
       threadId: topicId,
       caption,
-      progressCallback,
     })
+    step('telegram.pdf.send.done', { messageId: Number(sent?.id || 0) || null })
+    return sent
   }
 
   async downloadMessageMedia(message, progressCallback) {
