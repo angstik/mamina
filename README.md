@@ -68,3 +68,12 @@ Vite est configuré en multi-page afin de générer `index.html`, `master.html` 
 - Ajout de `FamileoPdf.renderCover()`, requis par l'application utilisateur.
 - Diagnostic détaillé après analyse PDF : métadonnées, nombre d'articles, rendu et stockage de la couverture.
 - Les valeurs lancées `null`/`undefined` sont maintenant représentées explicitement dans les logs.
+
+
+## v0.3 — diagnostic PDF renforcé
+
+- instrumentation de chaque sous-étape de `FamileoPdf.load()`;
+- trace page par page;
+- erreurs `null` / non-`Error` PDF.js encapsulées dans une vraie `Error`;
+- chemin d'extraction texte Safari sans spread ni `for...of`;
+- suppression du doublon `renderCover()` introduit en v0.2.

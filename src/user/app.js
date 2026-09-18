@@ -17,7 +17,11 @@ const homeUrls=[]
 const readerUrls=[]
 
 function status(id,text,ok=null){const e=$(id);e.textContent=text;e.className='status'+(ok===true?' ok':ok===false?' error':'')}
-function debug(e){const text=e?.stack||e?.message||String(e);$('debug').textContent+=($('debug').textContent?'\n':'')+text;logError('ui',e?.message||String(e),e)}
+function debug(e){
+  const text=e?.stack||e?.message||(e===null?'Rejet null':e===undefined?'Rejet undefined':String(e))
+  $('debug').textContent+=($('debug').textContent?'\n':'')+text
+  logError('ui',text,e)
+}
 function esc(s){return String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')}
 function formatDate(iso){if(!iso)return'';const d=new Date(`${iso}T12:00:00`);return Number.isNaN(d.getTime())?iso:new Intl.DateTimeFormat('fr-FR',{day:'numeric',month:'long',year:'numeric'}).format(d)}
 function objectUrl(blob,bucket=readerUrls){const u=URL.createObjectURL(blob);bucket.push(u);return u}

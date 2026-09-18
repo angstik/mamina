@@ -177,7 +177,7 @@ export class UserMaminaService {
     info('sync.discover','Téléchargement PDF',{topicId:tid,messageId:pdfRow.id})
     const bytes=await this.gateway.downloadMessageMedia(rawPdf)
     info('sync.discover','Analyse PDF',{bytes:bytes?.byteLength||bytes?.length||0})
-    const pdf=await FamileoPdf.load(bytes)
+    const pdf=await FamileoPdf.load(bytes,{trace:(scope,message,detail)=>info(scope,message,detail)})
     info('sync.discover','PDF analysé',{
       magazineId:pdf.magazine?.magazineId||null,
       issue:pdf.magazine?.issue??null,
@@ -342,7 +342,7 @@ export class UserMaminaService {
     let rows
     if(magazine.fullyCached && bytes) {
       rows=await listMessagesByMagazine(magazineId)
-      const pdf=await FamileoPdf.load(bytes)
+      const pdf=await FamileoPdf.load(bytes,{trace:(scope,message,detail)=>info(scope,message,detail)})
       this.current={magazine,pdf,articles:pdf.articles(),rows}
     } else {
       const raw=await this.gateway.topicMessages(this.dialog.peer,magazine.topicId,{limit:Infinity})
@@ -350,7 +350,7 @@ export class UserMaminaService {
       const pdfIdx=models.findIndex(r=>r.meta?.kind==='pdf')
       if(pdfIdx<0) throw new Error('PDF introuvable dans le sujet.')
       bytes=await this.gateway.downloadMessageMedia(raw[pdfIdx])
-      const pdf=await FamileoPdf.load(bytes)
+      const pdf=await FamileoPdf.load(bytes,{trace:(scope,message,detail)=>info(scope,message,detail)})
       const articles=pdf.articles()
       const resolved=resolveRowsToArticles(models,articles)
       rows=[...resolved.byArticle.values()].flat()
