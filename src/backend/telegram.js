@@ -1,5 +1,6 @@
 import { TelegramClient, InputMedia } from '@mtcute/web'
 import { withMeta, parseMeta, canonicalRoots } from './protocol.js'
+import { info, warn, error as logError } from './log.js'
 
 export class TelegramGateway {
   constructor({ apiId, apiHash }) {
@@ -7,22 +8,58 @@ export class TelegramGateway {
       apiId,
       apiHash,
       storage: 'mamina-telegram-user',
-      logLevel: 2,
+      logLevel: Number(localStorage.getItem('MTCUTE_LOG_LEVEL') || 2),
       updates: { catchUp: true, messageGroupingInterval: 250 },
     })
     this.self = null
+    this.connectionState = 'offline'
+    this.connectionListeners = new Set()
+    this.tg.onConnectionState.add((state) => {
+      this.connectionState = state
+      info('telegram.connection', `État: ${state}`)
+      for (const fn of this.connectionListeners) { try { fn(state) } catch {} }
+    })
+    this.tg.onError.add((err) => logError('telegram', err?.message || 'Erreur mtcute', err))
   }
 
   async login() {
+    info('telegram.login','Démarrage / reprise de session')
     this.self = await this.tg.start({
       phone: async () => prompt('Numéro Telegram (+33…)') || '',
       code: async () => prompt('Code Telegram') || '',
       password: async () => prompt('Mot de passe 2FA') || '',
     })
+    info('telegram.login','Session prête',{user:this.self?.displayName||this.self?.username||null})
     return this.self
   }
 
   async logout() { await this.tg.logOut(); this.self = null }
+
+  onConnectionState(handler) {
+    this.connectionListeners.add(handler)
+    try { handler(this.connectionState) } catch {}
+    return () => this.connectionListeners.delete(handler)
+  }
+
+  isConnected() { return Boolean(this.tg?.isConnected) }
+
+  async ensureConnected(reason='manual') {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      warn('telegram.connection',`Réseau hors ligne (${reason})`)
+      throw new Error('Pas de connexion réseau.')
+    }
+    info('telegram.connection',`Contrôle connexion (${reason})`,{connected:Boolean(this.tg?.isConnected)})
+    try {
+      await this.tg.connect()
+      await this.tg.call({ _: 'help.getConfig' })
+      info('telegram.connection',`Connexion Telegram opérationnelle (${reason})`,{connected:Boolean(this.tg?.isConnected)})
+      return true
+    } catch (e) {
+      logError('telegram.connection',`Échec reconnexion (${reason})`,e)
+      throw e
+    }
+  }
+
 
   onNewMessage(handler) {
     const wrapped = (message) => {

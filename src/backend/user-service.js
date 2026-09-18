@@ -9,6 +9,7 @@ import {
   getReadState, putReadState, listReadStates,
   putAsset, getAsset, deleteAsset, pruneToMagazineIds,
 } from './user-storage.js'
+import { info, warn, error as logError } from './log.js'
 
 function idOfPeer(peer) { return String(typeof peer?.id === 'bigint' ? peer.id : peer?.id?.value ?? peer?.id ?? '') }
 function topicKey(peer, topicId) { return `${idOfPeer(peer)}:${Number(topicId)}` }
@@ -66,12 +67,14 @@ export class UserMaminaService {
     this.syncing=null
     this.updateUnsubscribe=null
     this.onChanged=null
+    this.onConnectionState=null
   }
 
   async unlock(password) {
     const blob=await loadEncryptedSecret()
     const creds=await decryptCredentials(blob,password)
     this.gateway=new TelegramGateway(creds)
+    this.gateway.onConnectionState(state=>this.onConnectionState?.(state))
   }
 
   async login() {
@@ -115,14 +118,19 @@ export class UserMaminaService {
 
   async syncAll() {
     if(!this.dialog) throw new Error('Aucun groupe sélectionné.')
+    info('sync','Synchronisation demandée',{group:this.dialogModel?.title||null})
     if(this.syncing) return this.syncing
-    this.syncing=this._syncAll().finally(()=>{this.syncing=null})
+    this.syncing=this._syncAll().then(result=>{info('sync','Synchronisation terminée',{magazines:result?.length||0});return result}).catch(e=>{logError('sync','Synchronisation échouée',e);throw e}).finally(()=>{this.syncing=null})
     return this.syncing
   }
 
   async _syncAll() {
     const peer=this.dialog.peer
-    const topics=(await this.gateway.topics(peer)).filter(isMagazineTopic).sort((a,b)=>topicIdOf(b)-topicIdOf(a))
+    info('sync','Lecture des sujets Telegram')
+    const allTopics=await this.gateway.topics(peer)
+    info('sync','Sujets reçus',{count:allTopics.length})
+    const topics=allTopics.filter(isMagazineTopic).sort((a,b)=>topicIdOf(b)-topicIdOf(a))
+    info('sync','Sujets Famileo détectés',{count:topics.length,titles:topics.slice(0,10).map(t=>t.title)})
     const cached=await listMagazines()
     const cachedByTopic=new Map(cached.map(m=>[m.topicKey,m]))
     let found=[]
@@ -132,6 +140,7 @@ export class UserMaminaService {
       const tid=topicIdOf(topic); if(!tid) continue
       const key=topicKey(peer,tid)
       let magazine=cachedByTopic.get(key)
+      info('sync.topic','Traitement sujet',{title:topic.title||'',topicId:tid,cached:Boolean(magazine)})
       if(!magazine) magazine=await this.discoverTopic(topic)
       else magazine=await this.syncKnownTopic(magazine)
       if(magazine) found.push(magazine)
@@ -156,15 +165,18 @@ export class UserMaminaService {
 
   async discoverTopic(topic) {
     const peer=this.dialog.peer, tid=topicIdOf(topic), key=topicKey(peer,tid)
+    info('sync.discover','Découverte du sujet',{title:topic.title||'',topicId:tid})
     const raw=await this.gateway.topicMessages(peer,tid,{limit:Infinity})
     const rows=raw.map(TelegramGateway.messageModel)
     const pdfIndex=rows.findIndex(r=>r.meta?.kind==='pdf')
-    if(pdfIndex<0) return null
+    if(pdfIndex<0){info('sync.discover','Pas de marqueur PDF Mamina',{topicId:tid});return null}
     const pdfRow=rows[pdfIndex]
     const rawPdf=raw[pdfIndex]
     if(!rawPdf?.media) return null
 
+    info('sync.discover','Téléchargement PDF',{topicId:tid,messageId:pdfRow.id})
     const bytes=await this.gateway.downloadMessageMedia(rawPdf)
+    info('sync.discover','Analyse PDF',{bytes:bytes?.byteLength||bytes?.length||0})
     const pdf=await FamileoPdf.load(bytes)
     if(pdfRow.meta?.sha256 && pdf.magazine.sha256!==pdfRow.meta.sha256) throw new Error(`Hash PDF incohérent pour ${topic.title||tid}.`)
     const articles=pdf.articles()
@@ -185,14 +197,16 @@ export class UserMaminaService {
     await putTopicState({topicKey:key,topicId:tid,cursor:record.lastMessageId,updatedAt:record.updatedAt})
     // Temporarily retain bytes so promotion to top-2 needs no second download.
     await putAsset(`staging-pdf:${record.magazineId}`,bytes)
+    info('sync.discover','Revue découverte',{magazineId:record.magazineId,articles:articles.length,reactions:comments.length})
     return record
   }
 
   async syncKnownTopic(magazine) {
     const peer=this.dialog.peer, state=await getTopicState(magazine.topicKey)
+    info('sync.known','Synchronisation revue connue',{magazineId:magazine.magazineId,topicId:magazine.topicId})
     const cursor=Number(state?.cursor||magazine.lastMessageId||0)
     const raw=await this.gateway.topicMessages(peer,magazine.topicId,{minId:cursor,limit:Infinity})
-    if(!raw.length) return magazine
+    if(!raw.length){info('sync.known','Aucun nouveau message',{magazineId:magazine.magazineId,cursor});return magazine}
     const rows=raw.map(TelegramGateway.messageModel).filter(r=>r.id>cursor)
     const messages=rows.filter(r=>r.meta?.kind==='message')
     let unreadAdd=0
@@ -371,6 +385,13 @@ export class UserMaminaService {
     if(this.current.magazine.fullyCached) await putAsset(assetKey,blob)
     return blob
   }
+
+  async ensureConnected(reason='app-resume') {
+    if(!this.gateway) throw new Error('Telegram non initialisé.')
+    return this.gateway.ensureConnected(reason)
+  }
+
+  connectionState() { return this.gateway?.connectionState || 'offline' }
 
   async getSettings() { return {reactionOrder:await settings.get('reactionOrder','asc'),recentColors:await settings.get('recentColors',[])} }
   async setReactionOrder(order) { if(!['asc','desc'].includes(order))throw new Error('Ordre invalide.');await settings.set('reactionOrder',order) }

@@ -52,3 +52,12 @@ Les types `img`, `icon`, etc. restent réservés pour les versions suivantes.
 
 Vite est configuré en multi-page afin de générer `index.html`, `master.html` et
 `secret-tool.html` dans `dist/`.
+
+## V0.1 — diagnostic et reprise de connexion
+
+- Erreurs de synchronisation affichées avec leur message réel.
+- Journaux techniques persistants dans Réglages, copiables/effaçables.
+- État réseau et état de connexion mtcute visibles.
+- Option de logs mtcute détaillés (niveau 4, appliquée au prochain démarrage).
+- Reprise de connexion + synchro au retour réseau, focus, pageshow et retour au premier plan.
+- Polling de sécurité 30 s uniquement lorsque la PWA est visible et en ligne.

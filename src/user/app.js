@@ -1,5 +1,6 @@
 import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
+import { logs, clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
 const $=id=>document.getElementById(id)
 const service=new UserMaminaService()
@@ -10,16 +11,55 @@ let reactionOrder='asc'
 let composerArticleKey=null
 let safetyTimer=null
 let readTimer=null
+let resumeTimer=null
+let lastResumeAt=0
 const homeUrls=[]
 const readerUrls=[]
 
 function status(id,text,ok=null){const e=$(id);e.textContent=text;e.className='status'+(ok===true?' ok':ok===false?' error':'')}
-function debug(e){$('debug').textContent+=($('debug').textContent?'\n':'')+(e?.stack||e?.message||String(e))}
+function debug(e){const text=e?.stack||e?.message||String(e);$('debug').textContent+=($('debug').textContent?'\n':'')+text;logError('ui',e?.message||String(e),e)}
 function esc(s){return String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')}
 function formatDate(iso){if(!iso)return'';const d=new Date(`${iso}T12:00:00`);return Number.isNaN(d.getTime())?iso:new Intl.DateTimeFormat('fr-FR',{day:'numeric',month:'long',year:'numeric'}).format(d)}
 function objectUrl(blob,bucket=readerUrls){const u=URL.createObjectURL(blob);bucket.push(u);return u}
 function freeHomeUrls(){while(homeUrls.length)URL.revokeObjectURL(homeUrls.pop())}
 function freeReaderUrls(){while(readerUrls.length)URL.revokeObjectURL(readerUrls.pop())}
+
+function renderTechLogs(){
+  const el=$('techLogs'); if(!el)return
+  el.textContent=formatLogs() || 'Aucun journal.'
+  el.scrollTop=el.scrollHeight
+}
+function updateNetworkUi(){
+  if($('networkState'))$('networkState').textContent=navigator.onLine?'En ligne':'Hors ligne'
+}
+function setConnectionUi(state){
+  const badge=$('connectionBadge'), label=$('telegramState')
+  const names={offline:'hors ligne',connecting:'connexion…',updating:'rattrapage…',connected:'connecté'}
+  const text=names[state]||state||'—'
+  if(badge){badge.textContent=`Telegram : ${text}`;badge.className=`connection-badge ${state||''}`}
+  if(label)label.textContent=text
+}
+function setLastSync(text){if($('lastSyncState'))$('lastSyncState').textContent=text}
+
+async function resumeConnection(reason){
+  if($('setup')?.hidden!==true)return
+  const now=Date.now()
+  if(now-lastResumeAt<2500)return
+  lastResumeAt=now
+  clearTimeout(resumeTimer)
+  resumeTimer=setTimeout(async()=>{
+    try{
+      info('lifecycle',`Reprise application: ${reason}`,{online:navigator.onLine,visibility:document.visibilityState})
+      $('syncStatus').textContent='Reconnexion Telegram…'
+      await service.ensureConnected(reason)
+      await refreshList(false)
+    }catch(e){
+      debug(e)
+      $('syncStatus').textContent=`Connexion impossible : ${e?.message||e}`
+      $('syncStatus').classList.add('sync-error')
+    }
+  },150)
+}
 
 function renderMarkup(text=''){
   let s=esc(text)
@@ -69,23 +109,44 @@ async function enterApp(){
   $('setup').hidden=true
   $('settingsPanel').hidden=false
   const cfg=await service.getSettings();reactionOrder=cfg.reactionOrder;$('reactionOrder').value=reactionOrder
+  service.onConnectionState=setConnectionUi
+  setConnectionUi(service.connectionState())
   service.onChanged=async()=>{await refreshList(false); if(currentModel){const id=currentModel.magazine.magazineId; currentModel=await service.openMagazine(id); await renderReader(true)}}
   await refreshList(true)
   clearInterval(safetyTimer)
-  safetyTimer=setInterval(()=>refreshList(false).catch(debug),30000)
+  safetyTimer=setInterval(()=>{if(document.visibilityState==='visible'&&navigator.onLine)refreshList(false).catch(debug)},30000)
+  updateNetworkUi();renderTechLogs()
 }
 
 async function refreshList(showStatus=true){
   try{
+    $('syncStatus').classList.remove('sync-error')
     if(showStatus)$('syncStatus').textContent='Synchronisation…'
+    info('ui.sync','Début synchronisation',{manual:showStatus})
     magazines=await service.syncAll()
     await renderMagazineList()
-    $('syncStatus').textContent=`À jour · ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`
-  }catch(e){debug(e);$('syncStatus').textContent='Erreur de synchronisation'}
+    const at=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})
+    $('syncStatus').textContent=`À jour · ${at}`
+    setLastSync(at)
+  }catch(e){debug(e);const msg=e?.message||String(e);$('syncStatus').textContent=`Erreur synchro : ${msg}`;$('syncStatus').classList.add('sync-error');setLastSync(`Erreur : ${msg}`);throw e}
 }
 $('syncNow').onclick=()=>refreshList(true)
 
 $('reactionOrder').onchange=async()=>{reactionOrder=$('reactionOrder').value;await service.setReactionOrder(reactionOrder);if(currentModel)await renderReader(true)}
+
+$('verboseLogs').checked=Number(localStorage.getItem('MTCUTE_LOG_LEVEL')||2)>=4
+$('verboseLogs').onchange=()=>{
+  localStorage.setItem('MTCUTE_LOG_LEVEL',$('verboseLogs').checked?'4':'2')
+  info('settings','Niveau de logs mtcute modifié',{level:$('verboseLogs').checked?4:2,restartRequired:true})
+  alert('Le niveau de logs mtcute sera appliqué au prochain démarrage de Mamina.')
+}
+$('copyLogs').onclick=async()=>{
+  try{await navigator.clipboard.writeText(formatLogs());$('copyLogs').textContent='Copié ✓';setTimeout(()=>$('copyLogs').textContent='Copier les logs',1200)}
+  catch(e){debug(e);alert('Copie impossible. Tu peux sélectionner le texte des logs manuellement.')}
+}
+$('clearLogs').onclick=()=>{clearTechLogs();renderTechLogs()}
+onLog(()=>renderTechLogs())
+updateNetworkUi();renderTechLogs()
 
 async function renderMagazineList(){
   const host=$('magazines');host.innerHTML='';freeHomeUrls()
@@ -233,4 +294,9 @@ $('sendText').onclick=async()=>{
   }catch(e){debug(e);status('sendStatus','Erreur : '+e.message,false)}finally{btn.disabled=false}
 }
 
-window.addEventListener('pagehide',()=>{clearInterval(safetyTimer);clearTimeout(readTimer);freeHomeUrls();freeReaderUrls()})
+window.addEventListener('online',()=>{updateNetworkUi();resumeConnection('online')})
+window.addEventListener('offline',()=>{updateNetworkUi();setConnectionUi('offline');$('syncStatus').textContent='Hors ligne — les données locales restent disponibles.'})
+window.addEventListener('focus',()=>resumeConnection('focus'))
+window.addEventListener('pageshow',()=>resumeConnection('pageshow'))
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumeConnection('visibilitychange')})
+window.addEventListener('pagehide',()=>{clearTimeout(readTimer);freeHomeUrls();freeReaderUrls();info('lifecycle','Application suspendue / pagehide')})

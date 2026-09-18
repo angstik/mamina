@@ -28,11 +28,23 @@
     </section>
 
     <section id="settingsPanel" class="panel compact" hidden>
+      <div class="settings-head"><strong>Réglages</strong><span id="connectionBadge" class="connection-badge">Telegram : —</span></div>
       <label for="reactionOrder">Ordre des réactions</label>
       <select id="reactionOrder">
         <option value="asc">Anciennes → récentes</option>
         <option value="desc">Récentes → anciennes</option>
       </select>
+      <details class="tech-settings">
+        <summary>Diagnostic et journaux techniques</summary>
+        <div class="diagnostic-grid">
+          <div><span>Réseau</span><strong id="networkState">—</strong></div>
+          <div><span>Telegram</span><strong id="telegramState">—</strong></div>
+          <div><span>Dernière synchro</span><strong id="lastSyncState">—</strong></div>
+        </div>
+        <label class="check-row"><input id="verboseLogs" type="checkbox"> Logs mtcute détaillés au prochain démarrage</label>
+        <div class="log-actions"><button id="copyLogs" type="button">Copier les logs</button><button id="clearLogs" type="button" class="secondary">Effacer</button></div>
+        <pre id="techLogs" class="tech-logs"></pre>
+      </details>
     </section>
 
     <section id="magazines" class="magazine-list"></section>
@@ -66,7 +78,7 @@
     </div>
   </div>
 
-  <details class="debug-box"><summary>Diagnostic</summary><pre id="debug"></pre></details>
+  <details class="debug-box"><summary>Diagnostic rapide</summary><pre id="debug"></pre></details>
   <script type="module" src="/src/user/app.js"></script>
 </body>
 </html>
