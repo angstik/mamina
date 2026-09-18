@@ -100,3 +100,14 @@ La liste des dialogs sépare visuellement les forums (`isForum`) des autres conv
 ## v1.3
 
 PDF.js utilise explicitement le build `legacy` et le worker `legacy`, pour compatibilité Safari/iOS.
+
+
+## v1.4 — correctif Safari getTextContent
+
+PDF.js 6.x appelle en interne `for await...of` dans `getTextContent()`.
+Certaines versions de Safari fournissent `ReadableStream.getReader()` mais pas
+l'itérateur asynchrone attendu. La v1.4 contourne ce bug en consommant
+`page.streamTextContent()` explicitement via `getReader()` et en reconstruisant
+le même objet `{items, styles, lang}`.
+
+Aucun changement Telegram dans cette version.

@@ -4,6 +4,32 @@ import { articleKey } from './protocol.js'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
 
+async function getTextContentCompat(page, params = {}) {
+  // Safari 26.x: PDF.js getTextContent() uses `for await...of` on the
+  // ReadableStream returned by streamTextContent(). Some Safari versions
+  // expose getReader() but not ReadableStream[Symbol.asyncIterator], which
+  // makes getTextContent() throw `undefined is not a function`.
+  // Consume the same stream through the reader API instead.
+  const stream = page.streamTextContent(params)
+  const reader = stream.getReader()
+  const textContent = { items: [], styles: Object.create(null), lang: null }
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      if (!value) continue
+      if (textContent.lang == null && value.lang != null) textContent.lang = value.lang
+      if (value.styles) Object.assign(textContent.styles, value.styles)
+      if (Array.isArray(value.items)) textContent.items.push(...value.items)
+    }
+  } finally {
+    reader.releaseLock?.()
+  }
+
+  return textContent
+}
+
 function slugify(s='') {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'gazette'
 }
@@ -43,7 +69,7 @@ export class FamileoPdf {
     const metadata = await doc.getMetadata().catch(()=>({info:{},metadata:null}))
     const title = metadata?.info?.Title || metadata?.metadata?.get?.('dc:title') || 'Gazette Famileo'
     const cover = await doc.getPage(1)
-    const coverTc = await cover.getTextContent()
+    const coverTc = await getTextContentCompat(cover)
     const coverText = coverTc.items.map(x=>x.str||'').join(' ')
     const issueMatch = coverText.match(/N[°º]\s*(\d+)/i)
     const issue = issueMatch ? Number(issueMatch[1]) : null
@@ -54,7 +80,7 @@ export class FamileoPdf {
     for(let pageNo=2;pageNo<doc.numPages;pageNo++){
       const page=await doc.getPage(pageNo)
       const viewport=page.getViewport({scale:1})
-      const tc=await page.getTextContent()
+      const tc=await getTextContentCompat(page)
       const slots=inferSlots(tc, viewport.height)
       const text=tc.items.map(x=>x.str||'').join(' ').trim()
       pagePlans.push({page:pageNo,slots,text})
