@@ -1,12 +1,72 @@
-<!doctype html><html lang="fr"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="color-scheme" content="light dark"><meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="manifest" href="./manifest.webmanifest"><title>Mamina</title></head><body>
-<main>
-<h1>Mamina — prototype fonctionnel</h1>
-<section><h2>1. Déverrouiller</h2><input id="password" type="password" placeholder="Mot de passe Mamina"><button id="unlock">Déverrouiller</button><pre id="unlockStatus"></pre></section>
-<section><h2>2. Telegram</h2><button id="login">Connexion Telegram</button><button id="loadDialogs">Charger les groupes</button><select id="dialogs"><option value="">— groupe —</option></select><pre id="telegramStatus"></pre></section>
-<section><h2>3. Revue</h2><button id="loadTopics">Charger les sujets</button><select id="topics"><option value="">— sujet —</option></select><button id="openTopic">Ouvrir la revue</button><hr><label>Admin : nouveau PDF Famileo</label><input id="newPdf" type="file" accept="application/pdf"><button id="createMagazine">Créer le sujet + publier le PDF</button><pre id="topicStatus"></pre><details open><summary>Diagnostic publication PDF</summary><pre id="publishTrace"></pre></details></section>
-<section><div class="row"><h2>4. Articles</h2><button id="sync">Synchroniser</button></div><div id="magazine"></div><div id="articles"></div></section>
-<details><summary>Diagnostic</summary><pre id="debug"></pre></details>
-</main><script type="module" src="/src/frontend/app.js"></script></body></html>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <title>Mamina</title>
+</head>
+<body>
+  <main id="home" class="home">
+    <header class="topbar">
+      <div><h1>Mamina</h1><div id="syncStatus" class="subtle">Non connecté</div></div>
+      <button id="syncNow" class="icon-button" title="Synchroniser">↻</button>
+    </header>
+
+    <section id="setup" class="panel">
+      <h2>Connexion</h2>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Mot de passe Mamina">
+      <button id="start">Démarrer</button>
+      <div id="setupStatus" class="status"></div>
+      <div id="groupChooser" hidden>
+        <label for="groupSelect">Groupe familial</label>
+        <select id="groupSelect"></select>
+        <button id="chooseGroup">Utiliser ce groupe</button>
+      </div>
+    </section>
+
+    <section id="settingsPanel" class="panel compact" hidden>
+      <label for="reactionOrder">Ordre des réactions</label>
+      <select id="reactionOrder">
+        <option value="asc">Anciennes → récentes</option>
+        <option value="desc">Récentes → anciennes</option>
+      </select>
+    </section>
+
+    <section id="magazines" class="magazine-list"></section>
+  </main>
+
+  <section id="reader" class="reader" hidden>
+    <header class="reader-bar">
+      <button id="back" class="icon-button">‹</button>
+      <div><strong id="readerTitle"></strong><div id="readerPage" class="subtle"></div></div>
+      <span></span>
+    </header>
+    <div id="articleDeck" class="article-deck"></div>
+  </section>
+
+  <div id="composerModal" class="composer-modal" hidden>
+    <div class="composer-sheet">
+      <div class="composer-title">Ajouter une réaction</div>
+      <textarea id="composerText" autofocus></textarea>
+      <div id="colorRow" class="color-row" hidden></div>
+      <div class="format-row">
+        <button id="colorButton" title="Couleur"><span class="color-swatch"></span></button>
+        <button data-wrap="**" title="Gras"><strong>B</strong></button>
+        <button data-wrap="__" title="Souligné"><u>U</u></button>
+        <button data-wrap="~~" title="Barré"><s>S</s></button>
+        <button id="clearText" title="Vider">Vider</button>
+        <button id="deleteText" title="Supprimer">⌫</button>
+        <button id="cancelComposer" title="Fermer">×</button>
+        <button id="sendText" class="send-button" title="Envoyer">➤</button>
+      </div>
+      <div id="sendStatus" class="status"></div>
+    </div>
+  </div>
+
+  <details class="debug-box"><summary>Diagnostic</summary><pre id="debug"></pre></details>
+  <script type="module" src="/src/user/app.js"></script>
+</body>
+</html>

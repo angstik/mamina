@@ -89,6 +89,16 @@ export class FamileoPdf {
     return new FamileoPdf(bytes,doc,magazine,pagePlans)
   }
 
+  async renderCover(scale=1.25) {
+    const page = await this.doc.getPage(1)
+    const viewport = page.getViewport({ scale })
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.ceil(viewport.width)
+    canvas.height = Math.ceil(viewport.height)
+    await page.render({ canvas, viewport }).promise
+    return canvas
+  }
+
   articles() {
     const out=[]
     for(const plan of this.pagePlans) for(const slot of plan.slots) out.push({

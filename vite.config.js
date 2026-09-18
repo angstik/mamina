@@ -1,9 +1,16 @@
 import { defineConfig } from 'vite'
-import { resolve, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
-const here = dirname(fileURLToPath(import.meta.url))
+import { resolve } from 'node:path'
+
 export default defineConfig({
   base: './',
   optimizeDeps: { exclude: ['@mtcute/wasm'] },
-  build: { rollupOptions: { input: { app: resolve(here,'index.html'), secretTool: resolve(here,'secret-tool.html') } } },
+  build: {
+    rollupOptions: {
+      input: {
+        user: resolve(process.cwd(), 'index.html'),
+        master: resolve(process.cwd(), 'master.html'),
+        secrets: resolve(process.cwd(), 'secret-tool.html'),
+      },
+    },
+  },
 })

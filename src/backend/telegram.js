@@ -8,6 +8,7 @@ export class TelegramGateway {
       apiHash,
       storage: 'mamina-telegram-user',
       logLevel: 2,
+      updates: { catchUp: true, messageGroupingInterval: 250 },
     })
     this.self = null
   }
@@ -22,6 +23,14 @@ export class TelegramGateway {
   }
 
   async logout() { await this.tg.logOut(); this.self = null }
+
+  onNewMessage(handler) {
+    const wrapped = (message) => {
+      try { handler(message) } catch (error) { console.error('Mamina update handler', error) }
+    }
+    this.tg.onNewMessage.add(wrapped)
+    return () => this.tg.onNewMessage.remove?.(wrapped)
+  }
 
   async dialogs(limit=200) {
     const out=[]
@@ -154,8 +163,8 @@ export class TelegramGateway {
     return { rootId:Number(found.canonical.message.id), duplicates:found.duplicates.map(x=>Number(x.message.id)), messages }
   }
 
-  async postTextComment(peer, topicId, rootId, articleKey, text) {
-    return this.tg.sendText(peer, withMeta(text, { kind:'message', type:'text', articleKey }), {
+  async postTextComment(peer, topicId, rootId, articleKey, text, format='mamina-markdown-v1') {
+    return this.tg.sendText(peer, withMeta(text, { kind:'message', type:'text', format, articleKey }), {
       threadId: topicId,
       replyTo: rootId,
     })
@@ -176,6 +185,8 @@ export class TelegramGateway {
       id: Number(message.id),
       date: message.date ? new Date(message.date).toISOString() : null,
       author: message.sender?.displayName || message.sender?.username || message.sender?.firstName || '—',
+      senderId: Number(message.sender?.id || 0) || null,
+      isOutgoing: Boolean(message.isOutgoing),
       text: message.text || message.caption || '',
       meta,
       replyToId: Number(message.replyToMessage?.id || message.replyTo?.id || 0) || null,
