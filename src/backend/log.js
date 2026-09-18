@@ -3,8 +3,12 @@ const MAX=400
 const listeners=new Set()
 
 function safe(value){
-  if(value==null)return value
-  if(value instanceof Error)return {name:value.name,message:value.message,stack:value.stack}
+  if(value==null)return {thrown:String(value)}
+  if(value instanceof Error)return {
+    name:value.name||'Error',
+    message:value.message||String(value),
+    stack:value.stack||null,
+  }
   try{return JSON.parse(JSON.stringify(value,(k,v)=>typeof v==='bigint'?v.toString():v))}catch{return String(value)}
 }
 

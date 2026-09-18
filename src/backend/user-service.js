@@ -178,11 +178,39 @@ export class UserMaminaService {
     const bytes=await this.gateway.downloadMessageMedia(rawPdf)
     info('sync.discover','Analyse PDF',{bytes:bytes?.byteLength||bytes?.length||0})
     const pdf=await FamileoPdf.load(bytes)
-    if(pdfRow.meta?.sha256 && pdf.magazine.sha256!==pdfRow.meta.sha256) throw new Error(`Hash PDF incohérent pour ${topic.title||tid}.`)
+    info('sync.discover','PDF analysé',{
+      magazineId:pdf.magazine?.magazineId||null,
+      issue:pdf.magazine?.issue??null,
+      date:pdf.magazine?.date||null,
+      pages:pdf.magazine?.pageCount??null,
+    })
+
+    if(pdfRow.meta?.sha256 && pdf.magazine.sha256!==pdfRow.meta.sha256) {
+      throw new Error(`Hash PDF incohérent pour ${topic.title||tid}.`)
+    }
+
     const articles=pdf.articles()
+    info('sync.discover','Articles détectés',{
+      topicId:tid,
+      count:articles.length,
+      slots:articles.reduce((acc,a)=>{acc[a.slot]=(acc[a.slot]||0)+1;return acc},{}),
+    })
+
     const resolved=resolveRowsToArticles(rows,articles)
-    const cover=await canvasBlob(await pdf.renderCover())
+
+    info('sync.discover','Rendu couverture',{topicId:tid})
+    const coverCanvas=await pdf.renderCover()
+    info('sync.discover','Conversion couverture en image',{
+      width:coverCanvas.width,
+      height:coverCanvas.height,
+    })
+    const cover=await canvasBlob(coverCanvas)
+    info('sync.discover','Stockage couverture',{
+      magazineId:pdf.magazine.magazineId,
+      bytes:cover.size||0,
+    })
     await putAsset(`cover:${pdf.magazine.magazineId}`,cover)
+    info('sync.discover','Couverture stockée',{magazineId:pdf.magazine.magazineId})
 
     const read=await this.readMap()
     const comments=[...resolved.byArticle.values()].flat()

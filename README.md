@@ -61,3 +61,10 @@ Vite est configuré en multi-page afin de générer `index.html`, `master.html` 
 - Option de logs mtcute détaillés (niveau 4, appliquée au prochain démarrage).
 - Reprise de connexion + synchro au retour réseau, focus, pageshow et retour au premier plan.
 - Polling de sécurité 30 s uniquement lorsque la PWA est visible et en ligne.
+
+
+## Correctif v0.2
+
+- Ajout de `FamileoPdf.renderCover()`, requis par l'application utilisateur.
+- Diagnostic détaillé après analyse PDF : métadonnées, nombre d'articles, rendu et stockage de la couverture.
+- Les valeurs lancées `null`/`undefined` sont maintenant représentées explicitement dans les logs.
