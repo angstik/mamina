@@ -10,7 +10,27 @@ async function run(id,fn){try{return await fn()}catch(e){debug(e);status(id,'Err
 
 $('unlock').onclick=()=>run('unlockStatus',async()=>{await service.unlock($('password').value);status('unlockStatus','Secrets déverrouillés en mémoire.',true)})
 $('login').onclick=()=>run('telegramStatus',async()=>{const me=await service.login();status('telegramStatus',`Connecté : ${me.displayName||me.username||'Telegram'}`,true)})
-$('loadDialogs').onclick=()=>run('telegramStatus',async()=>{dialogs=await service.listDialogs();const s=$('dialogs');s.innerHTML='<option value="">— groupe —</option>';dialogs.forEach((d,i)=>{const o=document.createElement('option');o.value=i;o.textContent=d.peer?.displayName||d.peer?.title||d.peer?.username||String(d.peer?.id);s.appendChild(o)});status('telegramStatus',`${dialogs.length} dialogs chargés.`,true)})
+$('loadDialogs').onclick=()=>run('telegramStatus',async()=>{
+  dialogs=await service.listDialogs()
+  const s=$('dialogs')
+  s.innerHTML='<option value="">— groupe —</option>'
+
+  const forums=document.createElement('optgroup')
+  forums.label='Groupes avec sujets'
+  const others=document.createElement('optgroup')
+  others.label='Autres dialogues'
+
+  dialogs.forEach((d,i)=>{
+    const o=document.createElement('option')
+    o.value=i
+    o.textContent=(d.isForum?'🧵 ':'')+d.title
+    ;(d.isForum?forums:others).appendChild(o)
+  })
+
+  if(forums.children.length)s.appendChild(forums)
+  if(others.children.length)s.appendChild(others)
+  status('telegramStatus',`${forums.children.length} avec sujets · ${others.children.length} autres.`,true)
+})
 $('dialogs').onchange=async()=>{if($('dialogs').value==='')return;await service.selectDialog(dialogs[+$('dialogs').value]);$('topics').innerHTML='<option value="">— sujet —</option>';topics=[]}
 $('loadTopics').onclick=()=>run('topicStatus',async()=>{topics=await service.listTopics();const s=$('topics');s.innerHTML='<option value="">— sujet —</option>';topics.forEach((t,i)=>{const o=document.createElement('option');o.value=i;o.textContent=t.title||`Sujet ${t.id}`;s.appendChild(o)});status('topicStatus',`${topics.length} sujets chargés.`,true)})
 $('openTopic').onclick=()=>run('topicStatus',async()=>{if($('topics').value==='')throw new Error('Choisis un sujet.');await service.selectTopic(topics[+$('topics').value]);status('topicStatus','Téléchargement / parsing de la revue…');model=await service.loadMagazine();await renderModel();status('topicStatus','Revue chargée.',true)})

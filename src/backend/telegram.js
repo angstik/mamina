@@ -29,6 +29,17 @@ export class TelegramGateway {
     return out
   }
 
+  static dialogModel(dialog) {
+    const peer = dialog.peer
+    return {
+      dialog,
+      title: peer?.displayName || peer?.title || peer?.username || String(peer?.id ?? ''),
+      isForum: Boolean(peer?.isForum),
+      isGroup: Boolean(peer?.isGroup),
+      peerType: peer?.type || null,
+    }
+  }
+
   async topics(peer) {
     const out=[]
     for await (const t of this.tg.iterForumTopics(peer, { limit: Infinity })) out.push(t)
@@ -64,7 +75,20 @@ export class TelegramGateway {
       date: meta.date ?? null,
       sha256: meta.sha256,
     })
-    return this.tg.sendMedia(peer, InputMedia.document(file, { fileName: file.name, fileMime: 'application/pdf', fileSize: file.size }), {
+
+    // Safari/iOS: avoid relying on File.stream() in the upload pipeline.
+    // mtcute explicitly accepts Uint8Array as InputFileLike.
+    const bytes = file instanceof Uint8Array
+      ? file
+      : new Uint8Array(await file.arrayBuffer())
+
+    const media = InputMedia.document(bytes, {
+      fileName: file.name || 'gazette.pdf',
+      fileMime: file.type || 'application/pdf',
+      fileSize: bytes.byteLength,
+    })
+
+    return this.tg.sendMedia(peer, media, {
       threadId: topicId,
       caption,
       progressCallback,

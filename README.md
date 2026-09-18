@@ -82,3 +82,9 @@ La détection `h/b/p` utilise actuellement la position verticale des lignes de d
 Settings → Pages → Source = **GitHub Actions**.
 
 Le workflow est inclus.
+
+
+## v1.1 — correctifs
+
+- Upload PDF navigateur : le `File` est converti en `Uint8Array` avant `InputMedia.document`, afin d'éviter le chemin `File.stream()` problématique sur certains Safari/iOS.
+- La liste des dialogs distingue maintenant les **Groupes avec sujets** (`peer.isForum`) des autres dialogues.

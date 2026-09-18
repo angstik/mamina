@@ -19,8 +19,8 @@ export class MaminaService {
 
   async login(){if(!this.gateway)throw new Error('Secrets non déverrouillés.');return this.gateway.login()}
   async logout(){if(this.gateway)await this.gateway.logout()}
-  async listDialogs(){return this.gateway.dialogs()}
-  async selectDialog(dialog){this.dialog=dialog;this.topic=null;this.pdf=null;await kv.set('lastDialogId',idOfPeer(dialog.peer))}
+  async listDialogs(){const rows=await this.gateway.dialogs();return rows.map(TelegramGateway.dialogModel)}
+  async selectDialog(dialogModel){const dialog=dialogModel?.dialog || dialogModel;this.dialog=dialog;this.topic=null;this.pdf=null;await kv.set('lastDialogId',idOfPeer(dialog.peer))}
   async listTopics(){if(!this.dialog)throw new Error('Aucun groupe sélectionné.');return this.gateway.topics(this.dialog.peer)}
   async selectTopic(topic){this.topic=topic;this.pdf=null;await kv.set(`lastTopic:${idOfPeer(this.dialog.peer)}`,Number(topic.id))}
 
