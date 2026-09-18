@@ -1,7 +1,7 @@
 {
-  "name": "mamina-full-prototype",
+  "name": "mamina-core-v1",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@mtcute/web": "0.32.1"
+    "@mtcute/web": "0.32.1",
+    "pdfjs-dist": "6.3.289"
   },
   "devDependencies": {
     "vite": "^7.1.5"

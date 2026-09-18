@@ -1,25 +1,84 @@
-# Mamina — prototype complet
+# Mamina — core v1
 
-Fonctions :
-- config Telegram App dans `src/config.js`
-- session mtcute en IndexedDB
-- sélection du dialog
-- création d’un sujet mensuel
-- envoi texte, image ou PDF
-- limite d’upload lue dynamiquement depuis Telegram
-- publication dans le sujet sélectionné
-- réponse à un message synchronisé
-- synchronisation incrémentale
-- cache cumulatif IndexedDB par dialog
-- vidage du cache local
+Objectif de cette étape : **backend propre, front volontairement minimal**.
 
-## Configuration
-Remplacer `apiId` et `apiHash` dans `src/config.js`.
+## Séparation
 
-## Déploiement
-GitHub Pages → Source = GitHub Actions.
+`src/backend/`
+- `crypto.js` : PBKDF2-SHA256 + AES-256-GCM, aucun secret en clair persisté.
+- `telegram.js` : toute la couche mtcute/Telegram.
+- `protocol.js` : protocole MAMINA, article keys, typage `kind/type`, canonicalisation lazy des roots.
+- `pdf.js` : parsing Famileo via PDF.js, SHA-256, magazineId, détection `h/b/p`, rendu/crop des articles.
+- `storage.js` : cache IndexedDB cumulatif messages + PDF + curseurs.
+- `service.js` : orchestration métier, sans DOM de présentation.
 
-## Notes
-La création de sujet demande le droit Telegram `manageTopics`.
-La limite d’upload est dérivée de `upload_max_fileparts_default/premium × 524288`.
-Les éditions/suppressions/réactions d’anciens messages ne sont pas encore resynchronisées.
+`src/frontend/`
+- `app.js` + `styles.css` : UI minimale de test.
+
+## Secrets — pas de config.js
+
+Aucun `config.js` n'est fourni.
+
+1. Lance le projet (`npm install && npm run dev`).
+2. Ouvre `/secret-tool.html`.
+3. Entre `apiId`, `apiHash` et le mot de passe partagé.
+4. Le navigateur télécharge `telegram-secret.json`.
+5. Place ce fichier dans `public/telegram-secret.json`.
+
+Le fichier contient uniquement un blob AES-GCM chiffré. La clé AES est dérivée du mot de passe avec PBKDF2-SHA256, sel aléatoire 128 bits, 600000 itérations. Le mot de passe n'est pas stocké.
+
+## Protocole
+
+### Slots article
+- `h` : demi-page haute
+- `b` : demi-page basse
+- `p` : page entière
+
+`articleKey = <magazineId>:p<NN>:<h|b|p>`
+
+### Métadonnées Telegram
+Les messages machine terminent par une ligne `MAMINA::<base64url(JSON)>`.
+
+`kind` :
+- `pdf`
+- `root`
+- `message`
+
+`type` pour `kind=message` :
+- `text`
+- `img`
+- extensible ensuite (`icon`, etc.)
+
+### Lazy init des files
+Au premier commentaire d'un article :
+1. resynchronisation du sujet ;
+2. recherche d'une racine `kind=root` pour `articleKey` ;
+3. création si absente ;
+4. nouvelle lecture ;
+5. si plusieurs racines existent, **la plus petite `message_id` est canonique** ;
+6. le commentaire est publié en réponse à cette racine.
+
+## PDF
+
+Le PDF est publié une seule fois dans le sujet. Chaque client :
+- retrouve le message `kind=pdf` ;
+- télécharge le PDF si absent du cache local ;
+- vérifie son SHA-256 ;
+- le parse avec PDF.js ;
+- construit les articles ;
+- rend chaque article localement en canvas.
+
+La détection `h/b/p` utilise actuellement la position verticale des lignes de date `le <jour> ...` dans le PDF Famileo. Si deux zones contiennent une date : `h+b`, sinon `p`. Ce point est isolé dans `pdf.js` pour pouvoir être amélioré sans toucher Telegram.
+
+## Telegram
+
+- sujets existants : `iterForumTopics()` ;
+- lecture d'un sujet précis : `iterSearchMessages({ chatId, threadId })` ;
+- création sujet : `createForumTopic()` ;
+- publication : `sendText()` / `sendMedia()` avec `threadId` et `replyTo`.
+
+## Déploiement GitHub Pages
+
+Settings → Pages → Source = **GitHub Actions**.
+
+Le workflow est inclus.
