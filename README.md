@@ -77,3 +77,11 @@ Vite est configuré en multi-page afin de générer `index.html`, `master.html` 
 - erreurs `null` / non-`Error` PDF.js encapsulées dans une vraie `Error`;
 - chemin d'extraction texte Safari sans spread ni `for...of`;
 - suppression du doublon `renderCover()` introduit en v0.2.
+
+
+## v0.4 — stockage binaire Safari
+
+- plus aucun `Blob` n'est écrit directement dans IndexedDB ;
+- les images sont persistées comme `Uint8Array + MIME` puis reconstruites en `Blob` à la lecture ;
+- PDF et autres octets sont stockés comme `Uint8Array` ;
+- les erreurs `IDBRequest.error` sont capturées avant `transaction.error`, qui peut être `null` dans Safari.

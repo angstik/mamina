@@ -35,12 +35,38 @@ async function transact(store, mode, fn) {
   const db = await openDb()
   try {
     return await new Promise((resolve, reject) => {
-      const tx = db.transaction(store, mode)
+      let settled = false
+      const fail = err => {
+        if (settled) return
+        settled = true
+        reject(err instanceof Error ? err : new Error(`IndexedDB: ${String(err ?? 'erreur inconnue')}`))
+      }
+
+      let tx
+      try { tx = db.transaction(store, mode) }
+      catch (e) { fail(e); return }
+
       let result
-      try { result = fn(tx.objectStore(store)) } catch (e) { reject(e); return }
-      tx.oncomplete = () => resolve(result)
-      tx.onerror = () => reject(tx.error)
-      tx.onabort = () => reject(tx.error || new Error('Transaction annulée.'))
+      try { result = fn(tx.objectStore(store)) }
+      catch (e) { fail(e); return }
+
+      if (result && typeof result === 'object' && 'onsuccess' in result && 'onerror' in result) {
+        result.onerror = () => fail(
+          result.error || tx.error || new Error(`IndexedDB ${store}: requête échouée.`)
+        )
+      }
+
+      tx.oncomplete = () => {
+        if (settled) return
+        settled = true
+        resolve(result && typeof result === 'object' && 'result' in result ? result.result : result)
+      }
+      tx.onerror = () => fail(
+        tx.error || (result && result.error) || new Error(`IndexedDB ${store}: transaction échouée.`)
+      )
+      tx.onabort = () => fail(
+        tx.error || (result && result.error) || new Error(`IndexedDB ${store}: transaction annulée.`)
+      )
     })
   } finally { db.close() }
 }
@@ -93,9 +119,67 @@ export async function getReadState(articleKey) { const db=await openDb(); try{re
 export async function putReadState(articleKey,lastReadMessageId) { return transact('readState','readwrite',s=>s.put({articleKey,lastReadMessageId:Number(lastReadMessageId)||0,updatedAt:new Date().toISOString()})) }
 export async function listReadStates() { const db=await openDb(); try{return await requestResult(db.transaction('readState').objectStore('readState').getAll())||[]}finally{db.close()} }
 
-export async function putAsset(key, value) { return transact('assets','readwrite',s=>s.put({key,value,updatedAt:new Date().toISOString()})) }
-export async function getAsset(key) { const db=await openDb(); try{return (await requestResult(db.transaction('assets').objectStore('assets').get(key)))?.value ?? null}finally{db.close()} }
-export async function deleteAsset(key) { return transact('assets','readwrite',s=>s.delete(key)) }
+async function encodeAsset(value) {
+  if (value instanceof Blob) {
+    return {
+      assetEncoding: 'blob-bytes-v1',
+      mime: value.type || 'application/octet-stream',
+      bytes: new Uint8Array(await value.arrayBuffer()),
+    }
+  }
+  if (value instanceof Uint8Array) {
+    return {
+      assetEncoding: 'uint8-v1',
+      bytes: new Uint8Array(value),
+    }
+  }
+  if (value instanceof ArrayBuffer) {
+    return {
+      assetEncoding: 'uint8-v1',
+      bytes: new Uint8Array(value.slice(0)),
+    }
+  }
+  return { assetEncoding: 'raw-v1', value }
+}
+
+function decodeAsset(encoded) {
+  if (encoded == null) return null
+  if (!encoded.assetEncoding) return encoded
+
+  if (encoded.assetEncoding === 'blob-bytes-v1') {
+    const bytes = encoded.bytes instanceof Uint8Array
+      ? encoded.bytes
+      : new Uint8Array(encoded.bytes || [])
+    return new Blob([bytes], { type: encoded.mime || 'application/octet-stream' })
+  }
+  if (encoded.assetEncoding === 'uint8-v1') {
+    return encoded.bytes instanceof Uint8Array
+      ? encoded.bytes
+      : new Uint8Array(encoded.bytes || [])
+  }
+  return encoded.value ?? null
+}
+
+export async function putAsset(key, value) {
+  const encoded = await encodeAsset(value)
+  return transact(
+    'assets',
+    'readwrite',
+    s => s.put({key,value:encoded,updatedAt:new Date().toISOString()})
+  )
+}
+
+export async function getAsset(key) {
+  const db=await openDb()
+  try {
+    const row=await requestResult(db.transaction('assets').objectStore('assets').get(key))
+    return decodeAsset(row?.value ?? null)
+  } finally { db.close() }
+}
+
+export async function deleteAsset(key) {
+  return transact('assets','readwrite',s=>s.delete(key))
+}
 
 export async function pruneToMagazineIds(keepIds) {
   const keep=new Set(keepIds)

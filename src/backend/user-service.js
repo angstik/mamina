@@ -210,7 +210,10 @@ export class UserMaminaService {
       bytes:cover.size||0,
     })
     await putAsset(`cover:${pdf.magazine.magazineId}`,cover)
-    info('sync.discover','Couverture stockée',{magazineId:pdf.magazine.magazineId})
+    info('sync.discover','Couverture stockée',{
+      magazineId:pdf.magazine.magazineId,
+      storage:'Uint8Array+MIME',
+    })
 
     const read=await this.readMap()
     const comments=[...resolved.byArticle.values()].flat()
