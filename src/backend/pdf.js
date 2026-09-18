@@ -1,5 +1,5 @@
-import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs'
-import workerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url'
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
+import workerSrc from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url'
 import { articleKey } from './protocol.js'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
@@ -43,7 +43,8 @@ export class FamileoPdf {
     const metadata = await doc.getMetadata().catch(()=>({info:{},metadata:null}))
     const title = metadata?.info?.Title || metadata?.metadata?.get?.('dc:title') || 'Gazette Famileo'
     const cover = await doc.getPage(1)
-    const coverText = (await cover.getTextContent()).items.map(x=>x.str||'').join(' ')
+    const coverTc = await cover.getTextContent()
+    const coverText = coverTc.items.map(x=>x.str||'').join(' ')
     const issueMatch = coverText.match(/N[°º]\s*(\d+)/i)
     const issue = issueMatch ? Number(issueMatch[1]) : null
     const date = isoFromText(coverText) || (metadata?.info?.CreationDate ? null : null)

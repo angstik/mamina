@@ -96,3 +96,7 @@ La publication admin est maintenant découpée en étapes explicitement tracées
 L'upload et l'envoi sont séparés : `uploadMedia()` reçoit le `File` natif du navigateur, puis `sendMedia()` reçoit `uploaded.inputMedia`. Le front affiche le stack complet si une étape échoue.
 
 La liste des dialogs sépare visuellement les forums (`isForum`) des autres conversations.
+
+## v1.3
+
+PDF.js utilise explicitement le build `legacy` et le worker `legacy`, pour compatibilité Safari/iOS.
