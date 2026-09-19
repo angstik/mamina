@@ -1,5 +1,20 @@
 # CHANGELOG MamiNa
 
+## v0.8.0
+**Synthèse :** reprise Telegram/outbox fiabilisée, activité visible, profil/splash, lecteur photo/texte amélioré, éditeur et zoom stabilisés, icône iOS explicite.
+
+C’est fait. La v0.8 corrige la reprise Telegram, ajoute une ligne d’activité sous les en-têtes, le splash de bienvenue avec profil Telegram, le formatage automatique des numéros français, la mise à jour forcée et l’affichage de la version.
+
+L’icône iOS utilise maintenant un `apple-touch-icon` 180×180 explicite avec un nouveau nom de fichier pour éviter l’ancien cache. iOS conserve souvent l’icône d’une PWA déjà ajoutée : si le “M” reste après déploiement, il faut supprimer l’icône de l’écran d’accueil puis ajouter MamiNa à nouveau.
+
+Le compteur de messages à transmettre reste toujours visible : vert à 0, orange clair au-dessus. Au retour réseau, MamiNa force la reconnexion, restaure le groupe si nécessaire, vide la file d’attente puis synchronise. La pastille manuelle fait la même chose.
+
+Dans la revue, le double-tap hors texte ouvre maintenant uniquement la zone photo, tandis que le double-tap texte affiche une vue sélectionnable avec avatar, auteur et date en gras puis le corps. Une copie provenant de cette vue et recollée dans l’éditeur reçoit un léger surlignage bleu clair. L’italique a été ajouté.
+
+L’éditeur garde maintenant le focus pendant l’envoi, les boutons de formatage préservent/restaurent explicitement la sélection, le rectangle de couleur suit la couleur courante et l’éditeur est ancré au bas du `visualViewport`. Le zoom/pan de l’article est conservé par article, borné pour ne pas montrer de vide et bénéficie d’une petite inertie. Pendant l’édition, la zone de revue est redimensionnée à la partie réellement visible au-dessus du clavier.
+
+Enfin, les images d’articles sont toujours chargées localement et les voisines sont préchauffées. Une ligne d’activité indique les opérations en cours (`Connexion à Telegram`, lecture des sujets/messages, analyse PDF, cache local, écriture base, envoi différé, etc.).
+
 ## v0.7.0
 **Synthèse :** lecteur et éditeur mobile affinés, cache local accéléré/prédictif, commentaire hors-ligne éditable et icône d’application.
 

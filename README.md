@@ -129,3 +129,19 @@ Points techniques principaux :
 - article enrichi avec `articleText` et `textBounds` pour le double-tap photo/texte ;
 - commentaire outbox rééditable avant envoi ;
 - icônes PWA/iOS 192 et 512.
+
+
+## v0.8
+
+Voir `CHANGELOG.md`.
+
+Points techniques :
+- `apple-touch-icon` 180×180 versionné ;
+- normalisation téléphone France vers `+33` ;
+- profil utilisateur Telegram mis en cache localement ;
+- ligne d’activité métier indépendante des logs ;
+- reconnexion + vidage outbox avant synchronisation ;
+- vue texte enrichie auteur/date/avatar et copie détectable ;
+- italique + surlignage local des collages provenant d’un article ;
+- zoom/pan borné, inertiel et persistant par article ;
+- éditeur ancré sur `visualViewport` et sélection restaurée pour les commandes riches.

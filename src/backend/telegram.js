@@ -23,6 +23,14 @@ export class TelegramGateway {
     this.tg.onError.add((err) => logError('telegram', err?.message || 'Erreur mtcute', err))
   }
 
+  normalizePhone(value) {
+    let raw=String(value||'').trim()
+    if(raw.startsWith('+')) return '+' + raw.slice(1).replace(/\D/g,'')
+    let digits=raw.replace(/\D/g,'')
+    if(digits.startsWith('0')) digits=digits.slice(1)
+    return '+33'+digits
+  }
+
   async login() {
     info('telegram.login','Démarrage / reprise de session')
     const ask = async (kind, fallbackLabel) => {
@@ -30,12 +38,27 @@ export class TelegramGateway {
       return prompt(fallbackLabel) || ''
     }
     this.self = await this.tg.start({
-      phone: async () => ask('phone','Numéro Telegram (+33…)'),
+      phone: async () => this.normalizePhone(await ask('phone','Numéro Telegram (+33…)')),
       code: async () => ask('code','Code Telegram'),
       password: async () => ask('password','Mot de passe 2FA'),
     })
     info('telegram.login','Session prête',{user:this.self?.displayName||this.self?.username||null})
     return this.self
+  }
+
+  async selfProfile() {
+    const user=this.self || await this.tg.getMe()
+    let avatar=null
+    try {
+      if(user?.photo) avatar=await this.tg.downloadAsBuffer(user.photo)
+    } catch(e) {
+      warn('telegram.profile','Avatar indisponible',{message:e?.message||String(e)})
+    }
+    return {
+      name:user?.displayName||user?.username||user?.firstName||'',
+      username:user?.username||null,
+      avatar,
+    }
   }
 
   async logout() { await this.tg.logOut(); this.self = null }
@@ -57,6 +80,8 @@ export class TelegramGateway {
     try {
       await this.tg.connect()
       await this.tg.call({ _: 'help.getConfig' })
+      this.connectionState='connected'
+      for (const fn of this.connectionListeners) { try { fn('connected') } catch {} }
       info('telegram.connection',`Connexion Telegram opérationnelle (${reason})`,{connected:Boolean(this.tg?.isConnected)})
       return true
     } catch (e) {

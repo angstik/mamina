@@ -210,15 +210,37 @@ function articleDetails(textContent, pageWidth, pageHeight, slot) {
   const cropH=(crop.y1-crop.y0)*pageHeight
   const padX=.02, padY=.025
 
-  return {
-    articleText:text.trim(),
-    textBounds:{
-      x0:Math.max(0,(minX-cropX)/cropW-padX),
-      y0:Math.max(0,(minY-cropY)/cropH-padY),
-      x1:Math.min(1,(maxX-cropX)/cropW+padX),
-      y1:Math.min(1,(maxY-cropY)/cropH+padY),
-    },
+  const articleText=text.trim()
+  let authorName='', articleDateLabel='', bodyText=articleText
+  const header=articleText.match(/^(.+?)\s+le\s+(\d{1,2}\s+[A-Za-zÀ-ÿ]+)\s+([\s\S]*)$/iu)
+  if(header){
+    authorName=header[1].replace(/\s+/g,' ').trim()
+    articleDateLabel=`le ${header[2].replace(/\s+/g,' ').trim()}`
+    bodyText=header[3].trim()
   }
+
+  const textBounds={
+    x0:Math.max(0,(minX-cropX)/cropW-padX),
+    y0:Math.max(0,(minY-cropY)/cropH-padY),
+    x1:Math.min(1,(maxX-cropX)/cropW+padX),
+    y1:Math.min(1,(maxY-cropY)/cropH+padY),
+  }
+
+  const photoBounds = slot==='h'
+    ? {x0:0,y0:0,x1:Math.max(.42,Math.min(.62,textBounds.x0-.015)),y1:1}
+    : slot==='b'
+      ? {x0:0,y0:0,x1:1,y1:Math.max(.50,Math.min(.76,textBounds.y0-.015))}
+      : (textBounds.x0>.48
+        ? {x0:0,y0:0,x1:Math.max(.45,textBounds.x0-.015),y1:1}
+        : {x0:0,y0:0,x1:1,y1:Math.max(.45,textBounds.y0-.015)})
+
+  const avatarBounds = slot==='h'
+    ? {x0:.69,y0:.035,x1:.81,y1:.19}
+    : slot==='b'
+      ? {x0:.055,y0:.66,x1:.19,y1:.86}
+      : {x0:.05,y0:.04,x1:.18,y1:.18}
+
+  return {articleText,authorName,articleDateLabel,bodyText,textBounds,photoBounds,avatarBounds}
 }
 
 function textFromContent(tc) {
@@ -358,7 +380,12 @@ export class FamileoPdf {
           slot,
           pageText:plan.text,
           articleText:plan.details?.[slot]?.articleText || plan.text,
+          authorName:plan.details?.[slot]?.authorName || '',
+          articleDateLabel:plan.details?.[slot]?.articleDateLabel || '',
+          bodyText:plan.details?.[slot]?.bodyText || plan.details?.[slot]?.articleText || plan.text,
           textBounds:plan.details?.[slot]?.textBounds || null,
+          photoBounds:plan.details?.[slot]?.photoBounds || null,
+          avatarBounds:plan.details?.[slot]?.avatarBounds || null,
         })
       }
     }

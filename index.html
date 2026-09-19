@@ -5,12 +5,20 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=yes">
   <meta name="color-scheme" content="light dark">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="MamiNa">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="apple-touch-icon" href="./mamina-192.png">
-  <link rel="icon" type="image/png" href="./mamina-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-v08.png?v=8">
+  <link rel="icon" type="image/png" sizes="192x192" href="./mamina-v08-192.png?v=8">
   <title>MamiNa</title>
 </head>
 <body>
+
+<div id="splash" class="splash" hidden>
+  <img id="splashAvatar" class="splash-avatar" alt="">
+  <div class="splash-title">MamiNa</div>
+  <div id="splashHello" class="splash-hello"></div>
+</div>
+
 <main id="home" class="home">
   <header class="homebar">
     <div class="homebrand">
@@ -19,10 +27,11 @@
     </div>
     <div class="status-cluster">
       <button id="openSettingsHome" class="icon-button" type="button" aria-label="Paramètres">⚙️</button>
-      <span id="pendingHome" class="pending-count" hidden>0</span>
+      <span id="pendingHome" class="pending-count zero">0</span>
       <button id="connectionPillHome" class="connection-pill unknown" type="button" title="Connexion Telegram">—</button>
     </div>
   </header>
+  <div id="activityHome" class="activity-strip" hidden></div>
 
   <section id="setup" class="panel setup-panel">
     <h2>Connexion Telegram</h2>
@@ -47,19 +56,29 @@
       <strong id="readerAppName">MamiNa</strong>
       <span id="readerDate"></span>
     </div>
-    <span id="pendingReader" class="pending-count" hidden>0</span>
+    <span id="pendingReader" class="pending-count zero">0</span>
     <button id="connectionPillReader" class="connection-pill unknown" type="button" title="Connexion Telegram">—</button>
     <div id="readerPage" class="reader-page subtle"></div>
   </header>
+  <div id="activityReader" class="activity-strip" hidden></div>
   <div id="articleDeck" class="article-deck"></div>
 </section>
 
 <div id="focusOverlay" class="focus-overlay" hidden>
   <div id="focusImageStage" class="focus-image-stage" hidden>
-    <img id="focusImage" alt="Article">
+    <img id="focusImage" alt="Photo de l’article">
   </div>
   <div id="focusTextStage" class="focus-text-stage" hidden>
-    <div id="focusText"></div>
+    <div class="focus-text-card">
+      <div class="focus-author-row">
+        <img id="focusAuthorAvatar" class="focus-author-avatar" alt="" hidden>
+        <div>
+          <div id="focusAuthor" class="focus-author"></div>
+          <div id="focusArticleDate" class="focus-article-date"></div>
+        </div>
+      </div>
+      <div id="focusText" class="focus-text"></div>
+    </div>
   </div>
 </div>
 
@@ -78,12 +97,21 @@
         <option value="light">Clair</option>
         <option value="dark">Sombre</option>
       </select>
+
       <label for="reactionOrder">Ordre des réactions</label>
       <select id="reactionOrder">
         <option value="asc">Anciennes → récentes</option>
         <option value="desc">Récentes → anciennes</option>
       </select>
-      <p class="subtle">MamiNa fonctionne d’abord depuis son cache local. Les deux dernières revues restent disponibles hors connexion. Un commentaire texte par article peut être gardé en attente puis envoyé automatiquement.</p>
+
+      <p class="subtle">MamiNa travaille d’abord depuis le cache local. Les deux dernières revues restent disponibles hors connexion. Un commentaire texte par article peut rester en attente puis partir automatiquement.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Application</h2>
+      <div class="settings-version">Version <strong id="appVersion">0.8.0</strong></div>
+      <button id="forceUpdate" type="button">Forcer la mise à jour</button>
+      <div id="updateStatus" class="status"></div>
     </section>
 
     <section class="panel">
@@ -92,14 +120,15 @@
         <div><span>Réseau</span><strong id="networkState">—</strong></div>
         <div><span>Telegram</span><strong id="telegramState">—</strong></div>
         <div><span>Dernière synchro</span><strong id="lastSyncState">—</strong></div>
-        <div><span>En attente</span><strong id="pendingSettings">0</strong></div>
+        <div><span>À transmettre</span><strong id="pendingSettings">0</strong></div>
       </div>
-      <p class="subtle">Touchez la pastille de connexion dans l’en-tête pour forcer une reconnexion. Pendant la reconnexion elle clignote et ne peut plus être activée.</p>
+      <p class="subtle">Touchez la pastille de connexion dans l’en-tête pour forcer une reconnexion et l’envoi des messages en attente.</p>
     </section>
 
     <details id="adminPanel" class="panel admin-panel">
       <summary>Administration / publication</summary>
-      <p class="subtle">Les actions sont exécutées avec le compte Telegram connecté. Sans droits administrateur, Telegram les refusera.</p>
+      <p class="subtle">Ces actions utilisent le compte Telegram connecté. Telegram refusera celles pour lesquelles le compte n’a pas les droits nécessaires.</p>
+
       <label for="adminAppTitle">Nom de l’application</label>
       <input id="adminAppTitle" value="MamiNa" maxlength="30">
       <button id="saveAdminTitle" type="button">Enregistrer</button>
@@ -139,19 +168,21 @@
 <div id="composerModal" class="composer-overlay" hidden>
   <div id="composerSheet" class="composer-sheet">
     <div id="composerText" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Écrire un message…"></div>
+
     <div id="formatRow" class="format-row">
       <button id="colorButton" type="button" title="Couleur"><span class="color-swatch"></span></button>
       <button data-command="bold" class="format-toggle" type="button" title="Gras" aria-pressed="false"><strong>G</strong></button>
+      <button data-command="italic" class="format-toggle" type="button" title="Italique" aria-pressed="false"><em>I</em></button>
       <button data-command="underline" class="format-toggle" type="button" title="Souligné" aria-pressed="false"><u>S</u></button>
       <button data-command="strikeThrough" class="format-toggle" type="button" title="Barré" aria-pressed="false"><s>B</s></button>
-      <span class="toolbar-spacer"></span>
       <button id="composerOptions" type="button" title="Options">⋯</button>
       <button id="clearText" type="button" title="Vider">🧹</button>
+      <span class="toolbar-spacer"></span>
       <button id="cancelComposer" type="button" title="Annuler">❌</button>
       <button id="sendText" class="send-button" type="button" title="Envoyer">✅</button>
     </div>
+
     <div id="colorRow" class="color-row" hidden></div>
-    <div id="sendStatus" class="status compact-status"></div>
   </div>
 </div>
 

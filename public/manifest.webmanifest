@@ -7,13 +7,13 @@
   "theme_color": "#ffffff",
   "icons": [
     {
-      "src": "./mamina-192.png",
+      "src": "./mamina-v08-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./mamina-512.png",
+      "src": "./mamina-v08-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
