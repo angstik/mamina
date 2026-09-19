@@ -1,7 +1,7 @@
 {
   "name": "mamina-user-v0",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

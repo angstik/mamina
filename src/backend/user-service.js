@@ -8,6 +8,7 @@ import {
   putMessages, listMessagesByMagazine, deleteMessagesByMagazine,
   getReadState, putReadState, listReadStates,
   putAsset, getAsset, deleteAsset, pruneToMagazineIds,
+  putOutbox, getOutbox, listOutbox, deleteOutbox, countOutbox,
 } from './user-storage.js'
 import { info, warn, error as logError } from './log.js'
 
@@ -68,12 +69,15 @@ export class UserMaminaService {
     this.updateUnsubscribe=null
     this.onChanged=null
     this.onConnectionState=null
+    this.authProvider=null
   }
+
+  setAuthProvider(provider) { this.authProvider=provider || null }
 
   async unlock(password) {
     const blob=await loadEncryptedSecret()
     const creds=await decryptCredentials(blob,password)
-    this.gateway=new TelegramGateway(creds)
+    this.gateway=new TelegramGateway(creds,{authProvider:this.authProvider})
     this.gateway.onConnectionState(state=>this.onConnectionState?.(state))
   }
 
@@ -81,6 +85,7 @@ export class UserMaminaService {
     if(!this.gateway) throw new Error('Secrets non déverrouillés.')
     const me=await this.gateway.login()
     this.installUpdates()
+    try { await this.flushOutbox() } catch(e) { warn('outbox','Envoi différé après login incomplet',{message:e?.message||String(e)}) }
     return me
   }
 
@@ -118,6 +123,9 @@ export class UserMaminaService {
 
   async syncAll() {
     if(!this.dialog) throw new Error('Aucun groupe sélectionné.')
+    if(this.gateway?.connectionState==='connected') {
+      try { await this.flushOutbox() } catch(e) { warn('outbox','Flush avant synchro incomplet',{message:e?.message||String(e)}) }
+    }
     info('sync','Synchronisation demandée',{group:this.dialogModel?.title||null})
     if(this.syncing) return this.syncing
     this.syncing=this._syncAll().then(result=>{info('sync','Synchronisation terminée',{magazines:result?.length||0});return result}).catch(e=>{logError('sync','Synchronisation échouée',e);throw e}).finally(()=>{this.syncing=null})
@@ -386,8 +394,21 @@ export class UserMaminaService {
     const read=await this.readMap()
     const commentsBy=new Map(articles.map(a=>[a.articleKey,[]]))
     for(const row of rows) if(row.articleKey && commentsBy.has(row.articleKey)) commentsBy.get(row.articleKey).push(row)
+    const outbox=await listOutbox()
+    const pendingBy=new Map(outbox.map(x=>[x.articleKey,x]))
     const withState=articles.map(a=>{
       const comments=(commentsBy.get(a.articleKey)||[]).sort((x,y)=>x.id-y.id)
+      const pending=pendingBy.get(a.articleKey)
+      if(pending) comments.push({
+        id:Number.MAX_SAFE_INTEGER,
+        articleKey:a.articleKey,
+        author:'Moi',
+        isOutgoing:true,
+        pending:true,
+        date:pending.createdAt,
+        displayText:pending.text,
+        text:pending.text,
+      })
       const lastRead=read.get(a.articleKey)||0
       return {...a,comments,lastReadMessageId:lastRead,unreadCount:comments.filter(c=>!c.isOutgoing&&c.id>lastRead).length}
     })
@@ -409,19 +430,99 @@ export class UserMaminaService {
     }
   }
 
-  async postText(articleKey,text) {
+  async queueText(articleKey,text) {
     if(!this.current) throw new Error('Aucune revue ouverte.')
     const article=this.current.articles.find(a=>a.articleKey===articleKey)
     if(!article) throw new Error('Article inconnu.')
-    if(!String(text).trim()) throw new Error('Message vide.')
-    const topicId=this.current.magazine.topicId
-    const full=await this.gateway.topicMessages(this.dialog.peer,topicId,{limit:Infinity})
-    const {rootId}=await this.gateway.ensureRoot(this.dialog.peer,topicId,this.current.pdf.magazine,article,full)
-    await this.gateway.postTextComment(this.dialog.peer,topicId,rootId,articleKey,text,'mamina-markdown-v1')
-    const magazine=await getMagazine(this.current.magazine.magazineId)
-    if(magazine) await this.syncKnownTopic(magazine)
-    return this.openMagazine(this.current.magazine.magazineId)
+    const clean=String(text||'').trim()
+    if(!clean) throw new Error('Message vide.')
+
+    // Keyed by articleKey: at most one pending message per discussion.
+    await putOutbox({
+      articleKey,
+      magazineId:this.current.magazine.magazineId,
+      topicId:this.current.magazine.topicId,
+      text:clean,
+      format:'mamina-markdown-v1',
+    })
+    info('outbox','Message mis en attente',{articleKey})
+    return this.currentView()
   }
+
+  async postText(articleKey,text) {
+    if(!this.current) throw new Error('Aucune revue ouverte.')
+    const clean=String(text||'').trim()
+    if(!clean) throw new Error('Message vide.')
+
+    const online = typeof navigator==='undefined' || navigator.onLine!==false
+    if(!this.gateway || !this.dialog || !online || this.gateway.connectionState!=='connected') {
+      return this.queueText(articleKey,clean)
+    }
+
+    try {
+      await this._sendTextNow({
+        articleKey,
+        magazineId:this.current.magazine.magazineId,
+        topicId:this.current.magazine.topicId,
+        text:clean,
+        format:'mamina-markdown-v1',
+      })
+      const magazine=await getMagazine(this.current.magazine.magazineId)
+      if(magazine) await this.syncKnownTopic(magazine)
+      return this.openMagazineLocalFirst(this.current.magazine.magazineId)
+    } catch(e) {
+      // Network/connection loss during send: preserve the user's text locally.
+      warn('outbox','Envoi direct impossible, message conservé localement',{
+        articleKey,message:e?.message||String(e),
+      })
+      return this.queueText(articleKey,clean)
+    }
+  }
+
+  async _sendTextNow(item) {
+    if(!this.gateway || !this.dialog) throw new Error('Telegram non initialisé.')
+    const magazine=await getMagazine(item.magazineId)
+    if(!magazine) throw new Error('Revue de la file d’attente introuvable.')
+
+    let bytes=await getAsset(`pdf:${magazine.magazineId}`)
+    if(!bytes) bytes=await getAsset(`staging-pdf:${magazine.magazineId}`)
+    if(!bytes) throw new Error('PDF local requis pour résoudre l’article en attente.')
+
+    const pdf=await FamileoPdf.load(bytes)
+    const article=pdf.articles().find(a=>a.articleKey===item.articleKey)
+    if(!article) throw new Error('Article de la file d’attente introuvable.')
+
+    const full=await this.gateway.topicMessages(this.dialog.peer,Number(item.topicId),{limit:Infinity})
+    const {rootId}=await this.gateway.ensureRoot(
+      this.dialog.peer,Number(item.topicId),pdf.magazine,article,full
+    )
+    await this.gateway.postTextComment(
+      this.dialog.peer,Number(item.topicId),rootId,item.articleKey,item.text,item.format||'mamina-markdown-v1'
+    )
+  }
+
+  async flushOutbox() {
+    if(!this.gateway || !this.dialog || this.gateway.connectionState!=='connected') return 0
+    const rows=await listOutbox()
+    let sent=0
+    for(const item of rows) {
+      try {
+        await this._sendTextNow(item)
+        await deleteOutbox(item.articleKey)
+        sent++
+        info('outbox','Message différé envoyé',{articleKey:item.articleKey})
+      } catch(e) {
+        warn('outbox','Message différé toujours en attente',{
+          articleKey:item.articleKey,message:e?.message||String(e),
+        })
+        // Keep remaining messages; a permission/network failure may affect all.
+        if(this.gateway.connectionState!=='connected') break
+      }
+    }
+    return sent
+  }
+
+  async pendingCount() { return countOutbox() }
 
   async getArticleImage(articleKey) {
     if(!this.current) throw new Error('Aucune revue ouverte.')
@@ -444,17 +545,68 @@ export class UserMaminaService {
   hasGateway() { return Boolean(this.gateway) }
   hasDialog() { return Boolean(this.dialog) }
 
+  async adminListForumDialogs() {
+    return this.listForumDialogs()
+  }
+
+  async adminListTopics() {
+    if(!this.dialog) throw new Error('Aucun groupe sélectionné.')
+    return this.gateway.topics(this.dialog.peer)
+  }
+
+  async adminCreateMagazine(file,{onStep,progressCallback}={}) {
+    if(!this.dialog) throw new Error('Aucun groupe sélectionné.')
+    if(!file) throw new Error('PDF manquant.')
+    const step=(name,detail={})=>onStep?.({name,detail,at:new Date().toISOString()})
+    try {
+      step('magazine.pdf.read.start',{name:file.name,size:file.size,type:file.type})
+      const pdf=await FamileoPdf.load(file)
+      const appTitle=await settings.get('appTitle','MamiNa')
+      const magazine={...pdf.magazine,appTitle}
+      const articles=pdf.articles()
+      step('magazine.pdf.read.done',{
+        magazineId:magazine.magazineId,issue:magazine.issue,date:magazine.date,articles:articles.length
+      })
+      const title=`${magazine.date?magazine.date.slice(0,7):'Revue'} — Famileo${magazine.issue?` N°${magazine.issue}`:''}`
+      step('magazine.topic.create.start',{title})
+      const {topicId}=await this.gateway.createTopic(this.dialog.peer,title)
+      step('magazine.topic.create.done',{topicId})
+      await this.gateway.postMagazinePdf(this.dialog.peer,topicId,file,magazine,{progressCallback,onStep})
+      step('magazine.done',{topicId})
+      await this.syncAll()
+      return {topicId,magazine,articles}
+    } catch(error) {
+      onStep?.({
+        name:'magazine.error',
+        detail:{message:error?.message||String(error),stack:error?.stack||null},
+        at:new Date().toISOString(),
+      })
+      throw error
+    }
+  }
+
+  async setAppTitle(value) {
+    const title=String(value||'').trim()||'MamiNa'
+    await settings.set('appTitle',title)
+    return title
+  }
+
   async getSettings() {
     return {
       reactionOrder:await settings.get('reactionOrder','asc'),
       articleOrderMode:await settings.get('articleOrderMode','magazine'),
       recentColors:await settings.get('recentColors',[]),
       appTitle:await settings.get('appTitle','MamiNa'),
+      theme:await settings.get('theme','system'),
     }
   }
   async setReactionOrder(order) {
     if(!['asc','desc'].includes(order))throw new Error('Ordre invalide.')
     await settings.set('reactionOrder',order)
+  }
+  async setTheme(theme) {
+    if(!['system','light','dark'].includes(theme)) throw new Error('Thème invalide.')
+    await settings.set('theme',theme)
   }
   async setArticleOrderMode(mode) {
     if(!['magazine','activity'].includes(mode))throw new Error('Ordre d’articles invalide.')

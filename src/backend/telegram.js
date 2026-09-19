@@ -3,7 +3,8 @@ import { withMeta, parseMeta, canonicalRoots } from './protocol.js'
 import { info, warn, error as logError } from './log.js'
 
 export class TelegramGateway {
-  constructor({ apiId, apiHash }) {
+  constructor({ apiId, apiHash }, { authProvider=null }={}) {
+    this.authProvider = authProvider
     this.tg = new TelegramClient({
       apiId,
       apiHash,
@@ -24,10 +25,14 @@ export class TelegramGateway {
 
   async login() {
     info('telegram.login','Démarrage / reprise de session')
+    const ask = async (kind, fallbackLabel) => {
+      if (this.authProvider?.[kind]) return String(await this.authProvider[kind]() || '')
+      return prompt(fallbackLabel) || ''
+    }
     this.self = await this.tg.start({
-      phone: async () => prompt('Numéro Telegram (+33…)') || '',
-      code: async () => prompt('Code Telegram') || '',
-      password: async () => prompt('Mot de passe 2FA') || '',
+      phone: async () => ask('phone','Numéro Telegram (+33…)'),
+      code: async () => ask('code','Code Telegram'),
+      password: async () => ask('password','Mot de passe 2FA'),
     })
     info('telegram.login','Session prête',{user:this.self?.displayName||this.self?.username||null})
     return this.self

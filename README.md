@@ -100,3 +100,19 @@ Vite est configuré en multi-page afin de générer `index.html`, `master.html` 
 - palette couleur remplace temporairement la barre de formatage ;
 - saisie fixée au-dessus du clavier ; le lecteur reste manipulable derrière mais le swipe horizontal est bloqué pendant l'édition ;
 - `master.html` contient un paramètre de nom d'application (défaut `MamiNa`) ; il est embarqué dans les métadonnées des prochaines revues.
+
+
+## v0.6
+
+- en-tête compact sans superposition ;
+- reconnexion uniquement via la pastille d'état, clignotante et non cliquable pendant la reconnexion ;
+- compteur de commentaires en attente à gauche de la pastille ;
+- file d'attente IndexedDB, maximum un commentaire texte par article ;
+- flush automatique à la reconnexion ;
+- page Paramètres intégrée : thème clair/sombre/système, explications, diagnostic et administration ;
+- `/master.html` redirige vers le volet Administration de la même application ;
+- saisie Telegram via formulaire `type=tel autocomplete=tel` et code `autocomplete=one-time-code` ;
+- éditeur riche sans balises visibles, états actifs G/S/B, palette temporaire, boutons emoji ;
+- palette couleur ne ferme pas le clavier pour les couleurs rapides ;
+- éditeur compact 1 à 3 lignes, fixé juste au-dessus du clavier ;
+- zoom/pan tactile de l'image article pendant la saisie, sans transformer la zone de saisie.

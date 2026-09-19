@@ -9,95 +9,154 @@
   <title>MamiNa</title>
 </head>
 <body>
-  <main id="home" class="home">
-    <header class="topbar">
-      <div class="brand-block">
-        <h1 id="homeAppName">MamiNa</h1>
-        <div id="syncStatus" class="subtle">Données locales</div>
-      </div>
-      <div class="topbar-actions">
-        <span id="connectionPillHome" class="connection-pill unknown" title="État Telegram">—</span>
-        <button id="syncNow" class="icon-button" title="Synchroniser">↻</button>
-      </div>
-    </header>
+<main id="home" class="home">
+  <header class="homebar">
+    <div><h1 id="homeAppName">MamiNa</h1><div id="syncStatus" class="subtle">Données locales</div></div>
+    <div class="status-cluster">
+      <span id="pendingHome" class="pending-count" hidden>0</span>
+      <button id="connectionPillHome" class="connection-pill unknown" type="button" title="Connexion Telegram">—</button>
+    </div>
+  </header>
 
-    <section id="setup" class="panel setup-panel">
-      <h2>Connexion Telegram</h2>
-      <p class="subtle">La lecture locale reste disponible sans connexion.</p>
-      <input id="password" type="password" autocomplete="current-password" placeholder="Mot de passe MamiNa">
-      <button id="start">Connecter Telegram</button>
-      <div id="setupStatus" class="status"></div>
-      <div id="groupChooser" hidden>
-        <label for="groupSelect">Groupe familial</label>
-        <select id="groupSelect"></select>
-        <button id="chooseGroup">Utiliser ce groupe</button>
-      </div>
-    </section>
+  <section id="setup" class="panel setup-panel">
+    <h2>Connexion Telegram</h2>
+    <p class="subtle">La lecture et la saisie locale restent disponibles sans connexion.</p>
+    <input id="password" type="password" autocomplete="current-password" placeholder="Mot de passe MamiNa">
+    <button id="start">Connecter Telegram</button>
+    <div id="setupStatus" class="status"></div>
+    <div id="groupChooser" hidden>
+      <label for="groupSelect">Groupe familial</label>
+      <select id="groupSelect"></select>
+      <button id="chooseGroup">Utiliser ce groupe</button>
+    </div>
+  </section>
 
-    <section id="settingsPanel" class="panel compact">
-      <div class="settings-head">
-        <strong>Réglages</strong>
-        <span id="connectionBadge" class="connection-label">Telegram : —</span>
-      </div>
+  <section id="magazines" class="magazine-list"></section>
+</main>
 
+<section id="reader" class="reader" hidden>
+  <header class="reader-bar">
+    <button id="back" class="icon-button" aria-label="Retour">‹</button>
+    <div class="reader-ident">
+      <strong id="readerAppName">MamiNa</strong>
+      <span id="readerDate"></span>
+    </div>
+    <button id="articleOrderButton" class="order-button" type="button">Revue</button>
+    <button id="openSettings" class="icon-button settings-button" type="button" aria-label="Paramètres">⚙️</button>
+    <span id="pendingReader" class="pending-count" hidden>0</span>
+    <button id="connectionPillReader" class="connection-pill unknown" type="button" title="Connexion Telegram">—</button>
+    <div id="readerPage" class="reader-page subtle"></div>
+  </header>
+  <div id="articleDeck" class="article-deck"></div>
+</section>
+
+<section id="settingsView" class="settings-view" hidden>
+  <header class="settings-bar">
+    <button id="closeSettings" class="icon-button" type="button">‹</button>
+    <strong>Paramètres</strong>
+  </header>
+
+  <div class="settings-body">
+    <section class="panel">
+      <h2>Affichage</h2>
+      <label for="themeSelect">Mode</label>
+      <select id="themeSelect">
+        <option value="system">Système</option>
+        <option value="light">Clair</option>
+        <option value="dark">Sombre</option>
+      </select>
       <label for="reactionOrder">Ordre des réactions</label>
       <select id="reactionOrder">
         <option value="asc">Anciennes → récentes</option>
         <option value="desc">Récentes → anciennes</option>
       </select>
-
-      <details class="tech-settings">
-        <summary>Diagnostic et journaux techniques</summary>
-        <div class="diagnostic-grid">
-          <div><span>Réseau</span><strong id="networkState">—</strong></div>
-          <div><span>Telegram</span><strong id="telegramState">—</strong></div>
-          <div><span>Dernière synchro</span><strong id="lastSyncState">—</strong></div>
-        </div>
-        <label class="check-row"><input id="verboseLogs" type="checkbox"> Logs mtcute détaillés au prochain démarrage</label>
-        <div class="log-actions">
-          <button id="copyLogs" type="button">Copier les logs</button>
-          <button id="clearLogs" type="button" class="secondary">Effacer</button>
-        </div>
-        <pre id="techLogs" class="tech-logs"></pre>
-      </details>
+      <p class="subtle">Les revues déjà mises en cache restent lisibles hors connexion. Un commentaire texte par article peut également être conservé en attente puis envoyé automatiquement.</p>
     </section>
 
-    <section id="magazines" class="magazine-list"></section>
-  </main>
+    <section class="panel">
+      <h2>Connexion</h2>
+      <div class="diagnostic-grid">
+        <div><span>Réseau</span><strong id="networkState">—</strong></div>
+        <div><span>Telegram</span><strong id="telegramState">—</strong></div>
+        <div><span>Dernière synchro</span><strong id="lastSyncState">—</strong></div>
+        <div><span>En attente</span><strong id="pendingSettings">0</strong></div>
+      </div>
+      <p class="subtle">Touchez la pastille de connexion dans l’en-tête pour forcer une reconnexion/synchronisation.</p>
+    </section>
 
-  <section id="reader" class="reader" hidden>
-    <header class="reader-bar">
-      <button id="back" class="icon-button back-button" aria-label="Retour">‹</button>
-      <strong id="readerAppName" class="reader-app-name">MamiNa</strong>
-      <span id="readerDate" class="reader-date"></span>
-      <button id="articleOrderButton" class="order-button" type="button" title="Ordre des articles">Revue</button>
-      <span id="connectionPillReader" class="connection-pill unknown" title="État Telegram">—</span>
-      <div id="readerPage" class="reader-page subtle"></div>
-    </header>
-    <div id="articleDeck" class="article-deck"></div>
-  </section>
+    <details id="adminPanel" class="panel admin-panel">
+      <summary>Administration / publication</summary>
+      <p class="subtle">Ces commandes utilisent le compte Telegram connecté. Telegram refusera naturellement les actions pour lesquelles ce compte n’a pas les droits nécessaires.</p>
 
-  <div id="composerModal" class="composer-overlay" hidden>
-    <div id="composerSheet" class="composer-sheet">
-      <div id="composerText" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Écrire un message…"></div>
+      <label for="adminAppTitle">Nom de l’application</label>
+      <input id="adminAppTitle" value="MamiNa" maxlength="30">
+      <button id="saveAdminTitle" type="button">Enregistrer</button>
+      <div id="adminTitleStatus" class="status"></div>
 
-      <div id="formatRow" class="format-row">
-        <button id="colorButton" type="button" title="Couleur"><span class="color-swatch"></span></button>
-        <button data-command="bold" type="button" title="Gras"><strong>B</strong></button>
-        <button data-command="underline" type="button" title="Souligné"><u>U</u></button>
-        <button data-command="strikeThrough" type="button" title="Barré"><s>S</s></button>
-        <button id="clearText" type="button" title="Vider">Vider</button>
-        <button id="deleteText" type="button" title="Supprimer">⌫</button>
-        <button id="cancelComposer" type="button" title="Annuler">Annuler</button>
-        <button id="sendText" class="send-button" type="button" title="Envoyer">Envoyer</button>
+      <label for="adminGroupSelect">Groupe avec sujets</label>
+      <div class="inline-actions">
+        <select id="adminGroupSelect"></select>
+        <button id="adminRefreshGroups" type="button">Actualiser</button>
       </div>
 
-      <div id="colorRow" class="color-row" hidden></div>
-      <div id="sendStatus" class="status"></div>
-    </div>
-  </div>
+      <label for="adminTopicSelect">Sujets existants</label>
+      <div class="inline-actions">
+        <select id="adminTopicSelect"></select>
+        <button id="adminRefreshTopics" type="button">Actualiser</button>
+      </div>
 
-  <details class="debug-box"><summary>Diagnostic rapide</summary><pre id="debug"></pre></details>
-  <script type="module" src="/src/user/app.js"></script>
+      <label for="adminPdf">Nouveau PDF Famileo</label>
+      <input id="adminPdf" type="file" accept="application/pdf">
+      <button id="adminPublish" type="button">Créer le sujet + publier le PDF</button>
+      <div id="adminStatus" class="status"></div>
+      <pre id="adminTrace" class="tech-logs"></pre>
+    </details>
+
+    <details class="panel">
+      <summary>Diagnostic et journaux techniques</summary>
+      <label class="check-row"><input id="verboseLogs" type="checkbox"> Logs mtcute détaillés au prochain démarrage</label>
+      <div class="log-actions">
+        <button id="copyLogs" type="button">Copier les logs</button>
+        <button id="clearLogs" type="button" class="secondary">Effacer les logs</button>
+      </div>
+      <pre id="techLogs" class="tech-logs"></pre>
+    </details>
+  </div>
+</section>
+
+<div id="composerModal" class="composer-overlay" hidden>
+  <div id="composerSheet" class="composer-sheet">
+    <div id="composerText" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Écrire un message…"></div>
+
+    <div id="formatRow" class="format-row">
+      <button id="colorButton" type="button" title="Couleur"><span class="color-swatch"></span></button>
+      <button data-command="bold" class="format-toggle" type="button" title="Gras"><strong>G</strong></button>
+      <button data-command="underline" class="format-toggle" type="button" title="Souligné"><u>S</u></button>
+      <button data-command="strikeThrough" class="format-toggle" type="button" title="Barré"><s>B</s></button>
+      <button id="composerOptions" type="button" title="Options">⋯</button>
+      <button id="clearText" type="button" title="Vider">🧹</button>
+      <button id="cancelComposer" type="button" title="Annuler">❌</button>
+      <button id="sendText" class="send-button" type="button" title="Envoyer">✅</button>
+    </div>
+
+    <div id="colorRow" class="color-row" hidden></div>
+    <div id="sendStatus" class="status"></div>
+  </div>
+</div>
+
+<dialog id="telegramAuthModal" class="auth-dialog">
+  <form method="dialog" id="telegramAuthForm">
+    <h2 id="telegramAuthTitle">Telegram</h2>
+    <p id="telegramAuthHint" class="subtle"></p>
+    <input id="telegramAuthInput">
+    <div class="dialog-actions">
+      <button value="cancel" type="button" id="telegramAuthCancel" class="secondary">Annuler</button>
+      <button value="ok" type="submit">Continuer</button>
+    </div>
+  </form>
+</dialog>
+
+<details class="debug-box"><summary>Diagnostic rapide</summary><pre id="debug"></pre></details>
+<script type="module" src="/src/user/app.js"></script>
 </body>
 </html>

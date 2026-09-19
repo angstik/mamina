@@ -1,5 +1,5 @@
 const DB = 'mamina-user-v0'
-const VERSION = 1
+const VERSION = 2
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -25,6 +25,11 @@ function openDb() {
       if (!db.objectStoreNames.contains('assets')) db.createObjectStore('assets', { keyPath: 'key' })
       if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings')
       if (!db.objectStoreNames.contains('topics')) db.createObjectStore('topics', { keyPath: 'topicKey' })
+      if (!db.objectStoreNames.contains('outbox')) {
+        const s = db.createObjectStore('outbox', { keyPath: 'articleKey' })
+        s.createIndex('magazineId', 'magazineId')
+        s.createIndex('createdAt', 'createdAt')
+      }
     }
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
@@ -185,4 +190,34 @@ export async function pruneToMagazineIds(keepIds) {
   const keep=new Set(keepIds)
   const all=await listMagazines()
   for(const m of all) if(!keep.has(m.magazineId)) await deleteMagazine(m.magazineId)
+}
+
+
+export async function putOutbox(row) {
+  if (!row?.articleKey) throw new Error('Outbox: articleKey manquant.')
+  return transact('outbox','readwrite',store=>store.put({
+    ...row,
+    createdAt: row.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }))
+}
+export async function getOutbox(articleKey) {
+  const db=await openDb()
+  try{return await requestResult(db.transaction('outbox').objectStore('outbox').get(articleKey))}
+  finally{db.close()}
+}
+export async function listOutbox() {
+  const db=await openDb()
+  try{
+    const rows=await requestResult(db.transaction('outbox').objectStore('outbox').getAll())
+    return (rows||[]).sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||'')))
+  }finally{db.close()}
+}
+export async function deleteOutbox(articleKey) {
+  return transact('outbox','readwrite',store=>store.delete(articleKey))
+}
+export async function countOutbox() {
+  const db=await openDb()
+  try{return Number(await requestResult(db.transaction('outbox').objectStore('outbox').count())||0)}
+  finally{db.close()}
 }

@@ -1,17 +1,4 @@
-<!doctype html><html lang="fr"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="color-scheme" content="light dark"><meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="manifest" href="./manifest.webmanifest"><title>Mamina</title></head><body>
-<main>
-<h1>Mamina — prototype fonctionnel</h1>
-<section><h2>1. Déverrouiller</h2><input id="password" type="password" placeholder="Mot de passe Mamina"><button id="unlock">Déverrouiller</button><pre id="unlockStatus"></pre></section>
-<section><h2>2. Telegram</h2><button id="login">Connexion Telegram</button><button id="loadDialogs">Charger les groupes</button><select id="dialogs"><option value="">— groupe —</option></select><pre id="telegramStatus"></pre></section>
-<section><h2>3. Revue</h2>
-<label>Nom affiché dans l’application utilisateurs</label>
-<input id="appTitle" value="MamiNa" maxlength="30">
-<button id="saveAppTitle">Enregistrer le nom</button>
-<pre id="appTitleStatus"></pre>
-<button id="loadTopics">Charger les sujets</button><select id="topics"><option value="">— sujet —</option></select><button id="openTopic">Ouvrir la revue</button><hr><label>Admin : nouveau PDF Famileo</label><input id="newPdf" type="file" accept="application/pdf"><button id="createMagazine">Créer le sujet + publier le PDF</button><pre id="topicStatus"></pre><details open><summary>Diagnostic publication PDF</summary><pre id="publishTrace"></pre></details></section>
-<section><div class="row"><h2>4. Articles</h2><button id="sync">Synchroniser</button></div><div id="magazine"></div><div id="articles"></div></section>
-<details><summary>Diagnostic</summary><pre id="debug"></pre></details>
-</main><script type="module" src="/src/frontend/app.js"></script></body></html>
+<!doctype html>
+<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="0; url=./?settings=admin"><title>MamiNa</title></head>
+<body><p>Administration intégrée à <a href="./?settings=admin">MamiNa → Paramètres</a>.</p></body></html>
