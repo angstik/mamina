@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='0.9.0'
+const APP_VERSION='0.9.1'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const $=id=>document.getElementById(id)
@@ -30,15 +30,28 @@ window.addEventListener('error',e=>logError('window.error',e.message||'Erreur gl
 window.addEventListener('unhandledrejection',e=>logError('window.rejection',e.reason?.message||String(e.reason),e.reason))
 setInterval(()=>localStorage.setItem(HEARTBEAT_KEY,String(Date.now())),5000)
 
+function setArticleBadge(text,{timeout=1900}={}){
+  if($('reader').hidden)return
+  const page=$('articleDeck').querySelector(`[data-index="${currentArticleIndex}"]`)
+  const badge=page?.querySelector('.article-source-badge')
+  if(!badge)return
+  clearTimeout(badge._hideTimer)
+  badge.textContent=text
+  badge.hidden=false
+  if(timeout>0)badge._hideTimer=setTimeout(()=>{badge.hidden=true},timeout)
+}
 function showActivity(text){
   if(!text)return
   clearTimeout(activityTimer)
-  for(const id of ['activityHome','activityReader']){
-    const e=$(id);e.textContent=text;e.hidden=false
+  if(!$('reader').hidden){
+    setArticleBadge(text,{timeout:1900})
+    $('activityReader').hidden=true
+    return
   }
-  activityTimer=setTimeout(()=>{
-    for(const id of ['activityHome','activityReader'])$(id).hidden=true
-  },2600)
+  const e=$('activityHome')
+  e.textContent=text
+  e.hidden=false
+  activityTimer=setTimeout(()=>{e.hidden=true},2400)
 }
 service.setActivityListener(evt=>showActivity(evt.text))
 
@@ -353,7 +366,12 @@ async function loadVisual(i){
     }
     v.querySelector('.subtle')?.remove()
     const badge=v.querySelector('.article-source-badge')
-    if(badge){badge.textContent=result.source;badge.hidden=false}
+    if(badge){
+      clearTimeout(badge._hideTimer)
+      badge.textContent=result.source
+      badge.hidden=false
+      badge._hideTimer=setTimeout(()=>{badge.hidden=true},1800)
+    }
     v.prepend(img);v._pz?.apply()
   }catch(e){debug(e)}
 }
@@ -375,7 +393,7 @@ function activate(i){
 }
 let scrollTimer
 $('articleDeck').onscroll=()=>{if(!$('composerModal').hidden)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{const d=$('articleDeck'),i=Math.max(0,Math.min(displayArticles.length-1,Math.round(d.scrollLeft/d.clientWidth)));if(i!==currentArticleIndex)activate(i)},90)}
-function goArticle(delta){const next=Math.max(0,Math.min(displayArticles.length-1,currentArticleIndex+delta));if(next===currentArticleIndex)return;const d=$('articleDeck');d.scrollTo({left:next*d.clientWidth,behavior:'smooth'});setTimeout(()=>activate(next),190)}
+function goArticle(delta){if(!$('composerModal').hidden)return;const next=Math.max(0,Math.min(displayArticles.length-1,currentArticleIndex+delta));if(next===currentArticleIndex)return;const d=$('articleDeck');d.scrollTo({left:next*d.clientWidth,behavior:'smooth'});setTimeout(()=>activate(next),190)}
 
 function clampPan(container,img,scale,tx,ty){
   if(!img||scale<=1)return {tx:0,ty:0}
@@ -426,7 +444,7 @@ function installArticleGestures(container,index){
   container.addEventListener('touchend',e=>{
     if(start&&e.changedTouches?.length){
       const t=e.changedTouches[0],dx=t.clientX-start.x,dy=t.clientY-start.y,dur=performance.now()-start.time
-      if(st.scale===1&&Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.15){goArticle(dx<0?1:-1);start=null;pinch=null;return}
+      if($('composerModal').hidden&&st.scale===1&&Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.15){goArticle(dx<0?1:-1);start=null;pinch=null;return}
       if(st.scale>1&&lastMove){
         let vx=lastMove.vx*18,vy=lastMove.vy*18
         const inertia=()=>{
@@ -552,17 +570,50 @@ $('saveAdminTitle').onclick=async()=>{try{const t=await service.setAppTitle($('a
 $('adminPublish').onclick=async()=>{const f=$('adminPdf').files?.[0],trace=$('adminTrace');trace.textContent='';try{if(!f)throw new Error('Choisis un PDF.');$('adminPublish').disabled=true;const r=await service.adminCreateMagazine(f,{onStep:e=>{trace.textContent+=`${new Date(e.at).toLocaleTimeString()} ${e.name} ${JSON.stringify(e.detail||{})}\n`}});status('adminStatus',`Publié : ${r.articles.length} articles détectés.`,true);await localHome()}catch(e){status('adminStatus','Erreur : '+e.message,false)}finally{$('adminPublish').disabled=false}}
 
 /* Rich editor */
-function saveSelection(){const sel=getSelection();if(sel?.rangeCount&&$('composerText').contains(sel.anchorNode))savedRange=sel.getRangeAt(0).cloneRange()}
-function restoreSelection(){if(!savedRange)return false;try{const sel=getSelection();sel.removeAllRanges();sel.addRange(savedRange);return true}catch{return false}}
-function placeCaretEnd(el){const r=document.createRange();r.selectNodeContents(el);r.collapse(false);const s=getSelection();s.removeAllRanges();s.addRange(r);savedRange=r.cloneRange()}
-function rgbHex(v){if(/^#[0-9a-f]{6}$/i.test(v||''))return v.toUpperCase();const m=String(v||'').match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);return m?'#'+[m[1],m[2],m[3]].map(x=>(+x).toString(16).padStart(2,'0')).join('').toUpperCase():null}
+function saveSelection(){
+  if(toolbarGesture)return
+  const sel=getSelection()
+  if(sel?.rangeCount&&$('composerText').contains(sel.anchorNode)){
+    savedRange=sel.getRangeAt(0).cloneRange()
+  }
+}
+function forceSaveSelection(){
+  const sel=getSelection()
+  if(sel?.rangeCount&&$('composerText').contains(sel.anchorNode)){
+    savedRange=sel.getRangeAt(0).cloneRange()
+  }
+}
+function restoreSelection(){
+  if(!savedRange)return false
+  try{
+    const sel=getSelection()
+    sel.removeAllRanges()
+    sel.addRange(savedRange)
+    return true
+  }catch{return false}
+}
+function placeCaretEnd(el){
+  const r=document.createRange()
+  r.selectNodeContents(el)
+  r.collapse(false)
+  const sel=getSelection()
+  sel.removeAllRanges()
+  sel.addRange(r)
+  savedRange=r.cloneRange()
+}
+function rgbHex(v){
+  if(/^#[0-9a-f]{6}$/i.test(v||''))return v.toUpperCase()
+  const m=String(v||'').match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/)
+  return m?'#'+[m[1],m[2],m[3]].map(x=>(+x).toString(16).padStart(2,'0')).join('').toUpperCase():null
+}
 function defaultEditorColor(){
   const explicit=document.documentElement.dataset.theme
   const dark=explicit==='dark'||(!explicit&&matchMedia('(prefers-color-scheme: dark)').matches)
   return dark?'#FFFFFF':'#000000'
 }
 function explicitCaretColor(){
-  const sel=getSelection();let n=sel?.anchorNode
+  const sel=getSelection()
+  let n=sel?.anchorNode
   if(n?.nodeType===3)n=n.parentElement
   while(n&&n!==$('composerText')){
     const c=rgbHex(n.style?.color||(n.tagName==='FONT'?n.getAttribute('color'):''))
@@ -571,65 +622,117 @@ function explicitCaretColor(){
   }
   return null
 }
-let toolbarLockUntil=0
-function setFormatVisual(button,active){button.classList.toggle('active',Boolean(active));button.setAttribute('aria-pressed',active?'true':'false')}
+function setFormatVisual(button,active){
+  button.classList.toggle('active',Boolean(active))
+  button.setAttribute('aria-pressed',active?'true':'false')
+}
+let toolbarGesture=false
 function updateToolbar(){
-  if($('composerModal').hidden)return
-  if(Date.now()>=toolbarLockUntil){
-    for(const b of document.querySelectorAll('.format-toggle')){
-      let active=false;try{active=document.queryCommandState(b.dataset.command)}catch{}
-      setFormatVisual(b,active)
-    }
+  if($('composerModal').hidden||toolbarGesture)return
+  for(const b of document.querySelectorAll('.format-toggle')){
+    let active=false
+    try{active=document.queryCommandState(b.dataset.command)}catch{}
+    setFormatVisual(b,active)
   }
-  const explicit=explicitCaretColor();if(explicit)currentColor=explicit
+  const explicit=explicitCaretColor()
+  if(explicit)currentColor=explicit
   document.querySelector('.color-swatch').style.background=currentColor
 }
-document.addEventListener('selectionchange',()=>{if(!$('composerModal').hidden){saveSelection();requestAnimationFrame(updateToolbar)}})
+document.addEventListener('selectionchange',()=>{
+  if($('composerModal').hidden||toolbarGesture)return
+  saveSelection()
+  requestAnimationFrame(updateToolbar)
+})
 
 function openComposer(k){
   composerArticleKey=k
   const article=displayArticles.find(x=>x.articleKey===k)
   const pending=article?.comments?.find(c=>c.pending)
   $('composerText').innerHTML=pending?renderMarkup(pending.displayText||pending.text||''):''
-  $('composerModal').hidden=false;$('reader').classList.add('composer-open')
-  $('formatRow').hidden=false;$('colorRow').hidden=true
+  $('composerModal').hidden=false
+  $('reader').classList.add('composer-open')
+  $('formatRow').hidden=false
+  $('colorRow').hidden=true
+
   const idx=displayArticles.findIndex(x=>x.articleKey===k)
   $('readerDate').textContent=`${idx+1}/${displayArticles.length} - page ${article.page} ${slotName(article.slot)}`
-  currentColor=defaultEditorColor();document.querySelector('.color-swatch').style.background=currentColor
-  const editor=$('composerText')
-  editor.focus({preventScroll:true});placeCaretEnd(editor)
-  try{document.execCommand('styleWithCSS',false,false)}catch{}
-  saveSelection();updateToolbar();requestAnimationFrame(positionComposer)
-}
+  currentColor=defaultEditorColor()
+  document.querySelector('.color-swatch').style.background=currentColor
 
+  const editor=$('composerText')
+  editor.focus({preventScroll:true})
+  placeCaretEnd(editor)
+  try{document.execCommand('styleWithCSS',false,false)}catch{}
+  forceSaveSelection()
+  updateToolbar()
+  requestAnimationFrame(positionComposer)
+}
 function closeComposer(){
-  $('composerModal').hidden=true;$('reader').classList.remove('composer-open')
+  $('composerModal').hidden=true
+  $('reader').classList.remove('composer-open')
   $('reader').style.height=''
   $('readerDate').textContent=fmtShort(currentModel.magazine.date)
-  composerArticleKey=null;savedRange=null
+  composerArticleKey=null
+  savedRange=null
+  toolbarGesture=false
 }
 $('cancelComposer').onpointerdown=e=>e.preventDefault()
 $('cancelComposer').onclick=closeComposer
 
+function applyFormatButton(button){
+  const editor=$('composerText')
+  editor.focus({preventScroll:true})
+  restoreSelection()
+
+  let before=false
+  try{before=document.queryCommandState(button.dataset.command)}catch{}
+  try{document.execCommand(button.dataset.command,false,null)}catch(e){debug(e)}
+
+  let after=!before
+  try{after=document.queryCommandState(button.dataset.command)}catch{}
+  setFormatVisual(button,after)
+  forceSaveSelection()
+
+  setTimeout(()=>{
+    toolbarGesture=false
+    editor.focus({preventScroll:true})
+    restoreSelection()
+    forceSaveSelection()
+    updateToolbar()
+  },80)
+}
+
 for(const b of document.querySelectorAll('.format-toggle')){
-  b.onpointerdown=e=>{e.preventDefault();saveSelection()}
-  b.onclick=()=>{
-    const editor=$('composerText');editor.focus({preventScroll:true});restoreSelection()
-    let before=false;try{before=document.queryCommandState(b.dataset.command)}catch{}
-    try{document.execCommand(b.dataset.command,false,null)}catch(e){debug(e)}
-    let after=!before
-    try{const reported=document.queryCommandState(b.dataset.command);if(reported!==before)after=reported}catch{}
-    toolbarLockUntil=Date.now()+180;setFormatVisual(b,after);saveSelection();setTimeout(updateToolbar,200)
-  }
+  b.addEventListener('pointerdown',e=>{
+    e.preventDefault()
+    e.stopPropagation()
+    toolbarGesture=true
+    forceSaveSelection()
+  })
+  b.addEventListener('pointerup',e=>{
+    e.preventDefault()
+    e.stopPropagation()
+    applyFormatButton(e.currentTarget)
+  })
+  b.addEventListener('click',e=>{
+    e.preventDefault()
+    e.stopPropagation()
+  })
 }
 $('clearText').onpointerdown=e=>e.preventDefault()
-$('clearText').onclick=()=>{$('composerText').innerHTML='';$('composerText').focus({preventScroll:true});placeCaretEnd($('composerText'));updateToolbar()}
+$('clearText').onclick=()=>{
+  $('composerText').innerHTML=''
+  $('composerText').focus({preventScroll:true})
+  placeCaretEnd($('composerText'))
+  forceSaveSelection()
+  updateToolbar()
+}
 $('composerOptions').onpointerdown=e=>e.preventDefault()
 $('composerOptions').onclick=()=>{}
 
-$('colorButton').onpointerdown=e=>{e.preventDefault();saveSelection()}
+$('colorButton').onpointerdown=e=>{e.preventDefault();toolbarGesture=true;forceSaveSelection()}
 $('colorButton').onclick=async()=>{
-  saveSelection();$('formatRow').hidden=true;$('colorRow').hidden=false
+  forceSaveSelection();$('formatRow').hidden=true;$('colorRow').hidden=false
   await colors();restoreSelection();$('composerText').focus({preventScroll:true});positionComposer()
 }
 async function colors(){
@@ -650,7 +753,14 @@ async function chooseColor(c){
   await service.rememberColor(currentColor)
   $('colorRow').hidden=true;$('formatRow').hidden=false
   document.querySelector('.color-swatch').style.background=currentColor
-  setTimeout(()=>{$('composerText').focus({preventScroll:true});saveSelection();updateToolbar();positionComposer()},0)
+  setTimeout(()=>{
+    toolbarGesture=false
+    $('composerText').focus({preventScroll:true})
+    restoreSelection()
+    forceSaveSelection()
+    updateToolbar()
+    positionComposer()
+  },0)
 }
 function nodeMarkup(n){
   if(n.nodeType===3)return n.nodeValue||''
@@ -679,12 +789,37 @@ visualViewport?.addEventListener('scroll',positionComposer)
 $('composerText').addEventListener('input',()=>{saveSelection();updateToolbar();positionComposer()})
 $('composerText').addEventListener('paste',e=>{
   const text=e.clipboardData?.getData('text/plain')||''
-  if(text && lastArticleCopy.text && Date.now()-lastArticleCopy.at<5*60*1000 && (text===lastArticleCopy.text || lastArticleCopy.text.includes(text))){
-    e.preventDefault()
-    const safe=esc(text).replace(/\n/g,'<br>')
-    document.execCommand('insertHTML',false,`<span class="article-paste">${safe}</span>`)
-    saveSelection();updateToolbar()
-  }
+  const fromArticle=text && lastArticleCopy.text && Date.now()-lastArticleCopy.at<5*60*1000 &&
+    (text===lastArticleCopy.text || lastArticleCopy.text.includes(text))
+  if(!fromArticle)return
+
+  e.preventDefault()
+  const sel=getSelection()
+  if(!sel?.rangeCount)return
+  const range=sel.getRangeAt(0)
+  range.deleteContents()
+
+  const quote=document.createElement('span')
+  quote.className='article-paste'
+  quote.textContent=text
+
+  // Caret deliberately leaves the highlighted span so following typing uses
+  // the current editor style instead of extending the quote highlight.
+  const normal=document.createTextNode('\u200B')
+  const frag=document.createDocumentFragment()
+  frag.append(quote,normal)
+  range.insertNode(frag)
+
+  const after=document.createRange()
+  after.setStart(normal,1)
+  after.collapse(true)
+  sel.removeAllRanges()
+  sel.addRange(after)
+  savedRange=after.cloneRange()
+
+  currentColor=defaultEditorColor()
+  try{document.execCommand('foreColor',false,currentColor)}catch{}
+  updateToolbar()
 })
 
 $('sendText').onpointerdown=e=>e.preventDefault()

@@ -1,5 +1,18 @@
 # CHANGELOG MamiNa
 
+## v0.9.1
+**Synthèse :** stabilisation de la vue Message, toolbar déterministe, activité dans la pastille article et collage cité sans propagation du style.
+
+La v0.9.1 sépare plus strictement les quatre vues. En vue Message, la liste des réactions disparaît : il ne reste que l’article manipulable et la saisie ; le swipe entre articles est bloqué jusque dans la logique gestuelle et le bouton + reste visible mais inopérant.
+
+La barre de formatage a été réécrite autour d’un seul événement `pointerup` par bouton, avec verrou de sélection pendant l’interaction. Les clics synthétiques iOS ne peuvent donc plus rejouer la commande. Le focus revient immédiatement dans l’éditeur après G/I/S/B ou une couleur. Le bouton envoyer n’a plus l’apparence permanente d’un bouton appuyé.
+
+Un extrait copié depuis le texte de l’article reste surligné uniquement pour l’extrait collé : le curseur est explicitement déplacé dans un nœud neutre après ce contenu, de sorte que la saisie suivante reprend la casse et la couleur courantes.
+
+En vue Article, les activités (`local`, `PDF`, synchronisation, etc.) utilisent désormais la petite pastille superposée à l’article et disparaissent automatiquement ; elles ne créent plus de ligne qui déplace l’article. La pastille `local/PDF` est elle aussi transitoire. Le changement de sens des messages ne reconstruit pas l’article.
+
+Le contraste des séparateurs, panneaux et contrôles a été légèrement renforcé. Les boutons flottants sont semi-transparents en vue Article et restent suffisamment visibles en vue Message.
+
 ## v0.9.0
 **Synthèse :** stabilisation iOS/mémoire, restauration après reload, éditeur fiabilisé, ordre des messages sans rerendu, contraste renforcé.
 

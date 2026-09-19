@@ -150,3 +150,14 @@ Points techniques :
 ## v0.9
 
 Voir `CHANGELOG.md`. Cette version est dédiée à la stabilité iOS, à la mémoire canvas/PDF.js et à la robustesse de l’éditeur.
+
+
+## v0.9.1
+
+Voir `CHANGELOG.md`.
+
+Passes de vérification :
+1. syntaxe de tous les fichiers JavaScript ;
+2. vérification de toutes les références DOM ;
+3. assertions ciblées sur navigation Message, toolbar, badge activité, collage et sérialisation mémoire ;
+4. contrôle des identifiants HTML dupliqués.
