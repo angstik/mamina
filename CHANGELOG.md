@@ -1,5 +1,14 @@
 # CHANGELOG MamiNa
 
+## v0.9.2
+**Synthèse :** toggle de style/couleur rétabli pour la frappe, messages différés normalisés immédiatement et bouton Revue/Récent restauré.
+
+La v0.9.2 conserve tel quel le mécanisme déjà fiable lorsqu’un texte est sélectionné. Pour une sélection vide, G/I/S/B utilisent maintenant un état de frappe explicite et créent un petit conteneur de saisie au curseur : le style reste donc actif pour les caractères suivants jusqu’au prochain toggle. La couleur suit exactement la même logique et reste active pendant la frappe.
+
+Lorsqu’un message de l’outbox est effectivement envoyé à Telegram, le message retourné par Telegram est immédiatement écrit dans IndexedDB avant de supprimer le brouillon local. L’affichage de la revue ouverte est ensuite relu depuis le cache local : le contour pointillé disparaît sans attendre une propagation ultérieure de l’historique Telegram.
+
+Le bouton d’ordre des articles `Revue / Récent` est restauré dans l’en-tête de la vue Article. Il conserve l’article courant lorsqu’on change d’ordre et disparaît en vue Message.
+
 ## v0.9.1
 **Synthèse :** stabilisation de la vue Message, toolbar déterministe, activité dans la pastille article et collage cité sans propagation du style.
 

@@ -161,3 +161,15 @@ Passes de vérification :
 2. vérification de toutes les références DOM ;
 3. assertions ciblées sur navigation Message, toolbar, badge activité, collage et sérialisation mémoire ;
 4. contrôle des identifiants HTML dupliqués.
+
+
+## v0.9.2
+
+Voir `CHANGELOG.md`.
+
+Vérifications spécifiques :
+- chemin sélection de texte inchangé pour G/I/S/B et couleur ;
+- chemin caret vide testé séparément via `typingState` + `typing-carrier` ;
+- persistance immédiate du message retourné par Telegram après flush outbox ;
+- relecture locale de la revue ouverte après synchronisation ;
+- conservation de l'article courant lors du changement Revue/Récent.

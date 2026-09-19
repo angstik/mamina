@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='0.9.1'
+const APP_VERSION='0.9.2'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const $=id=>document.getElementById(id)
@@ -13,6 +13,7 @@ let reactionOrder='asc',articleOrderMode='magazine',appName='MamiNa'
 let composerArticleKey=null,safetyTimer=null,reconnectTimer=null,connectionClock=null,readTimer=null
 let telegramState='offline',reconnecting=false,lastConnectedAt=Number(localStorage.getItem('MAMINA_LAST_CONNECTED_AT')||0)
 let currentColor='#000000',savedRange=null,lastArticleCopy={text:'',at:0}
+let typingState={bold:false,italic:false,underline:false,strikeThrough:false,color:null}
 let activityTimer=null
 const homeUrls=[],readerUrls=[]
 const zoomStates=new Map()
@@ -206,12 +207,24 @@ async function forceReconnect(reason='manual'){
 }
 $('connectionPillHome').onclick=()=>forceReconnect('pastille')
 $('connectionPillReader').onclick=()=>forceReconnect('pastille')
+async function refreshOpenMagazineLocal(){
+  if(!currentModel?.magazine?.magazineId)return
+  const keep=currentArticle()?.articleKey
+  const fresh=await service.openMagazineLocalFirst(currentModel.magazine.magazineId)
+  currentModel=fresh
+  const byKey=new Map(fresh.articles.map(a=>[a.articleKey,a]))
+  displayArticles=displayArticles.map(a=>byKey.has(a.articleKey)?{...a,...byKey.get(a.articleKey)}:a)
+  const idx=displayArticles.findIndex(a=>a.articleKey===keep)
+  if(idx>=0)currentArticleIndex=idx
+  rerenderCommentOrderOnly()
+}
 async function backgroundSync(){
   if(!service.hasGateway()||!service.hasDialog())return
   try{
     await service.syncAll()
     await service.flushOutbox(true)
     await localHome()
+    await refreshOpenMagazineLocal()
     $('lastSyncState').textContent=new Date().toLocaleTimeString('fr-FR')
     await refreshPending()
   }catch(e){debug(e)}
@@ -296,6 +309,24 @@ async function rebuild(key){
   currentArticleIndex=i>=0?i:0
   await renderReader()
 }
+function updateArticleOrderButton(){
+  const b=$('articleOrderButton')
+  if(!b)return
+  b.textContent=articleOrderMode==='magazine'?'Revue':'Récent'
+  b.title=articleOrderMode==='magazine'
+    ?'Ordre de la revue — toucher pour classer par activité'
+    :'Non lus récents, puis lus récents, puis ordre revue'
+}
+$('articleOrderButton').onclick=async()=>{
+  if(!$('composerModal').hidden)return
+  const keep=currentArticle()?.articleKey
+  articleOrderMode=articleOrderMode==='magazine'?'activity':'magazine'
+  await service.setArticleOrderMode(articleOrderMode)
+  displayArticles=orderArticles(currentModel.articles)
+  const idx=displayArticles.findIndex(a=>a.articleKey===keep)
+  currentArticleIndex=idx>=0?idx:0
+  await renderReader()
+}
 
 function renderMarkup(t=''){
   let s=esc(t)
@@ -310,6 +341,7 @@ function renderMarkup(t=''){
 async function renderReader(){
   freeUrls(readerUrls)
   $('readerDate').textContent=fmtShort(currentModel.magazine.date)
+  updateArticleOrderButton()
   const d=$('articleDeck');d.innerHTML=''
   displayArticles.forEach((a,i)=>{
     const p=document.createElement('section');p.className='article-page';p.dataset.index=i
@@ -627,20 +659,104 @@ function setFormatVisual(button,active){
   button.setAttribute('aria-pressed',active?'true':'false')
 }
 let toolbarGesture=false
+
+function selectionRange(){
+  const sel=getSelection()
+  if(!sel?.rangeCount)return null
+  const range=sel.getRangeAt(0)
+  if(!$('composerText').contains(range.commonAncestorContainer))return null
+  return range
+}
+function typingCarrierAtCaret(){
+  const sel=getSelection()
+  let n=sel?.anchorNode
+  if(n?.nodeType===3)n=n.parentElement
+  return n?.closest?.('.typing-carrier')||null
+}
+function syncTypingStateFromCaret(){
+  const range=selectionRange()
+  if(!range||!range.collapsed||typingCarrierAtCaret())return
+  try{typingState.bold=document.queryCommandState('bold')}catch{}
+  try{typingState.italic=document.queryCommandState('italic')}catch{}
+  try{typingState.underline=document.queryCommandState('underline')}catch{}
+  try{typingState.strikeThrough=document.queryCommandState('strikeThrough')}catch{}
+  const explicit=explicitCaretColor()
+  typingState.color=explicit||defaultEditorColor()
+  currentColor=typingState.color
+}
 function updateToolbar(){
   if($('composerModal').hidden||toolbarGesture)return
-  for(const b of document.querySelectorAll('.format-toggle')){
-    let active=false
-    try{active=document.queryCommandState(b.dataset.command)}catch{}
-    setFormatVisual(b,active)
+  const range=selectionRange()
+  if(range && !range.collapsed){
+    for(const b of document.querySelectorAll('.format-toggle')){
+      let active=false
+      try{active=document.queryCommandState(b.dataset.command)}catch{}
+      setFormatVisual(b,active)
+    }
+    const explicit=explicitCaretColor()
+    if(explicit)currentColor=explicit
+  }else{
+    for(const b of document.querySelectorAll('.format-toggle')){
+      setFormatVisual(b,Boolean(typingState[b.dataset.command]))
+    }
+    currentColor=typingState.color||defaultEditorColor()
   }
-  const explicit=explicitCaretColor()
-  if(explicit)currentColor=explicit
   document.querySelector('.color-swatch').style.background=currentColor
+}
+
+function moveCaretOutsideCarrier(){
+  const carrier=typingCarrierAtCaret()
+  if(!carrier)return
+  const onlyMarker=(carrier.textContent||'').replace(/\u200B/g,'').length===0
+  const range=document.createRange()
+  if(onlyMarker){
+    range.setStartBefore(carrier)
+    carrier.remove()
+  }else{
+    range.setStartAfter(carrier)
+  }
+  range.collapse(true)
+  const sel=getSelection()
+  sel.removeAllRanges()
+  sel.addRange(range)
+  savedRange=range.cloneRange()
+}
+function applyTypingCarrier(){
+  const editor=$('composerText')
+  editor.focus({preventScroll:true})
+  restoreSelection()
+  moveCaretOutsideCarrier()
+
+  const range=selectionRange()
+  if(!range||!range.collapsed)return
+
+  const span=document.createElement('span')
+  span.className='typing-carrier'
+  span.dataset.typing='1'
+  span.style.fontWeight=typingState.bold?'700':'normal'
+  span.style.fontStyle=typingState.italic?'italic':'normal'
+  const decorations=[]
+  if(typingState.underline)decorations.push('underline')
+  if(typingState.strikeThrough)decorations.push('line-through')
+  span.style.textDecoration=decorations.join(' ')||'none'
+  span.style.color=typingState.color||defaultEditorColor()
+
+  const marker=document.createTextNode('\u200B')
+  span.appendChild(marker)
+  range.insertNode(span)
+
+  const caret=document.createRange()
+  caret.setStart(marker,1)
+  caret.collapse(true)
+  const sel=getSelection()
+  sel.removeAllRanges()
+  sel.addRange(caret)
+  savedRange=caret.cloneRange()
 }
 document.addEventListener('selectionchange',()=>{
   if($('composerModal').hidden||toolbarGesture)return
   saveSelection()
+  syncTypingStateFromCaret()
   requestAnimationFrame(updateToolbar)
 })
 
@@ -657,6 +773,7 @@ function openComposer(k){
   const idx=displayArticles.findIndex(x=>x.articleKey===k)
   $('readerDate').textContent=`${idx+1}/${displayArticles.length} - page ${article.page} ${slotName(article.slot)}`
   currentColor=defaultEditorColor()
+  typingState={bold:false,italic:false,underline:false,strikeThrough:false,color:currentColor}
   document.querySelector('.color-swatch').style.background=currentColor
 
   const editor=$('composerText')
@@ -664,6 +781,7 @@ function openComposer(k){
   placeCaretEnd(editor)
   try{document.execCommand('styleWithCSS',false,false)}catch{}
   forceSaveSelection()
+  syncTypingStateFromCaret()
   updateToolbar()
   requestAnimationFrame(positionComposer)
 }
@@ -675,6 +793,7 @@ function closeComposer(){
   composerArticleKey=null
   savedRange=null
   toolbarGesture=false
+  typingState={bold:false,italic:false,underline:false,strikeThrough:false,color:null}
 }
 $('cancelComposer').onpointerdown=e=>e.preventDefault()
 $('cancelComposer').onclick=closeComposer
@@ -683,15 +802,22 @@ function applyFormatButton(button){
   const editor=$('composerText')
   editor.focus({preventScroll:true})
   restoreSelection()
+  const range=selectionRange()
+  if(!range)return
 
-  let before=false
-  try{before=document.queryCommandState(button.dataset.command)}catch{}
-  try{document.execCommand(button.dataset.command,false,null)}catch(e){debug(e)}
-
-  let after=!before
-  try{after=document.queryCommandState(button.dataset.command)}catch{}
-  setFormatVisual(button,after)
-  forceSaveSelection()
+  // Keep the already reliable selected-text path unchanged.
+  if(!range.collapsed){
+    try{document.execCommand(button.dataset.command,false,null)}catch(e){debug(e)}
+    let active=false
+    try{active=document.queryCommandState(button.dataset.command)}catch{}
+    setFormatVisual(button,active)
+    forceSaveSelection()
+  }else{
+    const command=button.dataset.command
+    typingState[command]=!typingState[command]
+    setFormatVisual(button,typingState[command])
+    applyTypingCarrier()
+  }
 
   setTimeout(()=>{
     toolbarGesture=false
@@ -699,7 +825,7 @@ function applyFormatButton(button){
     restoreSelection()
     forceSaveSelection()
     updateToolbar()
-  },80)
+  },45)
 }
 
 for(const b of document.querySelectorAll('.format-toggle')){
@@ -724,6 +850,8 @@ $('clearText').onclick=()=>{
   $('composerText').innerHTML=''
   $('composerText').focus({preventScroll:true})
   placeCaretEnd($('composerText'))
+  typingState={bold:false,italic:false,underline:false,strikeThrough:false,color:defaultEditorColor()}
+  currentColor=typingState.color
   forceSaveSelection()
   updateToolbar()
 }
@@ -748,14 +876,26 @@ async function colors(){
 }
 async function chooseColor(c){
   currentColor=String(c).toUpperCase()
-  $('composerText').focus({preventScroll:true});restoreSelection()
-  try{document.execCommand('foreColor',false,currentColor)}catch(e){debug(e)}
+  const editor=$('composerText')
+  editor.focus({preventScroll:true})
+  restoreSelection()
+  const range=selectionRange()
+
+  // Selected-text color path remains exactly the normal browser command.
+  if(range && !range.collapsed){
+    try{document.execCommand('foreColor',false,currentColor)}catch(e){debug(e)}
+  }else{
+    typingState.color=currentColor
+    applyTypingCarrier()
+  }
+
   await service.rememberColor(currentColor)
-  $('colorRow').hidden=true;$('formatRow').hidden=false
+  $('colorRow').hidden=true
+  $('formatRow').hidden=false
   document.querySelector('.color-swatch').style.background=currentColor
   setTimeout(()=>{
     toolbarGesture=false
-    $('composerText').focus({preventScroll:true})
+    editor.focus({preventScroll:true})
     restoreSelection()
     forceSaveSelection()
     updateToolbar()
@@ -763,7 +903,7 @@ async function chooseColor(c){
   },0)
 }
 function nodeMarkup(n){
-  if(n.nodeType===3)return n.nodeValue||''
+  if(n.nodeType===3)return (n.nodeValue||'').replace(/\u200B/g,'')
   if(n.nodeType!==1)return''
   const t=n.tagName.toLowerCase();if(t==='br')return'\n'
   let x='';for(const c of n.childNodes)x+=nodeMarkup(c)
@@ -772,6 +912,13 @@ function nodeMarkup(n){
   if(t==='i'||t==='em')x=`*${x}*`
   if(t==='u')x=`__${x}__`
   if(t==='s'||t==='strike')x=`~~${x}~~`
+  if(n.classList?.contains('typing-carrier')){
+    if(/700|bold/i.test(n.style.fontWeight||''))x=`**${x}**`
+    if((n.style.fontStyle||'')==='italic')x=`*${x}*`
+    const deco=n.style.textDecoration||''
+    if(deco.includes('underline'))x=`__${x}__`
+    if(deco.includes('line-through'))x=`~~${x}~~`
+  }
   if(n.classList?.contains('article-paste'))x=`[mark]${x}[/mark]`
   const col=rgbHex(t==='font'?n.getAttribute('color'):n.style?.color);if(col)x=`[color=${col}]${x}[/color]`
   return x
@@ -786,7 +933,11 @@ function positionComposer(){
 }
 visualViewport?.addEventListener('resize',positionComposer)
 visualViewport?.addEventListener('scroll',positionComposer)
-$('composerText').addEventListener('input',()=>{saveSelection();updateToolbar();positionComposer()})
+$('composerText').addEventListener('input',()=>{
+  forceSaveSelection()
+  updateToolbar()
+  positionComposer()
+})
 $('composerText').addEventListener('paste',e=>{
   const text=e.clipboardData?.getData('text/plain')||''
   const fromArticle=text && lastArticleCopy.text && Date.now()-lastArticleCopy.at<5*60*1000 &&

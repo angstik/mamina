@@ -524,13 +524,15 @@ export class UserMaminaService {
     }
 
     try {
-      await this._sendTextNow({
+      const item={
         articleKey,
         magazineId:this.current.magazine.magazineId,
         topicId:this.current.magazine.topicId,
         text:clean,
         format:'mamina-markdown-v1',
-      })
+      }
+      const result=await this._sendTextNow(item)
+      await this._persistSentResult(item,result)
       const magazine=await getMagazine(this.current.magazine.magazineId)
       if(magazine) await this.syncKnownTopic(magazine)
       return this.openMagazineLocalFirst(this.current.magazine.magazineId)
@@ -560,11 +562,34 @@ export class UserMaminaService {
       const {rootId}=await this.gateway.ensureRoot(
         this.dialog.peer,Number(item.topicId),pdf.magazine,article,full
       )
-      await this.gateway.postTextComment(
+      const sentMessage=await this.gateway.postTextComment(
         this.dialog.peer,Number(item.topicId),rootId,item.articleKey,item.text,item.format||'mamina-markdown-v1'
       )
+      return {sentMessage,magazine,article}
     } finally {
       try { await pdf.doc?.cleanup?.(); await pdf.doc?.destroy?.() } catch {}
+    }
+  }
+
+  async _persistSentResult(item,result) {
+    const message=result?.sentMessage
+    const magazine=result?.magazine
+    if(!message || !magazine?.fullyCached) return
+
+    const row=TelegramGateway.messageModel(message)
+    const payload={
+      ...row,
+      articleKey:item.articleKey,
+      displayText:stripMeta(row.text),
+      key:`${magazine.magazineId}:${row.id}`,
+      magazineId:magazine.magazineId,
+      topicKey:magazine.topicKey,
+    }
+    await putMessages([payload])
+
+    if(this.current?.magazine?.magazineId===magazine.magazineId){
+      const withoutSame=this.current.rows.filter(r=>r.id!==payload.id)
+      this.current.rows=[...withoutSame,payload].sort((a,b)=>a.id-b.id)
     }
   }
 
@@ -577,10 +602,13 @@ export class UserMaminaService {
     let sent=0
     for(const item of rows) {
       try {
-        await this._sendTextNow(item)
+        const result=await this._sendTextNow(item)
         await deleteOutbox(item.articleKey)
+
+        await this._persistSentResult(item,result)
+
         sent++
-        info('outbox','Message différé envoyé',{articleKey:item.articleKey})
+        info('outbox','Message différé envoyé et normalisé localement',{articleKey:item.articleKey,messageId:Number(message?.id||0)||null})
       } catch(e) {
         warn('outbox','Message différé toujours en attente',{
           articleKey:item.articleKey,message:e?.message||String(e),
