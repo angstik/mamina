@@ -3,6 +3,16 @@ import { MaminaService } from '../backend/service.js'
 
 const $=id=>document.getElementById(id)
 const service=new MaminaService()
+
+async function loadMasterSettings(){
+  try{$('appTitle').value=await service.getAppTitle()}catch{}
+}
+loadMasterSettings()
+$('saveAppTitle').onclick=()=>run('appTitleStatus',async()=>{
+  const title=await service.setAppTitle($('appTitle').value)
+  $('appTitle').value=title
+  status('appTitleStatus',`Nom enregistré : ${title}. Il sera inclus dans les prochaines revues publiées.`,true)
+})
 let dialogs=[],topics=[],model=null
 function status(id,text,ok=null){const e=$(id);e.textContent=text;e.className=ok===true?'ok':ok===false?'error':''}
 function debug(e){$('debug').textContent += ($('debug').textContent?'\n':'') + (e?.stack||e?.message||String(e))}

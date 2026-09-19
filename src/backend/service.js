@@ -18,6 +18,12 @@ export class MaminaService {
   }
 
   async login(){if(!this.gateway)throw new Error('Secrets non déverrouillés.');return this.gateway.login()}
+  async getAppTitle(){return String(await kv.get('appTitle')||'MamiNa')}
+  async setAppTitle(value){
+    const title=String(value||'').trim()||'MamiNa'
+    await kv.set('appTitle',title)
+    return title
+  }
   async logout(){if(this.gateway)await this.gateway.logout()}
   async listDialogs(){const rows=await this.gateway.dialogs();return rows.map(TelegramGateway.dialogModel)}
   async selectDialog(dialogModel){const dialog=dialogModel?.dialog || dialogModel;this.dialog=dialog;this.topic=null;this.pdf=null;await kv.set('lastDialogId',idOfPeer(dialog.peer))}
@@ -33,7 +39,7 @@ export class MaminaService {
 
       step('magazine.pdf.read.start',{name:file.name,size:file.size,type:file.type})
       const pdf=await FamileoPdf.load(file)
-      const m=pdf.magazine
+      const m={...pdf.magazine,appTitle:await this.getAppTitle()}
       const articles=pdf.articles()
       step('magazine.pdf.read.done',{magazineId:m.magazineId,issue:m.issue,date:m.date,articles:articles.length})
 

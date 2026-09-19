@@ -85,3 +85,18 @@ Vite est configuré en multi-page afin de générer `index.html`, `master.html` 
 - les images sont persistées comme `Uint8Array + MIME` puis reconstruites en `Blob` à la lecture ;
 - PDF et autres octets sont stockés comme `Uint8Array` ;
 - les erreurs `IDBRequest.error` sont capturées avant `transaction.error`, qui peut être `null` dans Safari.
+
+
+## v0.5 — local-first + lecteur
+
+- rendu de la liste et navigation depuis IndexedDB avant toute connexion Telegram ;
+- Telegram se synchronise en arrière-plan et ne bloque plus l'affichage ;
+- reprise/reconnexion sur focus, pageshow, visibilitychange, online + watchdog ;
+- pastille connexion : vert connecté, sinon ancienneté depuis la dernière connexion, rouge après 9 h ;
+- en-tête lecteur : nom d'application, date jour/mois, ordre des articles, connexion ;
+- ordre d'articles : revue ou activité (non lus récents, lus récents, puis ordre revue) ;
+- le changement d'ordre conserve l'article affiché ;
+- éditeur contenteditable riche : gras, souligné, barré, couleur sans balises visibles ;
+- palette couleur remplace temporairement la barre de formatage ;
+- saisie fixée au-dessus du clavier ; le lecteur reste manipulable derrière mais le swipe horizontal est bloqué pendant l'édition ;
+- `master.html` contient un paramètre de nom d'application (défaut `MamiNa`) ; il est embarqué dans les métadonnées des prochaines revues.

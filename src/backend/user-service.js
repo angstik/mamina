@@ -151,6 +151,7 @@ export class UserMaminaService {
     for(const m of cached) if(!found.some(x=>x.magazineId===m.magazineId)) found.push(m)
     found.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || b.topicId-a.topicId)
     found=found.slice(0,10)
+    if(found.length) await settings.set('appTitle',String(found[0].appTitle||'MamiNa'))
 
     for(const m of found.slice(0,2)) await this.ensureFullCache(m)
     for(const m of found.slice(2)) await this.dropFullCache(m)
@@ -220,6 +221,7 @@ export class UserMaminaService {
     const unread=comments.filter(c=>!c.isOutgoing && c.id>(read.get(c.articleKey)||0)).length
     const record={
       ...pdf.magazine,
+      appTitle:String(pdfRow.meta?.appTitle||'MamiNa'),
       topicId:tid, topicKey:key, topicTitle:topic.title||'', pdfMessageId:pdfRow.id,
       reactionCount:comments.length, unreadCount:unread, fullyCached:false,
       lastMessageId:rows.reduce((m,r)=>Math.max(m,r.id),0), updatedAt:new Date().toISOString(),
@@ -338,6 +340,22 @@ export class UserMaminaService {
     return Promise.all(magazines.map(async m=>({...m,cover:await getAsset(`cover:${m.magazineId}`)})))
   }
 
+  async openMagazineLocalFirst(magazineId) {
+    const magazine=await getMagazine(magazineId)
+    if(!magazine) throw new Error('Revue inconnue.')
+    const bytes=await getAsset(`pdf:${magazineId}`)
+    if(magazine.fullyCached && bytes) {
+      const rows=await listMessagesByMagazine(magazineId)
+      const pdf=await FamileoPdf.load(bytes,{trace:(scope,message,detail)=>info(scope,message,detail)})
+      this.current={magazine,pdf,articles:pdf.articles(),rows}
+      return this.currentView()
+    }
+    if(!this.gateway || !this.dialog) {
+      throw new Error('Cette revue n’est pas entièrement disponible hors ligne. Connecte Telegram pour la charger.')
+    }
+    return this.openMagazine(magazineId)
+  }
+
   async openMagazine(magazineId) {
     const magazine=await getMagazine(magazineId)
     if(!magazine) throw new Error('Revue inconnue.')
@@ -423,9 +441,25 @@ export class UserMaminaService {
   }
 
   connectionState() { return this.gateway?.connectionState || 'offline' }
+  hasGateway() { return Boolean(this.gateway) }
+  hasDialog() { return Boolean(this.dialog) }
 
-  async getSettings() { return {reactionOrder:await settings.get('reactionOrder','asc'),recentColors:await settings.get('recentColors',[])} }
-  async setReactionOrder(order) { if(!['asc','desc'].includes(order))throw new Error('Ordre invalide.');await settings.set('reactionOrder',order) }
+  async getSettings() {
+    return {
+      reactionOrder:await settings.get('reactionOrder','asc'),
+      articleOrderMode:await settings.get('articleOrderMode','magazine'),
+      recentColors:await settings.get('recentColors',[]),
+      appTitle:await settings.get('appTitle','MamiNa'),
+    }
+  }
+  async setReactionOrder(order) {
+    if(!['asc','desc'].includes(order))throw new Error('Ordre invalide.')
+    await settings.set('reactionOrder',order)
+  }
+  async setArticleOrderMode(mode) {
+    if(!['magazine','activity'].includes(mode))throw new Error('Ordre d’articles invalide.')
+    await settings.set('articleOrderMode',mode)
+  }
   async rememberColor(color) {
     const normalized=String(color||'').toUpperCase()
     if(!/^#[0-9A-F]{6}$/.test(normalized)) return

@@ -123,6 +123,7 @@ export class TelegramGateway {
       issue: meta.issue ?? null,
       date: meta.date ?? null,
       sha256: meta.sha256,
+      appTitle: meta.appTitle || 'MamiNa',
     })
 
     // @mtcute/web 0.32.1 explicitly supports the browser File API as InputFileLike.

@@ -2,23 +2,30 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=yes">
   <meta name="color-scheme" content="light dark">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.webmanifest">
-  <title>Mamina</title>
+  <title>MamiNa</title>
 </head>
 <body>
   <main id="home" class="home">
     <header class="topbar">
-      <div><h1>Mamina</h1><div id="syncStatus" class="subtle">Non connecté</div></div>
-      <button id="syncNow" class="icon-button" title="Synchroniser">↻</button>
+      <div class="brand-block">
+        <h1 id="homeAppName">MamiNa</h1>
+        <div id="syncStatus" class="subtle">Données locales</div>
+      </div>
+      <div class="topbar-actions">
+        <span id="connectionPillHome" class="connection-pill unknown" title="État Telegram">—</span>
+        <button id="syncNow" class="icon-button" title="Synchroniser">↻</button>
+      </div>
     </header>
 
-    <section id="setup" class="panel">
-      <h2>Connexion</h2>
-      <input id="password" type="password" autocomplete="current-password" placeholder="Mot de passe Mamina">
-      <button id="start">Démarrer</button>
+    <section id="setup" class="panel setup-panel">
+      <h2>Connexion Telegram</h2>
+      <p class="subtle">La lecture locale reste disponible sans connexion.</p>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Mot de passe MamiNa">
+      <button id="start">Connecter Telegram</button>
       <div id="setupStatus" class="status"></div>
       <div id="groupChooser" hidden>
         <label for="groupSelect">Groupe familial</label>
@@ -27,13 +34,18 @@
       </div>
     </section>
 
-    <section id="settingsPanel" class="panel compact" hidden>
-      <div class="settings-head"><strong>Réglages</strong><span id="connectionBadge" class="connection-badge">Telegram : —</span></div>
+    <section id="settingsPanel" class="panel compact">
+      <div class="settings-head">
+        <strong>Réglages</strong>
+        <span id="connectionBadge" class="connection-label">Telegram : —</span>
+      </div>
+
       <label for="reactionOrder">Ordre des réactions</label>
       <select id="reactionOrder">
         <option value="asc">Anciennes → récentes</option>
         <option value="desc">Récentes → anciennes</option>
       </select>
+
       <details class="tech-settings">
         <summary>Diagnostic et journaux techniques</summary>
         <div class="diagnostic-grid">
@@ -42,7 +54,10 @@
           <div><span>Dernière synchro</span><strong id="lastSyncState">—</strong></div>
         </div>
         <label class="check-row"><input id="verboseLogs" type="checkbox"> Logs mtcute détaillés au prochain démarrage</label>
-        <div class="log-actions"><button id="copyLogs" type="button">Copier les logs</button><button id="clearLogs" type="button" class="secondary">Effacer</button></div>
+        <div class="log-actions">
+          <button id="copyLogs" type="button">Copier les logs</button>
+          <button id="clearLogs" type="button" class="secondary">Effacer</button>
+        </div>
         <pre id="techLogs" class="tech-logs"></pre>
       </details>
     </section>
@@ -52,28 +67,32 @@
 
   <section id="reader" class="reader" hidden>
     <header class="reader-bar">
-      <button id="back" class="icon-button">‹</button>
-      <div><strong id="readerTitle"></strong><div id="readerPage" class="subtle"></div></div>
-      <span></span>
+      <button id="back" class="icon-button back-button" aria-label="Retour">‹</button>
+      <strong id="readerAppName" class="reader-app-name">MamiNa</strong>
+      <span id="readerDate" class="reader-date"></span>
+      <button id="articleOrderButton" class="order-button" type="button" title="Ordre des articles">Revue</button>
+      <span id="connectionPillReader" class="connection-pill unknown" title="État Telegram">—</span>
+      <div id="readerPage" class="reader-page subtle"></div>
     </header>
     <div id="articleDeck" class="article-deck"></div>
   </section>
 
-  <div id="composerModal" class="composer-modal" hidden>
-    <div class="composer-sheet">
-      <div class="composer-title">Ajouter une réaction</div>
-      <textarea id="composerText" autofocus></textarea>
-      <div id="colorRow" class="color-row" hidden></div>
-      <div class="format-row">
-        <button id="colorButton" title="Couleur"><span class="color-swatch"></span></button>
-        <button data-wrap="**" title="Gras"><strong>B</strong></button>
-        <button data-wrap="__" title="Souligné"><u>U</u></button>
-        <button data-wrap="~~" title="Barré"><s>S</s></button>
-        <button id="clearText" title="Vider">Vider</button>
-        <button id="deleteText" title="Supprimer">⌫</button>
-        <button id="cancelComposer" title="Fermer">×</button>
-        <button id="sendText" class="send-button" title="Envoyer">➤</button>
+  <div id="composerModal" class="composer-overlay" hidden>
+    <div id="composerSheet" class="composer-sheet">
+      <div id="composerText" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Écrire un message…"></div>
+
+      <div id="formatRow" class="format-row">
+        <button id="colorButton" type="button" title="Couleur"><span class="color-swatch"></span></button>
+        <button data-command="bold" type="button" title="Gras"><strong>B</strong></button>
+        <button data-command="underline" type="button" title="Souligné"><u>U</u></button>
+        <button data-command="strikeThrough" type="button" title="Barré"><s>S</s></button>
+        <button id="clearText" type="button" title="Vider">Vider</button>
+        <button id="deleteText" type="button" title="Supprimer">⌫</button>
+        <button id="cancelComposer" type="button" title="Annuler">Annuler</button>
+        <button id="sendText" class="send-button" type="button" title="Envoyer">Envoyer</button>
       </div>
+
+      <div id="colorRow" class="color-row" hidden></div>
       <div id="sendStatus" class="status"></div>
     </div>
   </div>
