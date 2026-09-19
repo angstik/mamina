@@ -6,13 +6,19 @@
   <meta name="color-scheme" content="light dark">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./mamina-192.png">
+  <link rel="icon" type="image/png" href="./mamina-192.png">
   <title>MamiNa</title>
 </head>
 <body>
 <main id="home" class="home">
   <header class="homebar">
-    <div><h1 id="homeAppName">MamiNa</h1><div id="syncStatus" class="subtle">Données locales</div></div>
+    <div class="homebrand">
+      <h1 id="homeAppName">MamiNa</h1>
+      <div id="syncStatus" class="subtle">Données locales</div>
+    </div>
     <div class="status-cluster">
+      <button id="openSettingsHome" class="icon-button" type="button" aria-label="Paramètres">⚙️</button>
       <span id="pendingHome" class="pending-count" hidden>0</span>
       <button id="connectionPillHome" class="connection-pill unknown" type="button" title="Connexion Telegram">—</button>
     </div>
@@ -41,14 +47,21 @@
       <strong id="readerAppName">MamiNa</strong>
       <span id="readerDate"></span>
     </div>
-    <button id="articleOrderButton" class="order-button" type="button">Revue</button>
-    <button id="openSettings" class="icon-button settings-button" type="button" aria-label="Paramètres">⚙️</button>
     <span id="pendingReader" class="pending-count" hidden>0</span>
     <button id="connectionPillReader" class="connection-pill unknown" type="button" title="Connexion Telegram">—</button>
     <div id="readerPage" class="reader-page subtle"></div>
   </header>
   <div id="articleDeck" class="article-deck"></div>
 </section>
+
+<div id="focusOverlay" class="focus-overlay" hidden>
+  <div id="focusImageStage" class="focus-image-stage" hidden>
+    <img id="focusImage" alt="Article">
+  </div>
+  <div id="focusTextStage" class="focus-text-stage" hidden>
+    <div id="focusText"></div>
+  </div>
+</div>
 
 <section id="settingsView" class="settings-view" hidden>
   <header class="settings-bar">
@@ -70,7 +83,7 @@
         <option value="asc">Anciennes → récentes</option>
         <option value="desc">Récentes → anciennes</option>
       </select>
-      <p class="subtle">Les revues déjà mises en cache restent lisibles hors connexion. Un commentaire texte par article peut également être conservé en attente puis envoyé automatiquement.</p>
+      <p class="subtle">MamiNa fonctionne d’abord depuis son cache local. Les deux dernières revues restent disponibles hors connexion. Un commentaire texte par article peut être gardé en attente puis envoyé automatiquement.</p>
     </section>
 
     <section class="panel">
@@ -81,13 +94,12 @@
         <div><span>Dernière synchro</span><strong id="lastSyncState">—</strong></div>
         <div><span>En attente</span><strong id="pendingSettings">0</strong></div>
       </div>
-      <p class="subtle">Touchez la pastille de connexion dans l’en-tête pour forcer une reconnexion/synchronisation.</p>
+      <p class="subtle">Touchez la pastille de connexion dans l’en-tête pour forcer une reconnexion. Pendant la reconnexion elle clignote et ne peut plus être activée.</p>
     </section>
 
     <details id="adminPanel" class="panel admin-panel">
       <summary>Administration / publication</summary>
-      <p class="subtle">Ces commandes utilisent le compte Telegram connecté. Telegram refusera naturellement les actions pour lesquelles ce compte n’a pas les droits nécessaires.</p>
-
+      <p class="subtle">Les actions sont exécutées avec le compte Telegram connecté. Sans droits administrateur, Telegram les refusera.</p>
       <label for="adminAppTitle">Nom de l’application</label>
       <input id="adminAppTitle" value="MamiNa" maxlength="30">
       <button id="saveAdminTitle" type="button">Enregistrer</button>
@@ -127,20 +139,19 @@
 <div id="composerModal" class="composer-overlay" hidden>
   <div id="composerSheet" class="composer-sheet">
     <div id="composerText" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Écrire un message…"></div>
-
     <div id="formatRow" class="format-row">
       <button id="colorButton" type="button" title="Couleur"><span class="color-swatch"></span></button>
-      <button data-command="bold" class="format-toggle" type="button" title="Gras"><strong>G</strong></button>
-      <button data-command="underline" class="format-toggle" type="button" title="Souligné"><u>S</u></button>
-      <button data-command="strikeThrough" class="format-toggle" type="button" title="Barré"><s>B</s></button>
+      <button data-command="bold" class="format-toggle" type="button" title="Gras" aria-pressed="false"><strong>G</strong></button>
+      <button data-command="underline" class="format-toggle" type="button" title="Souligné" aria-pressed="false"><u>S</u></button>
+      <button data-command="strikeThrough" class="format-toggle" type="button" title="Barré" aria-pressed="false"><s>B</s></button>
+      <span class="toolbar-spacer"></span>
       <button id="composerOptions" type="button" title="Options">⋯</button>
       <button id="clearText" type="button" title="Vider">🧹</button>
       <button id="cancelComposer" type="button" title="Annuler">❌</button>
       <button id="sendText" class="send-button" type="button" title="Envoyer">✅</button>
     </div>
-
     <div id="colorRow" class="color-row" hidden></div>
-    <div id="sendStatus" class="status"></div>
+    <div id="sendStatus" class="status compact-status"></div>
   </div>
 </div>
 
@@ -156,7 +167,6 @@
   </form>
 </dialog>
 
-<details class="debug-box"><summary>Diagnostic rapide</summary><pre id="debug"></pre></details>
 <script type="module" src="/src/user/app.js"></script>
 </body>
 </html>

@@ -351,13 +351,25 @@ export class UserMaminaService {
   async openMagazineLocalFirst(magazineId) {
     const magazine=await getMagazine(magazineId)
     if(!magazine) throw new Error('Revue inconnue.')
+
     const bytes=await getAsset(`pdf:${magazineId}`)
-    if(magazine.fullyCached && bytes) {
-      const rows=await listMessagesByMagazine(magazineId)
-      const pdf=await FamileoPdf.load(bytes,{trace:(scope,message,detail)=>info(scope,message,detail)})
-      this.current={magazine,pdf,articles:pdf.articles(),rows}
+    const storedArticles=await listArticles(magazineId)
+    const rows=await listMessagesByMagazine(magazineId)
+
+    // Fast path: no PDF.js parse on every opening. Articles and messages are
+    // already indexed in IndexedDB. PDF.js is loaded lazily only if an image
+    // is not in the local asset cache.
+    if(magazine.fullyCached && bytes && storedArticles.length) {
+      this.current={
+        magazine,
+        pdf:null,
+        pdfBytes:bytes,
+        articles:storedArticles,
+        rows,
+      }
       return this.currentView()
     }
+
     if(!this.gateway || !this.dialog) {
       throw new Error('Cette revue n’est pas entièrement disponible hors ligne. Connecte Telegram pour la charger.')
     }
@@ -523,17 +535,52 @@ export class UserMaminaService {
   }
 
   async pendingCount() { return countOutbox() }
+  async pendingForArticle(articleKey) { return getOutbox(articleKey) }
+
+  async ensureCurrentPdf() {
+    if(!this.current) throw new Error('Aucune revue ouverte.')
+    if(this.current.pdf) return this.current.pdf
+    const bytes=this.current.pdfBytes || await getAsset(`pdf:${this.current.magazine.magazineId}`)
+    if(!bytes) throw new Error('PDF local indisponible.')
+    this.current.pdf=await FamileoPdf.load(bytes)
+    this.current.pdfBytes=bytes
+
+    // Newer parser versions may enrich old stored article records with
+    // articleText/textBounds. Keep the enriched copy in memory and IndexedDB.
+    const parsed=this.current.pdf.articles()
+    if(parsed.length){
+      this.current.articles=parsed
+      try { await replaceArticles(this.current.magazine.magazineId,parsed) } catch {}
+    }
+    return this.current.pdf
+  }
 
   async getArticleImage(articleKey) {
     if(!this.current) throw new Error('Aucune revue ouverte.')
     const assetKey=`article:${articleKey}`
     const cached=await getAsset(assetKey)
     if(cached) return cached
-    const article=this.current.articles.find(a=>a.articleKey===articleKey)
+
+    let article=this.current.articles.find(a=>a.articleKey===articleKey)
     if(!article) throw new Error('Article inconnu.')
-    const blob=await canvasBlob(await this.current.pdf.renderArticle(article), 'image/jpeg', .86)
+    const pdf=await this.ensureCurrentPdf()
+    article=this.current.articles.find(a=>a.articleKey===articleKey) || article
+    const blob=await canvasBlob(await pdf.renderArticle(article), 'image/jpeg', .86)
     if(this.current.magazine.fullyCached) await putAsset(assetKey,blob)
     return blob
+  }
+
+  async warmArticleImages(articleKeys=[]) {
+    if(!this.current?.magazine?.fullyCached) return
+    for(const key of articleKeys){
+      try {
+        const cached=await getAsset(`article:${key}`)
+        if(!cached) await this.getArticleImage(key)
+      } catch(e) {
+        warn('cache','Préchargement article impossible',{articleKey:key,message:e?.message||String(e)})
+      }
+      await new Promise(resolve=>setTimeout(resolve,0))
+    }
   }
 
   async ensureConnected(reason='app-resume') {

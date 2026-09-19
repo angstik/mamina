@@ -157,6 +157,70 @@ function inferSlots(textContent, pageHeight) {
   return top&&bottom ? ['h','b'] : ['p']
 }
 
+
+function articleDetails(textContent, pageWidth, pageHeight, slot) {
+  const source = Array.isArray(textContent?.items) ? textContent.items : []
+  const crop = slot === 'h'
+    ? {x0:.035, y0:.015, x1:.965, y1:.490}
+    : slot === 'b'
+      ? {x0:.035, y0:.495, x1:.965, y1:.960}
+      : {x0:.035, y0:.015, x1:.965, y1:.960}
+
+  const selected=[]
+  for(let i=0;i<source.length;i++){
+    const it=source[i]
+    if(!it?.str || !it?.transform) continue
+    const x=Number(it.transform[4]||0)
+    const pdfY=Number(it.transform[5]||0)
+    const topY=pageHeight-pdfY
+    const nx=x/pageWidth
+    const ny=topY/pageHeight
+    if(nx<crop.x0 || nx>crop.x1 || ny<crop.y0 || ny>crop.y1) continue
+    // Exclude the Famileo footer/page number.
+    if(ny>.955) continue
+    selected.push({
+      str:String(it.str),
+      x,
+      y:topY,
+      width:Number(it.width||0),
+      height:Math.max(8,Number(it.height||Math.abs(it.transform[0])||10)),
+    })
+  }
+
+  selected.sort((a,b)=>a.y-b.y || a.x-b.x)
+  let text=''
+  for(let i=0;i<selected.length;i++){
+    if(text) text+=' '
+    text+=selected[i].str
+  }
+
+  if(!selected.length) return {articleText:text.trim(), textBounds:null}
+
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity
+  for(const it of selected){
+    minX=Math.min(minX,it.x)
+    minY=Math.min(minY,it.y-it.height)
+    maxX=Math.max(maxX,it.x+Math.max(it.width,10))
+    maxY=Math.max(maxY,it.y+it.height*.4)
+  }
+
+  const cropX=crop.x0*pageWidth
+  const cropY=crop.y0*pageHeight
+  const cropW=(crop.x1-crop.x0)*pageWidth
+  const cropH=(crop.y1-crop.y0)*pageHeight
+  const padX=.02, padY=.025
+
+  return {
+    articleText:text.trim(),
+    textBounds:{
+      x0:Math.max(0,(minX-cropX)/cropW-padX),
+      y0:Math.max(0,(minY-cropY)/cropH-padY),
+      x1:Math.min(1,(maxX-cropX)/cropW+padX),
+      y1:Math.min(1,(maxY-cropY)/cropH+padY),
+    },
+  }
+}
+
 function textFromContent(tc) {
   const arr = Array.isArray(tc?.items) ? tc.items : []
   let out = ''
@@ -250,7 +314,11 @@ export class FamileoPdf {
         const tc=await getTextContentCompat(page, {}, emit, `page ${pageNo}`)
         const slots=inferSlots(tc, viewport.height)
         const text=textFromContent(tc)
-        pagePlans.push({page:pageNo,slots,text})
+        const details={}
+        for(let si=0;si<slots.length;si++){
+          details[slots[si]]=articleDetails(tc,viewport.width,viewport.height,slots[si])
+        }
+        pagePlans.push({page:pageNo,slots,text,details})
         emit('pdf.page','Page analysée',{page:pageNo,slots,items:tc.items.length})
       } catch(e) {
         throw asError(e,`PDF / page ${pageNo}`)
@@ -289,6 +357,8 @@ export class FamileoPdf {
           page:plan.page,
           slot,
           pageText:plan.text,
+          articleText:plan.details?.[slot]?.articleText || plan.text,
+          textBounds:plan.details?.[slot]?.textBounds || null,
         })
       }
     }

@@ -116,3 +116,16 @@ Vite est configuré en multi-page afin de générer `index.html`, `master.html` 
 - palette couleur ne ferme pas le clavier pour les couleurs rapides ;
 - éditeur compact 1 à 3 lignes, fixé juste au-dessus du clavier ;
 - zoom/pan tactile de l'image article pendant la saisie, sans transformer la zone de saisie.
+
+
+## v0.7
+
+Voir `CHANGELOG.md`.
+
+Points techniques principaux :
+- ouverture locale d’une revue sans reparsing PDF systématique ;
+- PDF.js chargé à la demande uniquement pour une image absente du cache ;
+- préchauffage prédictif des articles courant ±2 ;
+- article enrichi avec `articleText` et `textBounds` pour le double-tap photo/texte ;
+- commentaire outbox rééditable avant envoi ;
+- icônes PWA/iOS 192 et 512.
