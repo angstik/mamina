@@ -2,7 +2,9 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='0.8.0'
+const APP_VERSION='0.9.0'
+const READER_STATE_KEY='MAMINA_READER_STATE'
+const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const $=id=>document.getElementById(id)
 const service=new UserMaminaService()
 
@@ -23,6 +25,10 @@ const freeUrls=b=>{while(b.length)URL.revokeObjectURL(b.pop())}
 const fmtDate=iso=>{if(!iso)return'';const d=new Date(`${iso}T12:00:00`);return new Intl.DateTimeFormat('fr-FR',{day:'numeric',month:'long',year:'numeric'}).format(d)}
 const fmtShort=iso=>{if(!iso)return'';const d=new Date(`${iso}T12:00:00`);return new Intl.DateTimeFormat('fr-FR',{day:'numeric',month:'long'}).format(d)}
 const slotName=s=>s==='h'?'haut':s==='b'?'bas':'pleine page'
+
+window.addEventListener('error',e=>logError('window.error',e.message||'Erreur globale',e.error||{filename:e.filename,lineno:e.lineno,colno:e.colno}))
+window.addEventListener('unhandledrejection',e=>logError('window.rejection',e.reason?.message||String(e.reason),e.reason))
+setInterval(()=>localStorage.setItem(HEARTBEAT_KEY,String(Date.now())),5000)
 
 function showActivity(text){
   if(!text)return
@@ -98,10 +104,16 @@ async function showWelcomeSplash(force=false){
 }
 async function init(){
   $('networkState').textContent=navigator.onLine?'En ligne':'Hors ligne'
+  const previousBeat=Number(localStorage.getItem(HEARTBEAT_KEY)||0)
   await showWelcomeSplash()
   await localHome()
   renderLogs()
   connectionClock=setInterval(refreshPills,1000)
+  const saved=readReaderState()
+  if(saved?.magazineId){
+    if(previousBeat && Date.now()-previousBeat<30000) info('lifecycle','Reprise automatique après rechargement probable',{saved})
+    await openMagazine(saved.magazineId,saved.articleKey,true)
+  }
 }
 init()
 
@@ -154,9 +166,12 @@ function startNetwork(){
   service.onChanged=async()=>{
     await localHome()
     if(currentModel){
-      const k=currentArticle()?.articleKey
-      currentModel=await service.openMagazineLocalFirst(currentModel.magazine.magazineId)
-      await rebuild(k)
+      const fresh=await service.openMagazineLocalFirst(currentModel.magazine.magazineId)
+      currentModel=fresh
+      const byKey=new Map(fresh.articles.map(a=>[a.articleKey,a]))
+      displayArticles=displayArticles.map(a=>byKey.has(a.articleKey)?{...a,...byKey.get(a.articleKey)}:a)
+      rerenderCommentOrderOnly()
+      await refreshPending()
     }
   }
   clearInterval(safetyTimer)
@@ -206,31 +221,47 @@ async function renderMagazineList(){
     h.appendChild(b)
   }
 }
-async function openMagazine(id){
+function readReaderState(){try{return JSON.parse(localStorage.getItem(READER_STATE_KEY)||'null')}catch{return null}}
+function saveReaderState(articleKey=currentArticle()?.articleKey){
+  if(!currentModel?.magazine?.magazineId)return
+  localStorage.setItem(READER_STATE_KEY,JSON.stringify({magazineId:currentModel.magazine.magazineId,articleKey:articleKey||null,at:Date.now()}))
+}
+function clearReaderState(){localStorage.removeItem(READER_STATE_KEY)}
+
+async function openMagazine(id,preferredArticleKey=null,restoring=false){
   try{
-    showActivity('Ouverture locale de la revue…')
+    showActivity(restoring?'Restauration de la revue…':'Ouverture locale de la revue…')
     currentModel=await service.openMagazineLocalFirst(id)
     await loadSettings()
     displayArticles=orderArticles(currentModel.articles)
-    const u=displayArticles.findIndex(a=>a.unreadCount>0)
-    currentArticleIndex=u>=0?u:0
+    const preferred=preferredArticleKey?displayArticles.findIndex(a=>a.articleKey===preferredArticleKey):-1
+    const unread=displayArticles.findIndex(a=>a.unreadCount>0)
+    currentArticleIndex=preferred>=0?preferred:(unread>=0?unread:0)
     $('home').hidden=true;$('reader').hidden=false
+    saveReaderState(displayArticles[currentArticleIndex]?.articleKey)
     await renderReader()
-    // Enrich older caches in background only if needed.
     if(displayArticles.some(a=>!a.photoBounds||!a.authorName)){
       setTimeout(async()=>{
         try{
-          showActivity('Index article · enrichissement local…')
           await service.ensureCurrentPdf()
-          currentModel=await service.openMagazineLocalFirst(id)
+          const keep=currentArticle()?.articleKey
+          currentModel=await service.currentView()
           displayArticles=orderArticles(currentModel.articles)
-          await rebuild(currentArticle()?.articleKey)
+          const idx=displayArticles.findIndex(a=>a.articleKey===keep)
+          if(idx>=0)currentArticleIndex=idx
         }catch(e){debug(e)}
-      },250)
+      },500)
     }
-  }catch(e){alert(e.message);debug(e)}
+  }catch(e){
+    if(restoring)clearReaderState();else alert(e.message)
+    debug(e)
+  }
 }
-$('back').onclick=async()=>{if(!$('composerModal').hidden)return;$('reader').hidden=true;$('home').hidden=false;freeUrls(readerUrls);currentModel=null;await localHome()}
+$('back').onclick=async()=>{
+  if(!$('composerModal').hidden)return
+  clearReaderState();$('reader').hidden=true;$('home').hidden=false
+  freeUrls(readerUrls);zoomStates.clear();await service.closeMagazine();currentModel=null;await localHome()
+}
 
 function magRank(a){return[Number(a.page||0),({h:0,p:0,b:1}[a.slot]??0)]}
 function latest(a,unread=false){let n=0;for(const c of a.comments||[]){if(c.pending)continue;if(unread&&(c.isOutgoing||c.id<=a.lastReadMessageId))continue;n=Math.max(n,+c.id||0)}return n}
@@ -270,12 +301,16 @@ async function renderReader(){
   displayArticles.forEach((a,i)=>{
     const p=document.createElement('section');p.className='article-page';p.dataset.index=i
     const v=document.createElement('div');v.className='article-visual'
-    v.innerHTML=`<div class="subtle">Chargement…</div><div class="article-actions"><button class="article-float message-order" title="Ordre des messages">${reactionOrder==='asc'?'↑':'↓'}</button><button class="article-float add-message" title="Ajouter">＋</button></div>`
+    v.innerHTML=`<div class="subtle">Chargement…</div><span class="article-source-badge" hidden></span><div class="article-actions"><button class="article-float message-order" title="Ordre des messages">${reactionOrder==='asc'?'↑':'↓'}</button><button class="article-float add-message" title="Ajouter">＋</button></div>`
     p.appendChild(v)
     const list=document.createElement('div');list.className='reaction-list';renderComments(a,list);p.appendChild(list)
     d.appendChild(p)
     v.querySelector('.add-message').onclick=()=>openComposer(a.articleKey)
-    v.querySelector('.message-order').onclick=async()=>{reactionOrder=reactionOrder==='asc'?'desc':'asc';await service.setReactionOrder(reactionOrder);await rebuild(a.articleKey)}
+    v.querySelector('.message-order').onclick=async()=>{
+      reactionOrder=reactionOrder==='asc'?'desc':'asc'
+      await service.setReactionOrder(reactionOrder)
+      rerenderCommentOrderOnly()
+    }
     installArticleGestures(v,i)
   })
   requestAnimationFrame(()=>{d.scrollLeft=currentArticleIndex*d.clientWidth;activate(currentArticleIndex)})
@@ -293,30 +328,43 @@ function renderComments(a,list){
     list.appendChild(e)
   }
 }
+function rerenderCommentOrderOnly(){
+  for(let i=0;i<displayArticles.length;i++){
+    const page=$('articleDeck').querySelector(`[data-index="${i}"]`)
+    const list=page?.querySelector('.reaction-list')
+    if(list)renderComments(displayArticles[i],list)
+    const button=page?.querySelector('.message-order')
+    if(button)button.textContent=reactionOrder==='asc'?'↑':'↓'
+  }
+  const list=$('articleDeck').querySelector(`[data-index="${currentArticleIndex}"] .reaction-list`)
+  if(list)requestAnimationFrame(()=>{list.scrollTop=reactionOrder==='asc'?list.scrollHeight:0})
+}
 async function loadVisual(i){
   const p=$('articleDeck').querySelector(`[data-index="${i}"]`),v=p?.querySelector('.article-visual')
   if(!v||v.querySelector('img'))return
   try{
-    showActivity(`Article ${i+1}/${displayArticles.length} · cache local`)
-    const b=await service.getArticleImage(displayArticles[i].articleKey)
+    const result=await service.getArticleImageInfo(displayArticles[i].articleKey)
     const img=document.createElement('img')
-    img.src=objectUrl(b,readerUrls)
+    img.src=objectUrl(result.blob,readerUrls)
     img.onload=()=>{
       const desired=Math.min(innerHeight*.58, v.clientWidth*(img.naturalHeight/img.naturalWidth))
       if(Number.isFinite(desired)&&desired>180) v.style.flexBasis=`${Math.round(desired)}px`
       v._pz?.apply()
     }
-    v.querySelector('.subtle')?.remove();v.prepend(img)
-    v._pz?.apply()
+    v.querySelector('.subtle')?.remove()
+    const badge=v.querySelector('.article-source-badge')
+    if(badge){badge.textContent=result.source;badge.hidden=false}
+    v.prepend(img);v._pz?.apply()
   }catch(e){debug(e)}
 }
 function warmAround(i){
   const keys=[]
-  for(const j of [i,i+1,i-1,i+2,i-2])if(j>=0&&j<displayArticles.length)keys.push(displayArticles[j].articleKey)
-  service.warmArticleImages(keys)
+  for(const j of [i+1,i-1])if(j>=0&&j<displayArticles.length)keys.push(displayArticles[j].articleKey)
+  if(keys.length)setTimeout(()=>service.warmArticleImages(keys),120)
 }
 function activate(i){
   currentArticleIndex=i
+  saveReaderState(currentArticle()?.articleKey)
   $('readerPage').textContent=`Article ${i+1}/${displayArticles.length} · p${currentArticle().page}-${currentArticle().slot}`
   ;[i,i-1,i+1].forEach(loadVisual)
   setTimeout(()=>warmAround(i),0)
@@ -416,7 +464,9 @@ function cropImage(img,bounds){
   const x=Math.max(0,Math.floor(b.x0*img.naturalWidth)),y=Math.max(0,Math.floor(b.y0*img.naturalHeight))
   const w=Math.max(1,Math.floor((b.x1-b.x0)*img.naturalWidth)),h=Math.max(1,Math.floor((b.y1-b.y0)*img.naturalHeight))
   const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,x,y,w,h,0,0,w,h)
-  return c.toDataURL('image/jpeg',.9)
+  const url=c.toDataURL('image/jpeg',.88)
+  try{c.width=1;c.height=1}catch{}
+  return url
 }
 function articleImg(index){return $('articleDeck').querySelector(`[data-index="${index}"] .article-visual img`)}
 function openFocusPhoto(a,index){
@@ -440,7 +490,15 @@ $('focusOverlay').addEventListener('pointerup',e=>{
   if(e.target.closest('.focus-text-stage'))return
   const n=Date.now();if(n-focusTap<350){closeFocus();focusTap=0}else focusTap=n
 })
-$('focusTextStage').addEventListener('dblclick',closeFocus)
+$('focusTextStage').addEventListener('dblclick',e=>{e.preventDefault();closeFocus()})
+let focusTextTap={time:0,x:0,y:0}
+$('focusTextStage').addEventListener('touchend',e=>{
+  if(e.changedTouches?.length!==1)return
+  const t=e.changedTouches[0],now=Date.now()
+  const close=now-focusTextTap.time<340 && Math.hypot(t.clientX-focusTextTap.x,t.clientY-focusTextTap.y)<28
+  focusTextTap={time:now,x:t.clientX,y:t.clientY}
+  if(close){e.preventDefault();closeFocus();focusTextTap={time:0,x:0,y:0}}
+},{passive:false})
 $('focusTextStage').addEventListener('copy',()=>{
   const txt=getSelection()?.toString()||''
   if(txt){lastArticleCopy={text:txt,at:Date.now()}}
@@ -498,35 +556,52 @@ function saveSelection(){const sel=getSelection();if(sel?.rangeCount&&$('compose
 function restoreSelection(){if(!savedRange)return false;try{const sel=getSelection();sel.removeAllRanges();sel.addRange(savedRange);return true}catch{return false}}
 function placeCaretEnd(el){const r=document.createRange();r.selectNodeContents(el);r.collapse(false);const s=getSelection();s.removeAllRanges();s.addRange(r);savedRange=r.cloneRange()}
 function rgbHex(v){if(/^#[0-9a-f]{6}$/i.test(v||''))return v.toUpperCase();const m=String(v||'').match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);return m?'#'+[m[1],m[2],m[3]].map(x=>(+x).toString(16).padStart(2,'0')).join('').toUpperCase():null}
+function defaultEditorColor(){
+  const explicit=document.documentElement.dataset.theme
+  const dark=explicit==='dark'||(!explicit&&matchMedia('(prefers-color-scheme: dark)').matches)
+  return dark?'#FFFFFF':'#000000'
+}
+function explicitCaretColor(){
+  const sel=getSelection();let n=sel?.anchorNode
+  if(n?.nodeType===3)n=n.parentElement
+  while(n&&n!==$('composerText')){
+    const c=rgbHex(n.style?.color||(n.tagName==='FONT'?n.getAttribute('color'):''))
+    if(c)return c
+    n=n.parentElement
+  }
+  return null
+}
+let toolbarLockUntil=0
+function setFormatVisual(button,active){button.classList.toggle('active',Boolean(active));button.setAttribute('aria-pressed',active?'true':'false')}
 function updateToolbar(){
   if($('composerModal').hidden)return
-  for(const b of document.querySelectorAll('.format-toggle')){
-    let active=false
-    try{active=document.queryCommandState(b.dataset.command)}catch{}
-    b.classList.toggle('active',active);b.setAttribute('aria-pressed',active?'true':'false')
+  if(Date.now()>=toolbarLockUntil){
+    for(const b of document.querySelectorAll('.format-toggle')){
+      let active=false;try{active=document.queryCommandState(b.dataset.command)}catch{}
+      setFormatVisual(b,active)
+    }
   }
-  let c=null;try{c=rgbHex(document.queryCommandValue('foreColor'))}catch{}
-  if(c)currentColor=c
+  const explicit=explicitCaretColor();if(explicit)currentColor=explicit
   document.querySelector('.color-swatch').style.background=currentColor
 }
 document.addEventListener('selectionchange',()=>{if(!$('composerModal').hidden){saveSelection();requestAnimationFrame(updateToolbar)}})
 
-async function openComposer(k){
+function openComposer(k){
   composerArticleKey=k
-  const pending=await service.pendingForArticle(k)
-  $('composerText').innerHTML=pending?renderMarkup(pending.text):''
+  const article=displayArticles.find(x=>x.articleKey===k)
+  const pending=article?.comments?.find(c=>c.pending)
+  $('composerText').innerHTML=pending?renderMarkup(pending.displayText||pending.text||''):''
   $('composerModal').hidden=false;$('reader').classList.add('composer-open')
   $('formatRow').hidden=false;$('colorRow').hidden=true
-  const a=displayArticles.find(x=>x.articleKey===k),idx=displayArticles.findIndex(x=>x.articleKey===k)
-  $('readerDate').textContent=`${idx+1}/${displayArticles.length} - page ${a.page} ${slotName(a.slot)}`
-  currentColor='#000000';document.querySelector('.color-swatch').style.background=currentColor
-  setTimeout(()=>{
-    placeCaretEnd($('composerText'))
-    $('composerText').focus({preventScroll:true})
-    try{document.execCommand('styleWithCSS',false,false)}catch{}
-    saveSelection();updateToolbar();positionComposer()
-  },30)
+  const idx=displayArticles.findIndex(x=>x.articleKey===k)
+  $('readerDate').textContent=`${idx+1}/${displayArticles.length} - page ${article.page} ${slotName(article.slot)}`
+  currentColor=defaultEditorColor();document.querySelector('.color-swatch').style.background=currentColor
+  const editor=$('composerText')
+  editor.focus({preventScroll:true});placeCaretEnd(editor)
+  try{document.execCommand('styleWithCSS',false,false)}catch{}
+  saveSelection();updateToolbar();requestAnimationFrame(positionComposer)
 }
+
 function closeComposer(){
   $('composerModal').hidden=true;$('reader').classList.remove('composer-open')
   $('reader').style.height=''
@@ -539,9 +614,12 @@ $('cancelComposer').onclick=closeComposer
 for(const b of document.querySelectorAll('.format-toggle')){
   b.onpointerdown=e=>{e.preventDefault();saveSelection()}
   b.onclick=()=>{
-    restoreSelection();$('composerText').focus({preventScroll:true})
+    const editor=$('composerText');editor.focus({preventScroll:true});restoreSelection()
+    let before=false;try{before=document.queryCommandState(b.dataset.command)}catch{}
     try{document.execCommand(b.dataset.command,false,null)}catch(e){debug(e)}
-    saveSelection();requestAnimationFrame(updateToolbar)
+    let after=!before
+    try{const reported=document.queryCommandState(b.dataset.command);if(reported!==before)after=reported}catch{}
+    toolbarLockUntil=Date.now()+180;setFormatVisual(b,after);saveSelection();setTimeout(updateToolbar,200)
   }
 }
 $('clearText').onpointerdown=e=>e.preventDefault()
@@ -556,7 +634,7 @@ $('colorButton').onclick=async()=>{
 }
 async function colors(){
   const row=$('colorRow');row.innerHTML=''
-  const cfg=await service.getSettings(),cs=[...new Set(['#000000',...(cfg.recentColors||[]),'#FF0000','#FFD400','#0066FF','#00A651'])]
+  const cfg=await service.getSettings(),base=defaultEditorColor(),cs=[...new Set([base,...(cfg.recentColors||[]),'#FF0000','#FFD400','#0066FF','#00A651'])]
   for(const c of cs){
     const b=document.createElement('button');b.className='color-choice';b.style.background=c
     b.onpointerdown=e=>e.preventDefault();b.onclick=()=>chooseColor(c);row.appendChild(b)
@@ -567,7 +645,7 @@ async function colors(){
 }
 async function chooseColor(c){
   currentColor=String(c).toUpperCase()
-  restoreSelection();$('composerText').focus({preventScroll:true})
+  $('composerText').focus({preventScroll:true});restoreSelection()
   try{document.execCommand('foreColor',false,currentColor)}catch(e){debug(e)}
   await service.rememberColor(currentColor)
   $('colorRow').hidden=true;$('formatRow').hidden=false
@@ -617,10 +695,16 @@ $('sendText').onclick=async()=>{
     b.disabled=true
     showActivity(telegramState==='connected'?'Envoi du message…':'Message conservé localement…')
     // Keep keyboard/editor in place until storage/network work is finished.
-    currentModel=await service.postText(composerArticleKey,t)
     const k=composerArticleKey
+    currentModel=await service.postText(k,t)
+    const updated=currentModel.articles.find(a=>a.articleKey===k)
+    const idx=displayArticles.findIndex(a=>a.articleKey===k)
+    if(updated&&idx>=0){
+      displayArticles[idx]={...displayArticles[idx],...updated}
+      const list=$('articleDeck').querySelector(`[data-index="${idx}"] .reaction-list`)
+      if(list)renderComments(displayArticles[idx],list)
+    }
     await refreshPending()
-    await rebuild(k)
     closeComposer()
   }catch(e){debug(e)}
   finally{b.disabled=false}

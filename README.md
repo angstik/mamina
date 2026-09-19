@@ -145,3 +145,8 @@ Points techniques :
 - italique + surlignage local des collages provenant d’un article ;
 - zoom/pan borné, inertiel et persistant par article ;
 - éditeur ancré sur `visualViewport` et sélection restaurée pour les commandes riches.
+
+
+## v0.9
+
+Voir `CHANGELOG.md`. Cette version est dédiée à la stabilité iOS, à la mémoire canvas/PDF.js et à la robustesse de l’éditeur.

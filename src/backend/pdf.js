@@ -411,6 +411,7 @@ export class FamileoPdf {
     out.width=w
     out.height=h
     out.getContext('2d').drawImage(canvas,x,y,w,h,0,0,w,h)
+    try { canvas.width=1; canvas.height=1; page.cleanup?.() } catch {}
     return out
   }
 }

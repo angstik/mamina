@@ -1,5 +1,31 @@
 # CHANGELOG MamiNa
 
+## v0.9.0
+**Synthèse :** stabilisation iOS/mémoire, restauration après reload, éditeur fiabilisé, ordre des messages sans rerendu, contraste renforcé.
+
+v0.9 : stabilise iOS, réduit la mémoire PDF/canvas, restaure la revue après reload, fiabilise l’éditeur et inverse les messages sans rerendu.
+
+La v0.9 est volontairement une version de stabilisation avant la v1. Le symptôme de rechargement sans message est très compatible avec une mise à mort du processus WebKit pour pression mémoire : notre code pouvait ouvrir/rendre plusieurs PDF en parallèle et, surtout, reparsait les deux revues complètes à chaque synchronisation de 30 secondes.
+
+Les rendus PDF sont maintenant sérialisés, les canvases sont libérés explicitement, les PDF temporaires sont détruits après usage, le préchargement ne concerne plus que les voisins immédiats et une revue déjà entièrement en cache n’est plus reparsée lors des synchronisations suivantes. L’état revue/article est conservé pour revenir automatiquement au même endroit après un reload iOS inattendu.
+
+Le double-tap de la vue texte est rétabli avec un gestionnaire tactile dédié. Le changement d’ordre des messages ne reconstruit plus l’article : seules les réactions sont rerendues. Une pastille `local` ou `PDF` est affichée directement sur l’article. Les traits, panneaux et boutons flottants ont plus de contraste.
+
+L’éditeur prend maintenant le focus de manière synchrone dès l’ouverture. La première couleur est noire en clair et blanche en sombre. Les commandes G/I/S/B restaurent la sélection après avoir remis le focus dans l’éditeur, et leur état visuel est verrouillé brièvement pour éviter les retours incohérents de Safari. L’envoi met à jour uniquement la liste de réactions courante avant de fermer l’éditeur, sans reconstruire le lecteur sous le clavier.
+
+J’ai effectué plusieurs passes de vérification : syntaxe Node de tous les modules cœur, contrôle de tous les IDs HTML référencés, absence de doublons, invariants ciblés sur les régressions ci-dessus, puis contrôle d’intégrité du ZIP. Le build Vite complet n’a pas pu être rejoué ici car `npm install` expire sur le réseau de l’environnement.
+
+## v0.9.0
+**Synthèse :** stabilisation iOS/mémoire, restauration après reload, éditeur fiabilisé, ordre des messages sans rerendu, contraste renforcé.
+
+La v0.9 est une passe de stabilisation avant v1. Les rendus PDF sont maintenant sérialisés, les canvases sont explicitement libérés, le préchargement est limité aux voisins immédiats et le PDF est détruit en quittant une revue. L’état revue/article est persisté afin de restaurer automatiquement l’écran après un rechargement iOS inattendu.
+
+Le double-tap de la vue texte est rétabli explicitement sur iOS. Les contrastes des traits, panneaux et boutons flottants sont renforcés. Le changement d’ordre des messages ne reconstruit plus l’article : seules les listes de commentaires et les flèches sont mises à jour. Une pastille `local` ou `PDF` est affichée directement sur l’article.
+
+L’éditeur reçoit le focus synchroniquement à l’ouverture pour faire apparaître le clavier iOS. La première couleur est noire en mode clair et blanche en mode sombre. Les commandes G/I/S/B conservent la sélection, exécutent la commande après avoir remis le focus, et affichent immédiatement un état actif stabilisé. Le rectangle de couleur n’est mis à jour que depuis une couleur explicitement appliquée, pour éviter le faux noir renvoyé par Safari en mode sombre.
+
+L’envoi d’un message ne reconstruit plus le lecteur sous le clavier : la liste courante est mise à jour en place, puis l’éditeur se ferme. Les erreurs globales et rejets de promesse sont journalisés ; en cas de kill mémoire iOS sans exception, la reprise se fait sur la dernière revue et le dernier article.
+
 ## v0.8.0
 **Synthèse :** reprise Telegram/outbox fiabilisée, activité visible, profil/splash, lecteur photo/texte amélioré, éditeur et zoom stabilisés, icône iOS explicite.
 

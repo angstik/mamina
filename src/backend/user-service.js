@@ -19,7 +19,10 @@ function topicIdOf(topic) { return Number(topic?.id || topic?.topicId || 0) }
 function rowMetaText(message) { return message?.text || message?.caption || '' }
 
 function canvasBlob(canvas, type='image/jpeg', quality=.82) {
-  return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Conversion image impossible.')), type, quality))
+  return new Promise((resolve, reject) => canvas.toBlob(blob => {
+    try { canvas.width=1; canvas.height=1 } catch {}
+    blob ? resolve(blob) : reject(new Error('Conversion image impossible.'))
+  }, type, quality))
 }
 
 function resolveRowsToArticles(rows, articles) {
@@ -71,6 +74,8 @@ export class UserMaminaService {
     this.onConnectionState=null
     this.authProvider=null
     this.onActivity=null
+    this.pdfLoadPromise=null
+    this.renderChain=Promise.resolve()
   }
 
   setAuthProvider(provider) { this.authProvider=provider || null }
@@ -267,9 +272,11 @@ export class UserMaminaService {
     }
     this.activity('Base locale · index revue')
     await putMagazine(record)
+    await replaceArticles(record.magazineId,articles.map(a=>({...a,magazineId:record.magazineId})))
     await putTopicState({topicKey:key,topicId:tid,cursor:record.lastMessageId,updatedAt:record.updatedAt})
     // Temporarily retain bytes so promotion to top-2 needs no second download.
     await putAsset(`staging-pdf:${record.magazineId}`,bytes)
+    try { await pdf.doc?.cleanup?.(); await pdf.doc?.destroy?.() } catch {}
     info('sync.discover','Revue découverte',{magazineId:record.magazineId,articles:articles.length,reactions:comments.length})
     return record
   }
@@ -305,6 +312,10 @@ export class UserMaminaService {
     let pdfBytes=await getAsset(`pdf:${fresh.magazineId}`)
     if(!pdfBytes) pdfBytes=await getAsset(`staging-pdf:${fresh.magazineId}`)
 
+    // Critical fast path: a fully cached magazine must not be reparsed every
+    // 30-second synchronization cycle.
+    if(fresh.fullyCached && pdfBytes) return fresh
+
     let raw=null, rows=null
     if(!pdfBytes || !fresh.fullyCached) {
       raw=await this.gateway.topicMessages(this.dialog.peer,fresh.topicId,{limit:Infinity})
@@ -314,11 +325,15 @@ export class UserMaminaService {
       if(!pdfBytes) pdfBytes=await this.gateway.downloadMessageMedia(raw[pdfIdx])
     }
 
-    const pdf=await FamileoPdf.load(pdfBytes)
-    const articles=pdf.articles()
+    let articles=await listArticles(fresh.magazineId)
+    if(!articles.length) {
+      const pdf=await FamileoPdf.load(pdfBytes)
+      articles=pdf.articles().map(a=>({...a,magazineId:fresh.magazineId}))
+      await replaceArticles(fresh.magazineId,articles)
+      try { await pdf.doc?.cleanup?.(); await pdf.doc?.destroy?.() } catch {}
+    }
     await putAsset(`pdf:${fresh.magazineId}`,pdfBytes)
     await deleteAsset(`staging-pdf:${fresh.magazineId}`)
-    await replaceArticles(fresh.magazineId,articles.map(a=>({...a,magazineId:fresh.magazineId})))
 
     if(!rows) {
       raw=await this.gateway.topicMessages(this.dialog.peer,fresh.topicId,{limit:Infinity})
@@ -396,9 +411,10 @@ export class UserMaminaService {
     // already indexed in IndexedDB. PDF.js is loaded lazily only if an image
     // is not in the local asset cache.
     if(magazine.fullyCached && bytes && storedArticles.length) {
+      const same=this.current?.magazine?.magazineId===magazineId
       this.current={
         magazine,
-        pdf:null,
+        pdf:same ? this.current.pdf : null,
         pdfBytes:bytes,
         articles:storedArticles,
         rows,
@@ -537,16 +553,19 @@ export class UserMaminaService {
     if(!bytes) throw new Error('PDF local requis pour résoudre l’article en attente.')
 
     const pdf=await FamileoPdf.load(bytes)
-    const article=pdf.articles().find(a=>a.articleKey===item.articleKey)
-    if(!article) throw new Error('Article de la file d’attente introuvable.')
-
-    const full=await this.gateway.topicMessages(this.dialog.peer,Number(item.topicId),{limit:Infinity})
-    const {rootId}=await this.gateway.ensureRoot(
-      this.dialog.peer,Number(item.topicId),pdf.magazine,article,full
-    )
-    await this.gateway.postTextComment(
-      this.dialog.peer,Number(item.topicId),rootId,item.articleKey,item.text,item.format||'mamina-markdown-v1'
-    )
+    try {
+      const article=pdf.articles().find(a=>a.articleKey===item.articleKey)
+      if(!article) throw new Error('Article de la file d’attente introuvable.')
+      const full=await this.gateway.topicMessages(this.dialog.peer,Number(item.topicId),{limit:Infinity})
+      const {rootId}=await this.gateway.ensureRoot(
+        this.dialog.peer,Number(item.topicId),pdf.magazine,article,full
+      )
+      await this.gateway.postTextComment(
+        this.dialog.peer,Number(item.topicId),rootId,item.articleKey,item.text,item.format||'mamina-markdown-v1'
+      )
+    } finally {
+      try { await pdf.doc?.cleanup?.(); await pdf.doc?.destroy?.() } catch {}
+    }
   }
 
   async flushOutbox(force=false) {
@@ -592,38 +611,52 @@ export class UserMaminaService {
   async ensureCurrentPdf() {
     if(!this.current) throw new Error('Aucune revue ouverte.')
     if(this.current.pdf) return this.current.pdf
-    const bytes=this.current.pdfBytes || await getAsset(`pdf:${this.current.magazine.magazineId}`)
-    if(!bytes) throw new Error('PDF local indisponible.')
-    this.current.pdf=await FamileoPdf.load(bytes)
-    this.current.pdfBytes=bytes
+    if(this.pdfLoadPromise) return this.pdfLoadPromise
 
-    // Newer parser versions may enrich old stored article records with
-    // articleText/textBounds. Keep the enriched copy in memory and IndexedDB.
-    const parsed=this.current.pdf.articles()
-    if(parsed.length){
-      this.current.articles=parsed
-      try { await replaceArticles(this.current.magazine.magazineId,parsed) } catch {}
-    }
-    return this.current.pdf
+    const currentRef=this.current
+    this.pdfLoadPromise=(async()=>{
+      const bytes=currentRef.pdfBytes || await getAsset(`pdf:${currentRef.magazine.magazineId}`)
+      if(!bytes) throw new Error('PDF local indisponible.')
+      const pdf=await FamileoPdf.load(bytes)
+      currentRef.pdf=pdf
+      currentRef.pdfBytes=bytes
+      const parsed=pdf.articles()
+      if(parsed.length){
+        currentRef.articles=parsed
+        try { await replaceArticles(currentRef.magazine.magazineId,parsed) } catch {}
+      }
+      return pdf
+    })()
+    try { return await this.pdfLoadPromise }
+    finally { this.pdfLoadPromise=null }
   }
 
-  async getArticleImage(articleKey) {
+  async getArticleImageInfo(articleKey) {
     if(!this.current) throw new Error('Aucune revue ouverte.')
     const assetKey=`article:${articleKey}`
     const cached=await getAsset(assetKey)
-    if(cached) {
-      this.activity('Article · image locale')
-      return cached
-    }
-    this.activity('Article · rendu depuis le PDF')
+    if(cached) return {blob:cached,source:'local'}
 
-    let article=this.current.articles.find(a=>a.articleKey===articleKey)
-    if(!article) throw new Error('Article inconnu.')
-    const pdf=await this.ensureCurrentPdf()
-    article=this.current.articles.find(a=>a.articleKey===articleKey) || article
-    const blob=await canvasBlob(await pdf.renderArticle(article), 'image/jpeg', .86)
-    if(this.current.magazine.fullyCached) await putAsset(assetKey,blob)
-    return blob
+    const task=async()=>{
+      const secondCheck=await getAsset(assetKey)
+      if(secondCheck) return {blob:secondCheck,source:'local'}
+      let article=this.current?.articles.find(a=>a.articleKey===articleKey)
+      if(!article) throw new Error('Article inconnu.')
+      this.activity('Préparation de l’article…')
+      const pdf=await this.ensureCurrentPdf()
+      article=this.current?.articles.find(a=>a.articleKey===articleKey) || article
+      const canvas=await pdf.renderArticle(article)
+      const blob=await canvasBlob(canvas,'image/jpeg',.84)
+      if(this.current?.magazine?.fullyCached) await putAsset(assetKey,blob)
+      return {blob,source:'PDF'}
+    }
+    const result=this.renderChain.then(task,task)
+    this.renderChain=result.then(()=>undefined,()=>undefined)
+    return result
+  }
+
+  async getArticleImage(articleKey) {
+    return (await this.getArticleImageInfo(articleKey)).blob
   }
 
   async warmArticleImages(articleKeys=[]) {
@@ -631,12 +664,24 @@ export class UserMaminaService {
     for(const key of articleKeys){
       try {
         const cached=await getAsset(`article:${key}`)
-        if(!cached) await this.getArticleImage(key)
+        if(!cached) await this.getArticleImageInfo(key)
       } catch(e) {
         warn('cache','Préchargement article impossible',{articleKey:key,message:e?.message||String(e)})
       }
-      await new Promise(resolve=>setTimeout(resolve,0))
+      await new Promise(resolve=>{
+        if('requestIdleCallback' in globalThis) requestIdleCallback(()=>resolve(),{timeout:350})
+        else setTimeout(resolve,40)
+      })
     }
+  }
+
+  async closeMagazine() {
+    const current=this.current
+    try { await this.renderChain } catch {}
+    this.current=null
+    this.pdfLoadPromise=null
+    try { await current?.pdf?.doc?.cleanup?.() } catch {}
+    try { await current?.pdf?.doc?.destroy?.() } catch {}
   }
 
   async ensureConnected(reason='app-resume') {
@@ -667,6 +712,7 @@ export class UserMaminaService {
       const appTitle=await settings.get('appTitle','MamiNa')
       const magazine={...pdf.magazine,appTitle}
       const articles=pdf.articles()
+      try { await pdf.doc?.cleanup?.(); await pdf.doc?.destroy?.() } catch {}
       step('magazine.pdf.read.done',{
         magazineId:magazine.magazineId,issue:magazine.issue,date:magazine.date,articles:articles.length
       })
