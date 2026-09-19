@@ -1,5 +1,14 @@
 # CHANGELOG MamiNa
 
+## v1.0.0
+**Synthèse :** finition visuelle finale : splash plus long, grande icône MamiNa, retours avec l’icône et pastille multicolore animée.
+
+La v1.0 apporte uniquement la finition cosmétique demandée, sans modifier les mécanismes fonctionnels validés en v0.9.2.
+
+Le splash screen reste affiché plus longtemps et sa transition est un peu plus douce. La grande icône MamiNa apparaît désormais en haut de la vue Magazines. Les boutons retour des en-têtes utilisent la petite icône MamiNa à la place de la flèche.
+
+Enfin, la pastille multicolore du sélecteur de couleur est animée en rotation continue, tout en conservant exactement le même comportement de sélection.
+
 ## v0.9.2
 **Synthèse :** toggle de style/couleur rétabli pour la frappe, messages différés normalisés immédiatement et bouton Revue/Récent restauré.
 

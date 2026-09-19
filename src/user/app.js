@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='0.9.2'
+const APP_VERSION='1.0.0'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const $=id=>document.getElementById(id)
@@ -113,7 +113,7 @@ async function showWelcomeSplash(force=false){
     }else $('splashAvatar').hidden=true
     splash.hidden=false
     splash.style.opacity='1'
-    setTimeout(()=>{splash.style.opacity='0';setTimeout(()=>splash.hidden=true,280)},900)
+    setTimeout(()=>{splash.style.opacity='0';setTimeout(()=>splash.hidden=true,430)},1650)
   }catch{}
 }
 async function init(){

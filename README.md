@@ -173,3 +173,12 @@ Vérifications spécifiques :
 - persistance immédiate du message retourné par Telegram après flush outbox ;
 - relecture locale de la revue ouverte après synchronisation ;
 - conservation de l'article courant lors du changement Revue/Récent.
+
+
+## v1.0.0
+
+Finition cosmétique finale sans modification du backend ni du protocole :
+- splash plus long ;
+- grande icône MamiNa sur la vue Magazines ;
+- icône MamiNa pour les boutons retour ;
+- pastille multicolore animée.
