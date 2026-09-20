@@ -1,5 +1,14 @@
 # CHANGELOG MamiNa
 
+## v1.1.2
+**Synthèse :** corrige les dates de couverture séparées en trois lignes et ajoute la copie directe des erreurs.
+
+Le parseur accepte maintenant les deux représentations PDF.js de la date de couverture : une ligne unique ou trois lignes typographiques (`31` / `AOÛT` / `2026`). Le diagnostic A12 inclut également toutes les lignes de couverture détectées.
+
+Un bouton `Copier l’erreur` apparaît après une erreur d’administration et copie contexte, version, message, stack et trace.
+
+Le paquet livré est différentiel : il ne contient que les fichiers modifiés.
+
 ## v1.1.1
 **Synthèse :** corrige l’identification du numéro de couverture et isole proprement les caches lors d’un changement de groupe.
 

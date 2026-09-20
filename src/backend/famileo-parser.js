@@ -56,7 +56,27 @@ export class FamileoGeometryParser{
     // valid Famileo cover into A11_ISSUE.
     let date_label=flow(pick(upright,13,'Regular'))
     if(!/^\d{1,2}\s+.+\s+\d{4}$/u.test(date_label)){
-      date_label=coverLines.find(x=>/^\d{1,2}\s+[\p{L}.]+\s+\d{4}$/u.test(x))||date_label
+      // Safari/PDF.js can expose the cyan tile as three typographic lines:
+      // "31" / "AOÛT" / "2026", rather than one logical text run.
+      date_label=coverLines.find(x=>/^\d{1,2}\s+[\p{L}.]+\s+\d{4}$/u.test(x))||''
+      if(!date_label){
+        for(let i=0;i<=coverLines.length-3;i++){
+          const day=coverLines[i],month=coverLines[i+1],year=coverLines[i+2]
+          if(/^\d{1,2}$/.test(day)&&/^[\p{L}.]+$/u.test(month)&&/^\d{4}$/.test(year)&&monthNumber(month)){
+            date_label=`${day} ${month} ${year}`
+            break
+          }
+        }
+      }
+      if(!date_label){
+        const tokens=coverLines.flatMap(x=>x.split(/\s+/)).filter(Boolean)
+        for(let i=0;i<=tokens.length-3;i++){
+          if(/^\d{1,2}$/.test(tokens[i])&&monthNumber(tokens[i+1])&&/^\d{4}$/.test(tokens[i+2])){
+            date_label=`${tokens[i]} ${tokens[i+1]} ${tokens[i+2]}`
+            break
+          }
+        }
+      }
     }
 
     let issue_label=flow(pick(upright,25,'Regular'))
@@ -80,7 +100,7 @@ export class FamileoGeometryParser{
     const date_iso=_parts&&monthNumber(_parts.month)?iso(_parts.year,monthNumber(_parts.month),_parts.day):null
     const cols=[56.7,181.4,306.1,430.9],rowY=[62.4,187.1,547,671.7],rowN=[0,1,4,5],thumbnails=[]
     for(const im of c.geom.images.filter(x=>x.srcWidth===437&&x.srcHeight===437)){const col=cols.reduce((best,x,i)=>Math.abs(im.x0-x)<Math.abs(im.x0-cols[best])?i:best,0),ri=rowY.reduce((best,y,i)=>Math.abs(im.top-y)<Math.abs(im.top-rowY[best])?i:best,0);thumbnails.push({col,row:rowN[ri],src_px:[437,437]})}thumbnails.sort((a,b)=>a.row-b.row||a.col-b.col)
-    assert(Number.isInteger(issue_number),'A11_ISSUE',`lines=${coverLines.join('|')}`);assert(/^\d{6}$/.test(client_code),'A11_CLIENT_CODE',`value=${client_code}`);assert(date_iso,'A12_COVER_DATE',`label=${date_label}`)
+    assert(Number.isInteger(issue_number),'A11_ISSUE',`lines=${coverLines.join('|')}`);assert(/^\d{6}$/.test(client_code),'A11_CLIENT_CODE',`value=${client_code}`);assert(date_iso,'A12_COVER_DATE',`label=${date_label};lines=${coverLines.join('|')}`)
     const posts=[],geometry={}
     for(let p=2;p<doc.numPages;p++){
       const d=pageData[p-1],boxes=d.geom.rects.filter(r=>r.width>400&&r.height>100).sort((a,b)=>a.top-b.top)
