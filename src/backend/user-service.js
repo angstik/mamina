@@ -8,7 +8,7 @@ import {
   putMessages, listMessagesByMagazine, deleteMessagesByMagazine,
   getReadState, putReadState, listReadStates,
   putAsset, getAsset, deleteAsset, pruneToMagazineIds,
-  putOutbox, getOutbox, listOutbox, deleteOutbox, countOutbox,
+  putOutbox, getOutbox, listOutbox, deleteOutbox, countOutbox, estimateLocalStorage,
 } from './user-storage.js'
 import { info, warn, error as logError } from './log.js'
 
@@ -634,6 +634,7 @@ export class UserMaminaService {
   }
 
   async pendingCount() { return countOutbox() }
+  async storageStats() { return estimateLocalStorage() }
   async pendingForArticle(articleKey) { return getOutbox(articleKey) }
 
   async ensureCurrentPdf() {

@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.0.0'
+const APP_VERSION='1.0.1'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const $=id=>document.getElementById(id)
@@ -113,7 +113,7 @@ async function showWelcomeSplash(force=false){
     }else $('splashAvatar').hidden=true
     splash.hidden=false
     splash.style.opacity='1'
-    setTimeout(()=>{splash.style.opacity='0';setTimeout(()=>splash.hidden=true,430)},1650)
+    setTimeout(()=>{splash.style.opacity='0';setTimeout(()=>splash.hidden=true,430)},2200)
   }catch{}
 }
 async function init(){
@@ -562,9 +562,111 @@ function installFocusPanZoom(){
   stage.ontouchend=()=>{if(st.scale>1&&lastMove){let vx=lastMove.vx*18,vy=lastMove.vy*18;const inertia=()=>{vx*=.91;vy*=.91;st.tx+=vx;st.ty+=vy;apply();if(Math.abs(vx)+Math.abs(vy)>.35)raf=requestAnimationFrame(inertia)};raf=requestAnimationFrame(inertia)}start=null;pinch=null}
 }
 
+function formatBytes(value){
+  const n=Number(value||0)
+  if(!Number.isFinite(n)||n<=0)return '0 o'
+  const units=['o','Ko','Mo','Go']
+  let v=n,u=0
+  while(v>=1024&&u<units.length-1){v/=1024;u++}
+  return `${v>=100||u===0?v.toFixed(0):v>=10?v.toFixed(1):v.toFixed(2)} ${units[u]}`
+}
+
+async function estimateLoadedAppBytes(){
+  const urls=new Set()
+  const base=new URL(location.href)
+  base.search=''
+  base.hash=''
+  urls.add(base.href)
+
+  for(const el of document.querySelectorAll('script[src],link[href]')){
+    const raw=el.src||el.href
+    if(!raw)continue
+    const u=new URL(raw,location.href)
+    if(u.origin===location.origin)urls.add(u.href)
+  }
+
+  let bytes=0
+  const resources=performance.getEntriesByType('resource')
+  const perfByUrl=new Map(resources.map(r=>[r.name,r]))
+  for(const r of resources){
+    try{
+      const u=new URL(r.name)
+      if(u.origin!==location.origin)continue
+      urls.add(u.href)
+      const size=Number(r.encodedBodySize||r.transferSize||0)
+      if(size>0)bytes+=size
+    }catch{}
+  }
+
+  // Fetch only resources whose size was not reported by Resource Timing.
+  for(const url of urls){
+    const perf=perfByUrl.get(url)
+    const known=Number(perf?.encodedBodySize||perf?.transferSize||0)
+    if(known>0)continue
+    try{
+      const res=await fetch(url,{cache:'force-cache'})
+      if(!res.ok)continue
+      const len=Number(res.headers.get('content-length')||0)
+      if(len>0)bytes+=len
+      else bytes+=(await res.arrayBuffer()).byteLength
+    }catch{}
+  }
+  return bytes
+}
+
+const STORE_LABELS={
+  assets:'PDF / images / avatar',
+  messages:'Messages',
+  articles:'Articles / index',
+  magazines:'Revues',
+  outbox:'Messages à transmettre',
+  readState:'État de lecture',
+  topics:'Sujets Telegram',
+  settings:'Réglages locaux',
+}
+
+async function refreshStorageStats(){
+  const button=$('refreshStorageStats')
+  button.disabled=true
+  status('storageStatus','Calcul des tailles…')
+  try{
+    const [db,appBytes,origin]=await Promise.all([
+      service.storageStats(),
+      estimateLoadedAppBytes(),
+      navigator.storage?.estimate?.() || Promise.resolve({usage:0,quota:0}),
+    ])
+
+    $('appCodeSize').textContent=formatBytes(appBytes)
+    $('indexedDbSize').textContent=`≈ ${formatBytes(db.totalBytes)}`
+    $('originUsage').textContent=formatBytes(origin.usage||0)
+    $('originQuota').textContent=formatBytes(origin.quota||0)
+
+    const host=$('indexedDbBreakdown')
+    host.innerHTML=''
+    const rows=Object.entries(db.stores)
+      .sort((a,b)=>b[1].bytes-a[1].bytes)
+    for(const [name,info] of rows){
+      const row=document.createElement('div')
+      row.className='storage-breakdown-row'
+      row.innerHTML=`<span>${esc(STORE_LABELS[name]||name)} · ${info.count}</span><strong>≈ ${formatBytes(info.bytes)}</strong>`
+      host.appendChild(row)
+    }
+    status('storageStatus','Tailles actualisées.',true)
+  }catch(e){
+    debug(e)
+    status('storageStatus','Calcul impossible : '+(e.message||e),false)
+  }finally{
+    button.disabled=false
+  }
+}
+
 /* Settings */
-$('openSettingsHome').onclick=()=>{$('settingsView').hidden=false}
+$('openSettingsHome').onclick=()=>{
+  $('settingsView').hidden=false
+  refreshStorageStats()
+}
 $('closeSettings').onclick=()=>{$('settingsView').hidden=true}
+$('refreshStorageStats').onclick=refreshStorageStats
 $('themeSelect').onchange=async()=>{applyTheme($('themeSelect').value);await service.setTheme($('themeSelect').value)}
 $('reactionOrder').onchange=async()=>{reactionOrder=$('reactionOrder').value;await service.setReactionOrder(reactionOrder);if(currentModel)await rebuild(currentArticle()?.articleKey)}
 $('forceUpdate').onclick=async()=>{

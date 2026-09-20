@@ -14,9 +14,12 @@
 <body>
 
 <div id="splash" class="splash" hidden>
-  <img id="splashAvatar" class="splash-avatar" alt="">
+  <img class="splash-brand-image" src="./mamina-v08-512.png?v=101" alt="MamiNa">
   <div class="splash-title">MamiNa</div>
-  <div id="splashHello" class="splash-hello"></div>
+  <div class="splash-user-row">
+    <img id="splashAvatar" class="splash-avatar" alt="">
+    <div id="splashHello" class="splash-hello"></div>
+  </div>
 </div>
 
 <main id="home" class="home">
@@ -116,6 +119,28 @@
       <div class="settings-version">Version <strong id="appVersion">0.8.0</strong></div>
       <button id="forceUpdate" type="button">Forcer la mise à jour</button>
       <div id="updateStatus" class="status"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Stockage</h2>
+      <div class="storage-grid">
+        <div><span>Application / code chargé</span><strong id="appCodeSize">—</strong></div>
+        <div><span>IndexedDB MamiNa</span><strong id="indexedDbSize">—</strong></div>
+        <div><span>Usage navigateur</span><strong id="originUsage">—</strong></div>
+        <div><span>Quota disponible</span><strong id="originQuota">—</strong></div>
+      </div>
+      <details class="storage-details">
+        <summary>Détail IndexedDB</summary>
+        <div id="indexedDbBreakdown" class="storage-breakdown"></div>
+      </details>
+      <button id="refreshStorageStats" type="button">Actualiser les tailles</button>
+      <div id="storageStatus" class="status"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Sécurité de connexion</h2>
+      <p><strong>Mot de passe MamiNa : jamais stocké.</strong></p>
+      <p class="subtle">Une simple perte de réseau ou de connexion Telegram ne redemande pas le mot de passe : les accès déjà déchiffrés restent en mémoire tant que la PWA n’a pas réellement été rechargée ou arrêtée. Après un vrai redémarrage de l’application, le mot de passe est demandé à nouveau.</p>
     </section>
 
     <section class="panel">

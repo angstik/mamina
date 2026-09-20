@@ -182,3 +182,12 @@ Finition cosmétique finale sans modification du backend ni du protocole :
 - grande icône MamiNa sur la vue Magazines ;
 - icône MamiNa pour les boutons retour ;
 - pastille multicolore animée.
+
+
+## v1.0.1
+
+- mot de passe MamiNa jamais stocké ; reconnexion automatique tant que les credentials restent en mémoire ;
+- statistiques de stockage dans Réglages : ressources applicatives chargées, estimation IndexedDB, usage/quota navigateur, détail par store ;
+- splash plus long avec grande image MamiNa existante, avatar et nom utilisateur agrandi.
+
+L'estimation IndexedDB est volontairement indiquée avec `≈` : elle mesure les données applicatives sérialisées, pas les frais internes du moteur IndexedDB. `navigator.storage.estimate()` fournit séparément l'usage global et le quota de l'origine.

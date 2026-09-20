@@ -221,3 +221,68 @@ export async function countOutbox() {
   try{return Number(await requestResult(db.transaction('outbox').objectStore('outbox').count())||0)}
   finally{db.close()}
 }
+
+
+function roughByteSize(value, seen=new WeakSet()) {
+  if (value == null) return 0
+  const t=typeof value
+  if (t==='string') return value.length*2
+  if (t==='number' || t==='bigint') return 8
+  if (t==='boolean') return 4
+  if (value instanceof Uint8Array) return value.byteLength
+  if (value instanceof ArrayBuffer) return value.byteLength
+  if (ArrayBuffer.isView(value)) return value.byteLength
+  if (value instanceof Blob) return value.size
+  if (value instanceof Date) return 16
+  if (t!=='object') return 0
+  if (seen.has(value)) return 0
+  seen.add(value)
+
+  let total=0
+  if (Array.isArray(value)) {
+    for (let i=0;i<value.length;i++) total+=roughByteSize(value[i],seen)
+    return total
+  }
+  for (const key of Object.keys(value)) {
+    total+=key.length*2
+    total+=roughByteSize(value[key],seen)
+  }
+  return total
+}
+
+async function estimateStoreBytes(db, storeName) {
+  return new Promise((resolve,reject)=>{
+    let bytes=0,count=0
+    const tx=db.transaction(storeName,'readonly')
+    const req=tx.objectStore(storeName).openCursor()
+    req.onsuccess=()=>{
+      const c=req.result
+      if(!c)return
+      count++
+      bytes+=roughByteSize(c.key)
+      bytes+=roughByteSize(c.value)
+      c.continue()
+    }
+    req.onerror=()=>reject(req.error)
+    tx.oncomplete=()=>resolve({bytes,count})
+    tx.onerror=()=>reject(tx.error||req.error)
+  })
+}
+
+export async function estimateLocalStorage() {
+  const db=await openDb()
+  try {
+    const stores={}
+    let totalBytes=0,totalCount=0
+    const names=Array.from(db.objectStoreNames)
+    for (const name of names) {
+      const info=await estimateStoreBytes(db,name)
+      stores[name]=info
+      totalBytes+=info.bytes
+      totalCount+=info.count
+    }
+    return {database:DB,totalBytes,totalCount,stores}
+  } finally {
+    db.close()
+  }
+}

@@ -1,5 +1,14 @@
 # CHANGELOG MamiNa
 
+## v1.0.1
+**Synthèse :** ajoute les statistiques de stockage, formalise le mode C sans mot de passe persistant et enrichit le splash de bienvenue.
+
+La v1.0.1 choisit le mode C : le mot de passe MamiNa n’est jamais écrit dans localStorage ni IndexedDB. Une coupure réseau ou une perte de la connexion Telegram réutilise les credentials déjà déchiffrés en mémoire ; une nouvelle saisie n’est nécessaire qu’après un véritable arrêt/rechargement de la PWA.
+
+La page Réglages contient maintenant un bloc Stockage avec la taille approximative du code/ressources chargées, la taille estimée d’IndexedDB MamiNa, l’usage total de stockage de l’origine et le quota annoncé par le navigateur. Le détail IndexedDB est ventilé par type de données : PDF/images/avatar, messages, articles, revues, outbox, états de lecture, sujets et réglages.
+
+Le splash de bienvenue réutilise la meilleure image MamiNa déjà livrée, en grand format, puis affiche l’avatar Telegram et le nom de l’utilisateur en plus gros. Sa durée est légèrement prolongée.
+
 ## v1.0.0
 **Synthèse :** finition visuelle finale : splash plus long, grande icône MamiNa, retours avec l’icône et pastille multicolore animée.
 
