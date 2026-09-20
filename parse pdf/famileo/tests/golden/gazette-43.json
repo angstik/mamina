@@ -1,0 +1,1580 @@
+{
+  "source": {
+    "pages": 16,
+    "page_size_pt": [
+      595.276,
+      841.89
+    ],
+    "producer": "TCPDF 6.11.3 (http://www.tcpdf.org)",
+    "title": "La gazette de Nadia Weiss",
+    "created": "D:20260914011914+02'00'"
+  },
+  "cover": {
+    "issue_label": "N°43",
+    "issue_number": 43,
+    "date_label": "14 SEPTEMBRE 2026",
+    "date_parts": {
+      "day": 14,
+      "month": "SEPTEMBRE",
+      "year": 2026
+    },
+    "date_iso": "2026-09-14",
+    "title": "De Nadia eihri Zidung",
+    "client_code": "854397",
+    "thumbnails": [
+      {
+        "col": 0,
+        "row": 0,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 1,
+        "row": 0,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 2,
+        "row": 0,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 3,
+        "row": 0,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 0,
+        "row": 1,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 1,
+        "row": 1,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 2,
+        "row": 1,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 0,
+        "row": 4,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 1,
+        "row": 4,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 2,
+        "row": 4,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 0,
+        "row": 5,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 1,
+        "row": 5,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 2,
+        "row": 5,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 3,
+        "row": 5,
+        "src_px": [
+          437,
+          437
+        ]
+      }
+    ]
+  },
+  "posts": [
+    {
+      "page": 2,
+      "author": "Héloïse Weiss",
+      "date_label": "le 31 août",
+      "text": "J'ai été en vacances avec une amie a Grasse et Cannes : ils ont de drôles de pigeons là bas... 😂 En bas a gauche c'est Gourdon, un tout petit village ! Et a droite... Mes petons a la plage !! On s'est même baignées !!",
+      "lines": [
+        "J'ai été en vacances avec une amie",
+        "a Grasse et Cannes : ils ont de",
+        "drôles de pigeons là bas... 😂 En bas",
+        "a gauche c'est Gourdon, un tout",
+        "petit village ! Et a droite... Mes",
+        "petons a la plage !! On s'est même",
+        "baignées !! "
+      ],
+      "emoji": [
+        {
+          "char": "😂",
+          "unified": "1F602",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-31"
+    },
+    {
+      "page": 2,
+      "author": "Stéphanie Vernier",
+      "date_label": "le 31 août",
+      "text": "Cham hors saison !",
+      "lines": [
+        "Cham hors saison !"
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            426.61,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-08-31"
+    },
+    {
+      "page": 3,
+      "author": "Hugo Lienhart",
+      "date_label": "le 31 août",
+      "text": "Le ciel était particulièrement beau avec la lumière et les nuages, tu ne trouves pas ?",
+      "lines": [
+        "Le ciel était particulièrement beau",
+        "avec la lumière et les nuages, tu ne",
+        "trouves pas ? "
+      ],
+      "emoji": [],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-31"
+    },
+    {
+      "page": 3,
+      "author": "Héloïse Weiss",
+      "date_label": "le 1 septembre",
+      "text": "Y'a pas a dire, après les vacances, retrouver son pot-de-colle / gardien de porte / doudou / appui- tête... Y'a que ça de vrai dans la vie !! Et dire qu'il y a des gens qui disent que c'est ''juste'' un chat non mais t'imagine un peu ?",
+      "lines": [
+        "Y'a pas a dire, après les vacances,",
+        "retrouver son pot-de-colle /",
+        "gardien de porte / doudou / appui-",
+        "tête... Y'a que ça de vrai dans la vie",
+        "!! Et dire qu'il y a des gens qui",
+        "disent que c'est ''juste'' un chat non",
+        "mais t'imagine un peu ? "
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-01"
+    },
+    {
+      "page": 4,
+      "author": "ISA Gottar",
+      "date_label": "le 1 septembre",
+      "text": "L automne s installe doucement...il fait nuit à 20h15 😒 mais regarde ces beaux couchers de soleil",
+      "lines": [
+        "L automne s installe doucement...il",
+        "fait nuit à 20h15 😒 mais regarde",
+        "ces beaux couchers de soleil"
+      ],
+      "emoji": [
+        {
+          "char": "😒",
+          "unified": "1F612",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-01"
+    },
+    {
+      "page": 4,
+      "author": "Florie Lienhart",
+      "date_label": "le 1 septembre",
+      "text": "Si tu te souviens des précédents numéros de famileo j'avais commencé à poncer ma bibliothèque et à peindre un tableau là c'est fini !",
+      "lines": [
+        "Si tu te souviens des précédents numéros de famileo",
+        "j'avais commencé à poncer ma bibliothèque et à peindre",
+        "un tableau là c'est fini ! "
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            426.61,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-09-01"
+    },
+    {
+      "page": 5,
+      "author": "Hugo Lienhart",
+      "date_label": "le 3 septembre",
+      "text": "Tout le monde a le droit de profiter du beau coucher de Soleil",
+      "lines": [
+        "Tout le monde a le droit de profiter du beau coucher de",
+        "Soleil"
+      ],
+      "emoji": [],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            31.18,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-09-03"
+    },
+    {
+      "page": 5,
+      "author": "Denis W",
+      "date_label": "le 4 septembre",
+      "text": "Dans le château de Prague il y a plusieurs églises dont la cathédrale Saint Guy qui est superbe et (➘ ) l'église Saint Georges. Le château de Prague est plus grand que Versailles !! (Si on ne compte pas les jardins 🫣). C'est un des joyaux de la ville, mais tu en verras plein d'autres dans la suite !",
+      "lines": [
+        "Dans le château de Prague il y a",
+        "plusieurs églises dont la cathédrale",
+        "Saint Guy qui est superbe et (➘ )",
+        "l'église Saint Georges. Le château",
+        "de Prague est plus grand que",
+        "Versailles !! (Si on ne compte pas",
+        "les jardins 🫣). C'est un des joyaux",
+        "de la ville, mais tu en verras plein",
+        "d'autres dans la suite !"
+      ],
+      "emoji": [
+        {
+          "char": "🫣",
+          "unified": "1FAE3",
+          "via": "sha256"
+        }
+      ],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-04"
+    },
+    {
+      "page": 6,
+      "author": "Denis W",
+      "date_label": "le 5 septembre",
+      "text": "Une des plus belles places de Prague et son monastère. En plus nous avons super beau temps pendant tout le séjour : c'était vraiment très bien.",
+      "lines": [
+        "Une des plus belles places de",
+        "Prague et son monastère. En plus",
+        "nous avons super beau temps",
+        "pendant tout le séjour : c'était",
+        "vraiment très bien."
+      ],
+      "emoji": [],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-05"
+    },
+    {
+      "page": 6,
+      "author": "Denis W",
+      "date_label": "le 5 septembre",
+      "text": "Ici c'est la cathédrale Sainte Barbara de Kutna Hora (à 120km à l'Est de Prague). Son toit est comme un chapiteau de cirque. Les photos du bas sont de la chapelle du palais d'été de l'empereur. C'est très étrange : les Tchèques se disent peu religieux, mais le patrimoine religieux est très riche !",
+      "lines": [
+        "Ici c'est la cathédrale Sainte",
+        "Barbara de Kutna Hora (à 120km à",
+        "l'Est de Prague). Son toit est",
+        "comme un chapiteau de cirque. Les",
+        "photos du bas sont de la chapelle",
+        "du palais d'été de l'empereur. C'est",
+        "très étrange : les Tchèques se",
+        "disent peu religieux, mais le",
+        "patrimoine religieux est très riche !"
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-05"
+    },
+    {
+      "page": 7,
+      "author": "Christine Lienhart",
+      "date_label": "le 5 septembre",
+      "text": "Soutenir une bonne action de la paroisse avec l'achat de bonnes tartes flambées font passer une belle soirée ensemble 🤗",
+      "lines": [
+        "Soutenir une bonne action de la paroisse avec l'achat de",
+        "bonnes tartes flambées font passer une belle soirée",
+        "ensemble 🤗"
+      ],
+      "emoji": [
+        {
+          "char": "🤗",
+          "unified": "1F917",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1481,
+            1111
+          ],
+          "box_pt": [
+            119.86,
+            31.18,
+            355.56,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-09-05"
+    },
+    {
+      "page": 7,
+      "author": "Denis W",
+      "date_label": "le 7 septembre",
+      "text": "Les bibliothèques historiques de Prague : le Clementinum et celle de Strahof",
+      "lines": [
+        "Les bibliothèques historiques de",
+        "Prague : le Clementinum et celle de",
+        "Strahof"
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-07"
+    },
+    {
+      "page": 8,
+      "author": "Denis W",
+      "date_label": "le 7 septembre",
+      "text": "A Prague ils ont même une Tour Eiffel (ils disent que si on mesure à partir de la base de la montagne, elle a la même hauteur que la parisienne 🤭...). Bon, elle est vraiment plus petite, mais ils ont trouvé celle de Paris si jolie qu'ils l'ont copié au début du siècle dernier, et montée en 5 mois !",
+      "lines": [
+        "A Prague ils ont même une Tour Eiffel (ils disent que si on",
+        "mesure à partir de la base de la montagne, elle a la",
+        "même hauteur que la parisienne 🤭...). Bon, elle est",
+        "vraiment plus petite, mais ils ont trouvé celle de Paris si",
+        "jolie qu'ils l'ont copié au début du siècle dernier, et",
+        "montée en 5 mois !"
+      ],
+      "emoji": [
+        {
+          "char": "🤭",
+          "unified": "1F92D",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            31.18,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-09-07"
+    },
+    {
+      "page": 8,
+      "author": "Denis W",
+      "date_label": "le 8 septembre",
+      "text": "Le quartier juif de Prague, le plus ancien encore conservé. Et le cimetière : savais-tu que le juifs mettaient la pierre tombale aux pied des morts pour ne pas se cognée la tête quand ils vont ressusciter 🤯.",
+      "lines": [
+        "Le quartier juif de Prague, le plus",
+        "ancien encore conservé. Et le",
+        "cimetière : savais-tu que le juifs",
+        "mettaient la pierre tombale aux",
+        "pied des morts pour ne pas se",
+        "cognée la tête quand ils vont",
+        "ressusciter 🤯."
+      ],
+      "emoji": [
+        {
+          "char": "🤯",
+          "unified": "1F92F",
+          "via": "sha256"
+        }
+      ],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-08"
+    },
+    {
+      "page": 9,
+      "author": "Denis W",
+      "date_label": "le 8 septembre",
+      "text": "A Prague il y a aussi des choses très étranges ... C'est la patrie de Franz Kafka un grand écrivain dont plusieurs statues rappellent l'œuvre. Et aussi des sculptures un peu étranges d'un artiste contemporain (Cerni) ... et un petit musée LEGO à côté d'un ossuaire contenant 60000 restes de 🦴🦴 ☠️🦴🦴.",
+      "lines": [
+        "A Prague il y a aussi des choses",
+        "très étranges ... C'est la patrie de",
+        "Franz Kafka un grand écrivain dont",
+        "plusieurs statues rappellent",
+        "l'œuvre. Et aussi des sculptures un",
+        "peu étranges d'un artiste",
+        "contemporain (Cerni) ... et un petit",
+        "musée LEGO à côté d'un ossuaire",
+        "contenant 60000 restes de 🦴🦴",
+        "☠️🦴🦴."
+      ],
+      "emoji": [
+        {
+          "char": "🦴",
+          "unified": "1F9B4",
+          "via": "sha256"
+        },
+        {
+          "char": "🦴",
+          "unified": "1F9B4",
+          "via": "sha256"
+        },
+        {
+          "char": "☠️",
+          "unified": "2620-FE0F",
+          "via": "sha256"
+        },
+        {
+          "char": "🦴",
+          "unified": "1F9B4",
+          "via": "sha256"
+        },
+        {
+          "char": "🦴",
+          "unified": "1F9B4",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-08"
+    },
+    {
+      "page": 9,
+      "author": "Denis W",
+      "date_label": "le 8 septembre",
+      "text": "... Et des pharmacies toutes aussi étranges ... on pourrait presque penser être chez Héloïse à Amsterdam 😇",
+      "lines": [
+        "... Et des pharmacies toutes aussi",
+        "étranges ... on pourrait presque",
+        "penser être chez Héloïse à",
+        "Amsterdam 😇"
+      ],
+      "emoji": [
+        {
+          "char": "😇",
+          "unified": "1F607",
+          "via": "sha256"
+        }
+      ],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-08"
+    },
+    {
+      "page": 10,
+      "author": "Denis W",
+      "date_label": "le 9 septembre",
+      "text": "Prague : sur la place de la vielle ville, deux églises emblématiques : Notre Dame de Tyn et Saint Nicolas. C'est aussi sur cette place qu'est l'hôtel de ville et le monument dédié à Jan Hus : un précurseur de près de 200ans de la Réforme Protestante.",
+      "lines": [
+        "Prague : sur la place de la vielle ville, deux églises",
+        "emblématiques : Notre Dame de Tyn et Saint Nicolas.",
+        "C'est aussi sur cette place qu'est l'hôtel de ville et le",
+        "monument dédié à Jan Hus : un précurseur de près de",
+        "200ans de la Réforme Protestante."
+      ],
+      "emoji": [],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            31.18,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-09-09"
+    },
+    {
+      "page": 10,
+      "author": "Florie Lienhart",
+      "date_label": "le 9 septembre",
+      "text": "Bon me voilà officiellement esclave de l'hôpital 😂. Et puis lundi avant la rentrée je me suis entraînée à faire des points de suture ! Ça commence à venir plus ou moins. Et enfin mercredi j'avais ma première garde aux urgences qui était étonnamment très calme et sympa avec 3h de sommeil quand même 😂",
+      "lines": [
+        "Bon me voilà officiellement esclave de l'hôpital 😂. Et puis",
+        "lundi avant la rentrée je me suis entraînée à faire des",
+        "points de suture ! Ça commence à venir plus ou moins. Et",
+        "enfin mercredi j'avais ma première garde aux urgences",
+        "qui était étonnamment très calme et sympa avec 3h de",
+        "sommeil quand même 😂"
+      ],
+      "emoji": [
+        {
+          "char": "😂",
+          "unified": "1F602",
+          "via": "sha256"
+        },
+        {
+          "char": "😂",
+          "unified": "1F602",
+          "via": "sha256"
+        }
+      ],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            426.61,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-09-09"
+    },
+    {
+      "page": 11,
+      "author": "Denis W",
+      "date_label": "le 9 septembre",
+      "text": "L'horloge astronomique : elle donne l'heure sur 24h, et aussi l'heure \"Bohémienne\" : Prague est en fait la capitale de la Bohème. À chaque heure le squelette 💀 sonne une clochette, et des figurines disent \"non non\" de la tête, puis les 12 apôtres défilent à la fenêtre (on les vois de l'interieur là)",
+      "lines": [
+        "L'horloge astronomique : elle donne l'heure sur 24h, et",
+        "aussi l'heure \"Bohémienne\" : Prague est en fait la capitale",
+        "de la Bohème. À chaque heure le squelette 💀 sonne une",
+        "clochette, et des figurines disent \"non non\" de la tête,",
+        "puis les 12 apôtres défilent à la fenêtre (on les vois de",
+        "l'interieur là)"
+      ],
+      "emoji": [
+        {
+          "char": "💀",
+          "unified": "1F480",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            31.18,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-09-09"
+    },
+    {
+      "page": 11,
+      "author": "Stéphanie Vernier",
+      "date_label": "le 11 septembre",
+      "text": "Regarde j'ai eu le droit de préparer quelques plats pour mettre dans le congélateur du studio d'Antonyn à Chambéry. J'en ai profité !!!",
+      "lines": [
+        "Regarde j'ai eu le droit de préparer quelques plats pour",
+        "mettre dans le congélateur du studio d'Antonyn à",
+        "Chambéry. J'en ai profité !!!"
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            426.61,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-09-11"
+    },
+    {
+      "page": 12,
+      "author": "Hugo Lienhart",
+      "date_label": "le 11 septembre",
+      "text": "J'ai profité une dernière fois de la belle cathédrale de Strasbourg avant d'aller à Lyon",
+      "lines": [
+        "J'ai profité une dernière fois de la",
+        "belle cathédrale de Strasbourg",
+        "avant d'aller à Lyon "
+      ],
+      "emoji": [],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-11"
+    },
+    {
+      "page": 12,
+      "author": "Florie Lienhart",
+      "date_label": "le 13 septembre",
+      "text": "Regarde ce magnifique coucher de soleil !",
+      "lines": [
+        "Regarde ce magnifique coucher de soleil !"
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            426.61,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-09-13"
+    },
+    {
+      "page": 13,
+      "author": "Morgane GOTTAR",
+      "date_label": "le 13 septembre",
+      "text": "Vu que tu ne me crois pas quand je te dis que je cuisine, voilà la preuve ! De petits légumes rôtis au four et un crumble aux fruits pour le dessert 😋 les escalopes milanaises et le rösti sont aussi entrain de cuire dans la poêle mais j'ai oublié de prendre une photo 🤭 Et bon appétit bien sûr ! 👩🏼‍🍳",
+      "lines": [
+        "Vu que tu ne me crois pas quand je te dis que je cuisine,",
+        "voilà la preuve ! De petits légumes rôtis au four et un",
+        "crumble aux fruits pour le dessert 😋 les escalopes",
+        "milanaises et le rösti sont aussi entrain de cuire dans la",
+        "poêle mais j'ai oublié de prendre une photo 🤭 Et bon",
+        "appétit bien sûr ! 👩🏼‍🍳"
+      ],
+      "emoji": [
+        {
+          "char": "😋",
+          "unified": "1F60B",
+          "via": "sha256"
+        },
+        {
+          "char": "🤭",
+          "unified": "1F92D",
+          "via": "sha256"
+        },
+        {
+          "char": "👩🏼‍🍳",
+          "unified": "1F469-1F3FC-200D-1F373",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            31.18,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-09-13"
+    },
+    {
+      "page": 13,
+      "author": "Tytouan Vernier",
+      "date_label": "le 13 septembre",
+      "text": "Quand Maman dit au lit c’est: À vos ordres cheffe!",
+      "lines": [
+        "Quand Maman dit au lit c’est: À vos",
+        "ordres cheffe!"
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-13"
+    },
+    {
+      "page": 14,
+      "author": "Lylou Vernier",
+      "date_label": "le 13 septembre",
+      "text": "Souvenir de mes vacances en Croatie, les paysages sont sublimes!!",
+      "lines": [
+        "Souvenir de mes vacances en",
+        "Croatie, les paysages sont",
+        "sublimes!!"
+      ],
+      "emoji": [],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-13"
+    },
+    {
+      "page": 14,
+      "author": "ISA Gottar",
+      "date_label": "le 13 septembre",
+      "text": "Quand l hotel all inclusiv fait la grasse mat et qu à 7h30 c est encore fermé, les clients attendent patiemment !",
+      "lines": [
+        "Quand l hotel all inclusiv fait la",
+        "grasse mat et qu à 7h30 c est",
+        "encore fermé, les clients attendent",
+        "patiemment !"
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-13"
+    },
+    {
+      "page": 15,
+      "author": "Morgane GOTTAR",
+      "date_label": "le 13 septembre",
+      "text": "C'est bien beau de faire pleins d'activités avec les enfants de la crèche mais c'est moins chouette quand il faut tout prévoir et découper le week end 😅 j'ai quand même mis 1h30 à tout faire... maintenant il reste plus qu'à plastifier et recommencer le découpage 🫣",
+      "lines": [
+        "C'est bien beau de faire pleins",
+        "d'activités avec les enfants de la",
+        "crèche mais c'est moins chouette",
+        "quand il faut tout prévoir et",
+        "découper le week end 😅 j'ai quand",
+        "même mis 1h30 à tout faire...",
+        "maintenant il reste plus qu'à",
+        "plastifier et recommencer le",
+        "découpage 🫣"
+      ],
+      "emoji": [
+        {
+          "char": "😅",
+          "unified": "1F605",
+          "via": "sha256"
+        },
+        {
+          "char": "🫣",
+          "unified": "1FAE3",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-13"
+    },
+    {
+      "page": 15,
+      "author": "Antonyn Vernier",
+      "date_label": "le 13 septembre",
+      "text": "Voila la logistique pour mon année tout seul à chambery😲.",
+      "lines": [
+        "Voila la logistique pour mon année",
+        "tout seul à chambery😲."
+      ],
+      "emoji": [
+        {
+          "char": "😲",
+          "unified": "1F632",
+          "via": "sha256"
+        }
+      ],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-09-13"
+    }
+  ],
+  "back": {
+    "recipient": {
+      "name": "NADIA WEISS",
+      "address_lines": [
+        "2 RUE DU CHÂTEAU D'EAU",
+        "67580 MERTZWILLER"
+      ]
+    },
+    "events": [
+      {
+        "kind": "nameday",
+        "name": "Florie",
+        "age": null,
+        "date_label": "le 5 oct."
+      },
+      {
+        "kind": "nameday",
+        "name": "Morgane",
+        "age": null,
+        "date_label": "le 8 oct."
+      },
+      {
+        "kind": "nameday",
+        "name": "Denis",
+        "age": null,
+        "date_label": "le 9 oct."
+      }
+    ],
+    "thumbnails": [
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      }
+    ]
+  },
+  "stats": {
+    "posts": 28,
+    "chronological": true,
+    "date_range": [
+      "2026-08-31",
+      "2026-09-13"
+    ],
+    "emoji_occurrences": 21,
+    "contributors": [
+      "Antonyn Vernier",
+      "Christine Lienhart",
+      "Denis W",
+      "Florie Lienhart",
+      "Hugo Lienhart",
+      "Héloïse Weiss",
+      "ISA Gottar",
+      "Lylou Vernier",
+      "Morgane GOTTAR",
+      "Stéphanie Vernier",
+      "Tytouan Vernier"
+    ]
+  }
+}

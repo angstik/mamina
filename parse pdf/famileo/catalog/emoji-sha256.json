@@ -1,0 +1,330 @@
+{
+ "note": "SHA-256 du flux image BRUT (non decode) -> codepoints. Voie rapide sans decodage.",
+ "built_from_issues": [
+  42,
+  43
+ ],
+ "count": 32,
+ "entries": {
+  "87b0136f37eb1fed6567b8beb662f8e96d36bef025f1f62debe66f6309f76d17": {
+   "u": "1F970",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 6928,
+   "sim": 0.99996,
+   "seen_in": [
+    42
+   ]
+  },
+  "8d85184042993bb9fd05dc3ac199057c1c617bfbe22f835d92f9d8eced44b987": {
+   "u": "1F4A6",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 5914,
+   "sim": 0.99995,
+   "seen_in": [
+    42
+   ]
+  },
+  "bd77df0f8cdcdfd11e5fc0a20b9c18716e7f9333686106fe722d04f476d6de8f": {
+   "u": "1F976",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 6092,
+   "sim": 0.99995,
+   "seen_in": [
+    42
+   ]
+  },
+  "2997608c0ebc941b1c07285a0f17d92a1847bc8fb6dd00ec2a0080b5c5ccfd2e": {
+   "u": "1F602",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 6504,
+   "sim": 0.99996,
+   "seen_in": [
+    42
+   ]
+  },
+  "fd395fc9bd01160b15e702250044ed3277197ad655b3e85d224dca3b34677db6": {
+   "u": "1F420",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 4953,
+   "sim": 0.99992,
+   "seen_in": [
+    42
+   ]
+  },
+  "67dfe3ca451a574f080e107aa162ed1843682bdfed0845e0dfcb2074319ed51b": {
+   "u": "1F60D",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 6227,
+   "sim": 0.99997,
+   "seen_in": [
+    42
+   ]
+  },
+  "7ec7e72591a5efba673d1f9ae4822da5f91e389a23cffe37f626da5716be9285": {
+   "u": "1F632",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 5738,
+   "sim": 0.99997,
+   "seen_in": [
+    42
+   ]
+  },
+  "f1982f385075b887f871584f9986de3ae0bd2bfc676d1e13bca17d1f2c8ddd07": {
+   "u": "1F923",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 6451,
+   "sim": 0.99996,
+   "seen_in": [
+    42
+   ]
+  },
+  "05620d36318f7e8854eab77511cfcadad0404bf9e47d09772a2ce074e5b4af53": {
+   "u": "1FAAE",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 2913,
+   "sim": 0.99998,
+   "seen_in": [
+    42
+   ]
+  },
+  "bd7ea61e574fd5b0d3fed34879f2742cff4b5ef490317a2237f31530fa34ed25": {
+   "u": "1FAE2",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 5945,
+   "sim": 0.99996,
+   "seen_in": [
+    42
+   ]
+  },
+  "d7abe31c218cb3cc3ae397a55834d7ca5d6021d48479d2aec359819e9d3b7efc": {
+   "u": "1F618",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 6194,
+   "sim": 0.99995,
+   "seen_in": [
+    42
+   ]
+  },
+  "8c003ccf322fa93d7e052cde788c88591bb1cbe1b33c8671c4fc6e2708d09dfb": {
+   "u": "1F601",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 6040,
+   "sim": 0.99996,
+   "seen_in": [
+    42
+   ]
+  },
+  "f4dd5622180cfca5da517a4536dd363f13c71ca56ad0055c74f619a475446a78": {
+   "u": "1F61C",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 5941,
+   "sim": 0.99996,
+   "seen_in": [
+    42
+   ]
+  },
+  "f971dd208e370bddbe642918444ce23ce92424612d074a315ab56165d841eb53": {
+   "u": "1F92D",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 5722,
+   "sim": 0.99996,
+   "seen_in": [
+    42
+   ]
+  },
+  "06f737abc35b688f3fea2554ccfb856be7be312a9ae2aa5158f7f6032baa6e5d": {
+   "u": "1F408-200D-2B1B",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 3520,
+   "sim": 0.99997,
+   "seen_in": [
+    42
+   ]
+  },
+  "37be95d1130f66bcf2e25c7d19b898eed720277a52a1d7cfd4bd6423efb94ff7": {
+   "u": "2600-FE0F",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 4921,
+   "sim": 0.99996,
+   "seen_in": [
+    42
+   ]
+  },
+  "fb3525a25e498808da3c9a8ecc34b305268316803b2d71ce63e8dc7221a8dbe2": {
+   "u": "1F440",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 4009,
+   "sim": 0.99997,
+   "seen_in": [
+    42
+   ]
+  },
+  "57ff379205178bb57ef34e13c5f5506e32cc9c4724734851b68e700bb53c42ba": {
+   "u": "1F42E",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 3845,
+   "sim": 0.9999,
+   "seen_in": [
+    42
+   ]
+  },
+  "cab363987e0042ba08798d8a34fac1d4bea5ba5fb33f1dc81aebd12a9332d967": {
+   "u": "1F603",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 5969,
+   "sim": 0.99996,
+   "seen_in": [
+    42
+   ]
+  },
+  "5a9b1be7a6fde42cb0fe592747170da2e297971e17e045dd050bee29e3b2f1b2": {
+   "u": "1F604",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 5933,
+   "sim": 0.99996,
+   "seen_in": [
+    42
+   ]
+  },
+  "d01e2fee5c55f97d90de499b5fa620ac03bfd72a1e1018672e0a1fc9fb4e3e6f": {
+   "u": "1F4A5",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 6277,
+   "sim": 0.99994,
+   "seen_in": [
+    42
+   ]
+  },
+  "f3f5be6d545a309bf86406a490c757738070e4ba6547529a1e9826b006442478": {
+   "u": "1F612",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 5679,
+   "sim": 0.99996,
+   "seen_in": [
+    43
+   ]
+  },
+  "28cfce22ab588b54639a584fb65d4b0916bd8bb29eb31ca747a638e8a5f33775": {
+   "u": "1FAE3",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 6440,
+   "sim": 0.99996,
+   "seen_in": [
+    43
+   ]
+  },
+  "c01bb434fc48c4c588f2e239547912fc3d90b069b2c9293df9c77d569e2d0d10": {
+   "u": "1F917",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 6395,
+   "sim": 0.99996,
+   "seen_in": [
+    43
+   ]
+  },
+  "e379a6757076d8f7673035d1ba5db136cb2e32bae28cd4762b6a86029c5a549e": {
+   "u": "1F92F",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 6865,
+   "sim": 0.99996,
+   "seen_in": [
+    43
+   ]
+  },
+  "b8c7b1bfb7eafd81d1eae72eaaed412b43c9826be1729b1b57b2463c95ec7c0b": {
+   "u": "1F9B4",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 2409,
+   "sim": 0.99987,
+   "seen_in": [
+    43
+   ]
+  },
+  "6c8f3666c825ae4628e48a3adbed0d4ef03be0a2c5f0899542677b2f735d1ab6": {
+   "u": "2620-FE0F",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 3845,
+   "sim": 0.99993,
+   "seen_in": [
+    43
+   ]
+  },
+  "dd43f0f695aee743e41d18523883daffc3ec10b8163b80fdd314100e44f0b7bc": {
+   "u": "1F607",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 6645,
+   "sim": 0.99995,
+   "seen_in": [
+    43
+   ]
+  },
+  "bb621429aa5eb6576bd03db78ace1725015b60d9d832a850fe7017e6e433247f": {
+   "u": "1F480",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 3003,
+   "sim": 0.99997,
+   "seen_in": [
+    43
+   ]
+  },
+  "1349f8c3b5867d2ec4300eba1c5808c35ce424ab0cdad9e727b76bcc930da3b0": {
+   "u": "1F60B",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 5794,
+   "sim": 0.99996,
+   "seen_in": [
+    43
+   ]
+  },
+  "164e60d2c5c6508ecbdcac942a11a59dfc39a2b1876542df8eb55a2ef223b940": {
+   "u": "1F469-1F3FC-200D-1F373",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 4815,
+   "sim": 0.9999,
+   "seen_in": [
+    43
+   ]
+  },
+  "1da474e5c15cdaa957e42aa944808c70fc2a2be1b434811f61bd402ac4fe8e7f": {
+   "u": "1F605",
+   "set": "apple",
+   "ext": "jpeg",
+   "bytes": 6241,
+   "sim": 0.99995,
+   "seen_in": [
+    43
+   ]
+  }
+ }
+}

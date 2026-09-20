@@ -1,0 +1,383 @@
+{
+ "notes": "Contrat de test independant du langage. Chaque implementation doit reproduire golden/*.json a l'identique et passer les cas unit.",
+ "fixtures": [
+  {
+   "issue": 42,
+   "pdf": "Document_PDF_2.pdf",
+   "golden": "golden/gazette-42.json",
+   "expect": {
+    "pages": 16,
+    "posts": 28,
+    "emoji_occurrences": 26,
+    "contributors": [
+     "Antonyn Vernier",
+     "Christine Lienhart",
+     "Denis W",
+     "Florie Lienhart",
+     "Hugo Lienhart",
+     "ISA Gottar",
+     "Lylou Vernier",
+     "Morgane GOTTAR",
+     "Stéphanie Vernier",
+     "Tytouan Vernier"
+    ],
+    "chronological": true,
+    "date_range": [
+     "2026-08-17",
+     "2026-08-30"
+    ],
+    "issue_number": 42,
+    "cover_date_iso": "2026-08-31",
+    "cover_title": "De Nadia eihri Zidung",
+    "client_code": "854397",
+    "cover_thumbnails": 14,
+    "recipient_name": "NADIA WEISS",
+    "recipient_address": [
+     "2 RUE DU CHÂTEAU D'EAU",
+     "67580 MERTZWILLER"
+    ],
+    "events": [
+     {
+      "kind": "birthday",
+      "name": "Anthony Weiss",
+      "age": 22,
+      "date_label": "le 9 sept."
+     },
+     {
+      "kind": "nameday",
+      "name": "Florie",
+      "age": null,
+      "date_label": "le 5 oct."
+     },
+     {
+      "kind": "nameday",
+      "name": "Morgane",
+      "age": null,
+      "date_label": "le 8 oct."
+     },
+     {
+      "kind": "nameday",
+      "name": "Denis",
+      "age": null,
+      "date_label": "le 9 oct."
+     }
+    ],
+    "back_thumbnails": 8,
+    "layouts": {
+     "text_right": 21,
+     "text_below": 7
+    },
+    "slots": {
+     "top": 14,
+     "bottom": 14
+    },
+    "emoji_unique": [
+     "1F408-200D-2B1B",
+     "1F420",
+     "1F42E",
+     "1F440",
+     "1F4A5",
+     "1F4A6",
+     "1F601",
+     "1F602",
+     "1F603",
+     "1F604",
+     "1F60D",
+     "1F618",
+     "1F61C",
+     "1F632",
+     "1F923",
+     "1F92D",
+     "1F970",
+     "1F976",
+     "1FAAE",
+     "1FAE2",
+     "2600-FE0F"
+    ]
+   }
+  },
+  {
+   "issue": 43,
+   "pdf": "Document_PDF.pdf",
+   "golden": "golden/gazette-43.json",
+   "expect": {
+    "pages": 16,
+    "posts": 28,
+    "emoji_occurrences": 21,
+    "contributors": [
+     "Antonyn Vernier",
+     "Christine Lienhart",
+     "Denis W",
+     "Florie Lienhart",
+     "Hugo Lienhart",
+     "Héloïse Weiss",
+     "ISA Gottar",
+     "Lylou Vernier",
+     "Morgane GOTTAR",
+     "Stéphanie Vernier",
+     "Tytouan Vernier"
+    ],
+    "chronological": true,
+    "date_range": [
+     "2026-08-31",
+     "2026-09-13"
+    ],
+    "issue_number": 43,
+    "cover_date_iso": "2026-09-14",
+    "cover_title": "De Nadia eihri Zidung",
+    "client_code": "854397",
+    "cover_thumbnails": 14,
+    "recipient_name": "NADIA WEISS",
+    "recipient_address": [
+     "2 RUE DU CHÂTEAU D'EAU",
+     "67580 MERTZWILLER"
+    ],
+    "events": [
+     {
+      "kind": "nameday",
+      "name": "Florie",
+      "age": null,
+      "date_label": "le 5 oct."
+     },
+     {
+      "kind": "nameday",
+      "name": "Morgane",
+      "age": null,
+      "date_label": "le 8 oct."
+     },
+     {
+      "kind": "nameday",
+      "name": "Denis",
+      "age": null,
+      "date_label": "le 9 oct."
+     }
+    ],
+    "back_thumbnails": 12,
+    "layouts": {
+     "text_right": 17,
+     "text_below": 11
+    },
+    "slots": {
+     "top": 14,
+     "bottom": 14
+    },
+    "emoji_unique": [
+     "1F469-1F3FC-200D-1F373",
+     "1F480",
+     "1F602",
+     "1F605",
+     "1F607",
+     "1F60B",
+     "1F612",
+     "1F632",
+     "1F917",
+     "1F92D",
+     "1F92F",
+     "1F9B4",
+     "1FAE3",
+     "2620-FE0F"
+    ]
+   }
+  }
+ ],
+ "unit": {
+  "month_number": [
+   [
+    "AOÛT",
+    8
+   ],
+   [
+    "août",
+    8
+   ],
+   [
+    "sept.",
+    9
+   ],
+   [
+    "SEPTEMBRE",
+    9
+   ],
+   [
+    "décembre",
+    12
+   ],
+   [
+    "Janvier",
+    1
+   ],
+   [
+    "fevrier",
+    2
+   ],
+   [
+    "zzz",
+    null
+   ]
+  ],
+  "codepoints": [
+   [
+    "1F602",
+    "😂"
+   ],
+   [
+    "2600-FE0F",
+    "☀️"
+   ],
+   [
+    "1F408-200D-2B1B",
+    "🐈‍⬛"
+   ],
+   [
+    "2620-FE0F",
+    "☠️"
+   ],
+   [
+    "1F469-1F3FC-200D-1F373",
+    "👩🏼‍🍳"
+   ]
+  ],
+  "year_rollover": [
+   {
+    "why": "numero a cheval sur decembre/janvier",
+    "cover_iso": "2027-01-11",
+    "labels": [
+     "le 28 décembre",
+     "le 3 janvier",
+     "le 9 janvier"
+    ],
+    "expect": [
+     "2026-12-28",
+     "2027-01-03",
+     "2027-01-09"
+    ]
+   },
+   {
+    "why": "numero a cheval sur aout/septembre (cas reel n.43)",
+    "cover_iso": "2026-09-14",
+    "labels": [
+     "le 31 août",
+     "le 1 septembre",
+     "le 13 septembre"
+    ],
+    "expect": [
+     "2026-08-31",
+     "2026-09-01",
+     "2026-09-13"
+    ]
+   },
+   {
+    "why": "29 fevrier : la remontee doit tomber sur une annee bissextile",
+    "cover_iso": "2028-03-05",
+    "labels": [
+     "le 29 février",
+     "le 2 mars"
+    ],
+    "expect": [
+     "2028-02-29",
+     "2028-03-02"
+    ]
+   }
+  ],
+  "layout": [
+   {
+    "why": "demi-page, collage a gauche, texte a droite",
+    "box": [
+     45.35,
+     31.2,
+     504.57,
+     381.26
+    ],
+    "collages": [
+     [
+      45.35,
+      31.59,
+      264.47,
+      380.45
+     ]
+    ],
+    "body_origin": [
+     310.0,
+     120.0
+    ],
+    "expect_layout": "text_right",
+    "expect_slot": "top"
+   },
+   {
+    "why": "demi-page basse, collage pleine largeur, texte dessous",
+    "box": [
+     45.35,
+     426.6,
+     504.57,
+     381.26
+    ],
+    "collages": [
+     [
+      45.35,
+      426.9,
+      504.0,
+      300.0
+     ]
+    ],
+    "body_origin": [
+     290.0,
+     740.0
+    ],
+    "expect_layout": "text_below",
+    "expect_slot": "bottom"
+   },
+   {
+    "why": "ARTICLE PLEINE PAGE, collage geant, texte dessous",
+    "box": [
+     45.35,
+     31.2,
+     504.57,
+     776.66
+    ],
+    "collages": [
+     [
+      45.35,
+      31.59,
+      504.0,
+      690.0
+     ]
+    ],
+    "body_origin": [
+     290.0,
+     740.0
+    ],
+    "expect_layout": "text_below",
+    "expect_slot": "full"
+   },
+   {
+    "why": "ARTICLE PLEINE PAGE, collage colonne gauche, texte a droite",
+    "box": [
+     45.35,
+     31.2,
+     504.57,
+     776.66
+    ],
+    "collages": [
+     [
+      45.35,
+      31.59,
+      264.47,
+      775.0
+     ]
+    ],
+    "body_origin": [
+     310.0,
+     300.0
+    ],
+    "expect_layout": "text_right",
+    "expect_slot": "full"
+   }
+  ],
+  "emoji_threshold": {
+   "min_sim": 0.999,
+   "observed_min_true_positive": 0.99987,
+   "observed_min_margin_same_set": 0.0017,
+   "observed_min_margin_cross_set": 0.0593
+  }
+ }
+}
