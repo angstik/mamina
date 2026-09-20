@@ -1,6 +1,8 @@
 import { loadEncryptedSecret, decryptCredentials } from './crypto.js'
 import { TelegramGateway } from './telegram.js'
 import { FamileoPdf } from './pdf.js'
+import { FamileoGeometryParser } from './famileo-parser.js'
+import { EmojiResolver } from './emoji-catalog.js'
 import { parseMeta, stripMeta } from './protocol.js'
 import {
   settings, putMagazine, getMagazine, getMagazineByTopic, listMagazines,
@@ -17,6 +19,22 @@ function topicKey(peer, topicId) { return `${idOfPeer(peer)}:${Number(topicId)}`
 function isMagazineTopic(topic) { return /famileo/i.test(String(topic?.title || '')) }
 function topicIdOf(topic) { return Number(topic?.id || topic?.topicId || 0) }
 function rowMetaText(message) { return message?.text || message?.caption || '' }
+const PARAMS_TOPIC='params', CATALOG_TOPIC='catalog'
+function exactTopic(topic,name){return String(topic?.title||'').trim().toLowerCase()===name}
+function slotCode(slot){return slot==='top'?'h':slot==='bottom'?'b':'p'}
+function postArticle(magazineId,post,sidecar={}){
+  const slot=slotCode(post.slot),box=post.box_pt||[0,0,1,1],collages=post.collages||[],g=sidecar[`${post.page}:${post.slot}`]||{}
+  const union=collages.length?{
+    x0:Math.min(...collages.map(x=>x.box_pt[0])),y0:Math.min(...collages.map(x=>x.box_pt[1])),
+    x1:Math.max(...collages.map(x=>x.box_pt[0]+x.box_pt[2])),y1:Math.max(...collages.map(x=>x.box_pt[1]+x.box_pt[3])),
+  }:null
+  const norm=b=>b?{x0:(b[0]-box[0])/box[2],y0:(b[1]-box[1])/box[3],x1:(b[0]+b[2]-box[0])/box[2],y1:(b[1]+b[3]-box[1])/box[3]}:null
+  const photoBounds=union?{x0:(union.x0-box[0])/box[2],y0:(union.y0-box[1])/box[3],x1:(union.x1-box[0])/box[2],y1:(union.y1-box[1])/box[3]}:null
+  let textBounds=norm(g.body_box_pt)
+  if(!textBounds&&photoBounds) textBounds=post.layout==='text_right'?{x0:Math.max(0,photoBounds.x1),y0:0,x1:1,y1:1}:{x0:0,y0:Math.max(0,photoBounds.y1),x1:1,y1:1}
+  return {magazineId,articleKey:`${magazineId}:p${String(post.page).padStart(2,'0')}:${slot}`,page:post.page,slot,pageText:post.text,articleText:post.text,authorName:post.author,articleDateLabel:post.date_label,bodyText:post.text,lines:post.lines||[],dateIso:post.date_iso||null,layout:post.layout,boxPt:post.box_pt,collages:post.collages||[],textBounds,photoBounds,avatarBounds:norm(g.avatar_box_pt)}
+}
+function parseEnvelopeArticles(magazineId,envelope){const gazette=envelope?.gazette||envelope;return (gazette?.posts||[]).map(p=>postArticle(magazineId,p,envelope?.geometry||{}))}
 
 function canvasBlob(canvas, type='image/jpeg', quality=.82) {
   return new Promise((resolve, reject) => canvas.toBlob(blob => {
@@ -142,9 +160,13 @@ export class UserMaminaService {
   }
 
   async selectDialog(model) {
-    this.dialog=model.dialog||model
+    const next=model.dialog||model,nextId=idOfPeer(next.peer),prev=await settings.get('groupId','')
+    this.dialog=next
     this.dialogModel=model.dialog?model:TelegramGateway.dialogModel(model)
-    await settings.set('groupId',idOfPeer(this.dialog.peer))
+    await settings.set('groupId',nextId)
+    if(String(prev)!==String(nextId)){
+      await settings.set('paramsMessageId',0);await settings.set('paramsTopicId',0);await settings.set('remoteParams',null)
+    }
     this.current=null
   }
 
@@ -165,6 +187,7 @@ export class UserMaminaService {
     this.activity('Telegram · lecture des sujets')
     info('sync','Lecture des sujets Telegram')
     const allTopics=await this.gateway.topics(peer)
+    try { await this.loadRemoteParams(allTopics) } catch(e) { warn('params','Paramètres distants indisponibles',{message:e?.message||String(e)}) }
     info('sync','Sujets reçus',{count:allTopics.length})
     const topics=allTopics.filter(isMagazineTopic).sort((a,b)=>topicIdOf(b)-topicIdOf(a))
     info('sync','Sujets Famileo détectés',{count:topics.length,titles:topics.slice(0,10).map(t=>t.title)})
@@ -219,21 +242,25 @@ export class UserMaminaService {
 
     info('sync.discover','Téléchargement PDF',{topicId:tid,messageId:pdfRow.id})
     const bytes=await this.gateway.downloadMessageMedia(rawPdf)
-    info('sync.discover','Analyse PDF',{bytes:bytes?.byteLength||bytes?.length||0})
-    this.activity('PDF · analyse locale')
-    const pdf=await FamileoPdf.load(bytes,{trace:(scope,message,detail)=>info(scope,message,detail)})
-    info('sync.discover','PDF analysé',{
-      magazineId:pdf.magazine?.magazineId||null,
-      issue:pdf.magazine?.issue??null,
-      date:pdf.magazine?.date||null,
-      pages:pdf.magazine?.pageCount??null,
-    })
-
-    if(pdfRow.meta?.sha256 && pdf.magazine.sha256!==pdfRow.meta.sha256) {
-      throw new Error(`Hash PDF incohérent pour ${topic.title||tid}.`)
+    let envelope=null
+    const parseIndex=rows.findIndex(r=>r.meta?.kind==='parse')
+    if(parseIndex>=0&&raw[parseIndex]?.media){
+      try { envelope=JSON.parse(new TextDecoder().decode(await this.gateway.downloadMessageMedia(raw[parseIndex]))) }
+      catch(e){ warn('sync.discover','JSON parsé invalide, fallback local',{message:e?.message||String(e)}) }
     }
-
-    const articles=pdf.articles()
+    let pdf=null, magazine, articles
+    if(envelope?.gazette){
+      const g=envelope.gazette,sha=pdfRow.meta?.sha256||envelope.sha256||null
+      const magazineKey=`famileo:${String(g.source?.title||'gazette').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}:n${g.cover.issue_number||0}:${g.cover.date_iso||'date-unknown'}`
+      magazine={title:g.source?.title||'Gazette Famileo',issue:g.cover.issue_number,date:g.cover.date_iso,sha256:sha,magazineKey,magazineId:pdfRow.meta?.magazineId||`${magazineKey}:sha256-${String(sha||'').slice(0,12)}`,pageCount:g.source?.pages||0,parsedSchema:envelope.schema||'mamina-gazette-v1'}
+      articles=parseEnvelopeArticles(magazine.magazineId,envelope)
+      this.activity('JSON Famileo · lecture directe')
+    } else {
+      this.activity('PDF · analyse locale (compatibilité)')
+      pdf=await FamileoPdf.load(bytes,{trace:(scope,message,detail)=>info(scope,message,detail)})
+      magazine=pdf.magazine;articles=pdf.articles()
+    }
+    if(pdfRow.meta?.sha256 && magazine.sha256 && magazine.sha256!==pdfRow.meta.sha256) throw new Error(`Hash PDF incohérent pour ${topic.title||tid}.`)
     info('sync.discover','Articles détectés',{
       topicId:tid,
       count:articles.length,
@@ -243,6 +270,7 @@ export class UserMaminaService {
     const resolved=resolveRowsToArticles(rows,articles)
 
     info('sync.discover','Rendu couverture',{topicId:tid})
+    if(!pdf) pdf=await FamileoPdf.load(bytes)
     const coverCanvas=await pdf.renderCover()
     info('sync.discover','Conversion couverture en image',{
       width:coverCanvas.width,
@@ -250,13 +278,13 @@ export class UserMaminaService {
     })
     const cover=await canvasBlob(coverCanvas)
     info('sync.discover','Stockage couverture',{
-      magazineId:pdf.magazine.magazineId,
+      magazineId:magazine.magazineId,
       bytes:cover.size||0,
     })
     this.activity('Base locale · couverture')
-    await putAsset(`cover:${pdf.magazine.magazineId}`,cover)
+    await putAsset(`cover:${magazine.magazineId}`,cover)
     info('sync.discover','Couverture stockée',{
-      magazineId:pdf.magazine.magazineId,
+      magazineId:magazine.magazineId,
       storage:'Uint8Array+MIME',
     })
 
@@ -264,7 +292,7 @@ export class UserMaminaService {
     const comments=[...resolved.byArticle.values()].flat()
     const unread=comments.filter(c=>!c.isOutgoing && c.id>(read.get(c.articleKey)||0)).length
     const record={
-      ...pdf.magazine,
+      ...magazine,
       appTitle:String(pdfRow.meta?.appTitle||'MamiNa'),
       topicId:tid, topicKey:key, topicTitle:topic.title||'', pdfMessageId:pdfRow.id,
       reactionCount:comments.length, unreadCount:unread, fullyCached:false,
@@ -272,11 +300,12 @@ export class UserMaminaService {
     }
     this.activity('Base locale · index revue')
     await putMagazine(record)
+    if(envelope?.gazette) await putAsset(`parse:${record.magazineId}`,new TextEncoder().encode(JSON.stringify(envelope)))
     await replaceArticles(record.magazineId,articles.map(a=>({...a,magazineId:record.magazineId})))
     await putTopicState({topicKey:key,topicId:tid,cursor:record.lastMessageId,updatedAt:record.updatedAt})
     // Temporarily retain bytes so promotion to top-2 needs no second download.
     await putAsset(`staging-pdf:${record.magazineId}`,bytes)
-    try { await pdf.doc?.cleanup?.(); await pdf.doc?.destroy?.() } catch {}
+    try { await pdf?.doc?.cleanup?.(); await pdf?.doc?.destroy?.() } catch {}
     info('sync.discover','Revue découverte',{magazineId:record.magazineId,articles:articles.length,reactions:comments.length})
     return record
   }
@@ -327,10 +356,16 @@ export class UserMaminaService {
 
     let articles=await listArticles(fresh.magazineId)
     if(!articles.length) {
-      const pdf=await FamileoPdf.load(pdfBytes)
-      articles=pdf.articles().map(a=>({...a,magazineId:fresh.magazineId}))
+      const parsedBytes=await getAsset(`parse:${fresh.magazineId}`)
+      if(parsedBytes){
+        try{articles=parseEnvelopeArticles(fresh.magazineId,JSON.parse(new TextDecoder().decode(parsedBytes)))}catch{}
+      }
+      if(!articles.length){
+        const pdf=await FamileoPdf.load(pdfBytes)
+        articles=pdf.articles().map(a=>({...a,magazineId:fresh.magazineId}))
+        try { await pdf.doc?.cleanup?.(); await pdf.doc?.destroy?.() } catch {}
+      }
       await replaceArticles(fresh.magazineId,articles)
-      try { await pdf.doc?.cleanup?.(); await pdf.doc?.destroy?.() } catch {}
     }
     await putAsset(`pdf:${fresh.magazineId}`,pdfBytes)
     await deleteAsset(`staging-pdf:${fresh.magazineId}`)
@@ -443,8 +478,15 @@ export class UserMaminaService {
       const pdfIdx=models.findIndex(r=>r.meta?.kind==='pdf')
       if(pdfIdx<0) throw new Error('PDF introuvable dans le sujet.')
       bytes=await this.gateway.downloadMessageMedia(raw[pdfIdx])
+      let articles=[]
+      const parsedBytes=await getAsset(`parse:${magazineId}`)
+      if(parsedBytes){try{articles=parseEnvelopeArticles(magazineId,JSON.parse(new TextDecoder().decode(parsedBytes)))}catch{}}
+      if(!articles.length){
+        const parseIdx=models.findIndex(r=>r.meta?.kind==='parse')
+        if(parseIdx>=0&&raw[parseIdx]?.media){try{const env=JSON.parse(new TextDecoder().decode(await this.gateway.downloadMessageMedia(raw[parseIdx])));articles=parseEnvelopeArticles(magazineId,env);await putAsset(`parse:${magazineId}`,new TextEncoder().encode(JSON.stringify(env)))}catch{}}
+      }
       const pdf=await FamileoPdf.load(bytes,{trace:(scope,message,detail)=>info(scope,message,detail)})
-      const articles=pdf.articles()
+      if(!articles.length)articles=pdf.articles()
       const resolved=resolveRowsToArticles(models,articles)
       rows=[...resolved.byArticle.values()].flat()
       this.current={magazine,pdf,articles,rows}
@@ -649,10 +691,11 @@ export class UserMaminaService {
       const pdf=await FamileoPdf.load(bytes)
       currentRef.pdf=pdf
       currentRef.pdfBytes=bytes
-      const parsed=pdf.articles()
-      if(parsed.length){
-        currentRef.articles=parsed
-        try { await replaceArticles(currentRef.magazine.magazineId,parsed) } catch {}
+      // Parsed v1 articles already contain authoritative geometry/text from
+      // the master JSON. Never replace them with the legacy PDF heuristic.
+      if(!currentRef.articles?.length){
+        const parsed=pdf.articles()
+        if(parsed.length){currentRef.articles=parsed;try{await replaceArticles(currentRef.magazine.magazineId,parsed)}catch{}}
       }
       return pdf
     })()
@@ -722,6 +765,40 @@ export class UserMaminaService {
   hasGateway() { return Boolean(this.gateway) }
   hasDialog() { return Boolean(this.dialog) }
 
+  async loadRemoteParams(topics=null) {
+    if(!this.dialog) return null
+    const peer=this.dialog.peer
+    let messageId=Number(await settings.get('paramsMessageId',0)||0),msg=null
+    if(messageId) msg=await this.gateway.messageById(peer,messageId).catch(()=>null)
+    if(!msg){const list=topics||await this.gateway.topics(peer),topic=list.find(t=>exactTopic(t,PARAMS_TOPIC));if(!topic)return null;const rows=await this.gateway.topicMessages(peer,topicIdOf(topic),{limit:50});const models=rows.map(TelegramGateway.messageModel);let i=-1;for(let x=models.length-1;x>=0;x--)if(models[x].meta?.kind==='mamina-params'){i=x;break}if(i<0)return null;msg=rows[i];messageId=Number(msg.id);await settings.set('paramsMessageId',messageId);await settings.set('paramsTopicId',topicIdOf(topic))}
+    const meta=TelegramGateway.messageModel(msg).meta;if(meta?.kind!=='mamina-params')return null;await settings.set('remoteParams',meta);return meta
+  }
+
+  async loadEmojiResolver() {
+    const params=await this.loadRemoteParams();if(!params?.catalog?.manifestMessageId)throw new Error('CATALOG_PARAMS_MISSING')
+    const peer=this.dialog.peer,manifestMsg=await this.gateway.messageById(peer,params.catalog.manifestMessageId);const manifest=TelegramGateway.messageModel(manifestMsg).meta
+    if(manifest?.kind!=='mamina-catalog-manifest')throw new Error('CATALOG_MANIFEST_INVALID')
+    const load=async(role)=>{const id=manifest.files?.[role];if(!id)throw new Error(`CATALOG_FILE_MISSING:${role}`);const key=`catalog:${id}`;let bytes=await getAsset(key);if(!bytes){const m=await this.gateway.messageById(peer,id);bytes=await this.gateway.downloadMessageMedia(m);await putAsset(key,bytes)}return bytes}
+    const [shaB,jsonB,binB]=await Promise.all([load('sha256'),load('json'),load('bin')]);return new EmojiResolver({shaJson:JSON.parse(new TextDecoder().decode(shaB)),catalogJson:JSON.parse(new TextDecoder().decode(jsonB)),catalogBin:binB,set:params.parser?.emojiSet||'apple',threshold:Number(params.parser?.emojiThreshold||.999)})
+  }
+
+  async adminInitializeSystem({shaFile,catalogJsonFile,catalogBinFile}={}) {
+    if(!this.dialog)throw new Error('Aucun groupe sélectionné.')
+    if(!shaFile||!catalogJsonFile||!catalogBinFile)throw new Error('Sélectionne les 3 fichiers catalogue.')
+    const peer=this.dialog.peer;let topics=await this.gateway.topics(peer)
+    const ensure=async name=>{let t=topics.find(x=>exactTopic(x,name));if(t)return topicIdOf(t);const c=await this.gateway.createTopic(peer,name);topics=await this.gateway.topics(peer);return c.topicId}
+    const paramsTopicId=await ensure(PARAMS_TOPIC),catalogTopicId=await ensure(CATALOG_TOPIC)
+    const post=async(file,role)=>this.gateway.postDocument(peer,catalogTopicId,file,{kind:'catalog-file',role,name:file.name})
+    const [shaMsg,jsonMsg,binMsg]=await Promise.all([post(shaFile,'sha256'),post(catalogJsonFile,'json'),post(catalogBinFile,'bin')])
+    const manifest=await this.gateway.postSystemText(peer,catalogTopicId,'Catalogue MamiNa',{kind:'mamina-catalog-manifest',version:1,files:{sha256:Number(shaMsg.id),json:Number(jsonMsg.id),bin:Number(binMsg.id)}})
+    const paramsMeta={kind:'mamina-params',version:1,parser:{spec:'SPEC_v1_CG',emojiSet:'apple',emojiThreshold:.999},catalog:{topicId:catalogTopicId,manifestMessageId:Number(manifest.id)}}
+    const oldParams=await this.gateway.topicMessages(peer,paramsTopicId,{limit:50})
+    const existing=[...oldParams].reverse().find(m=>TelegramGateway.messageModel(m).meta?.kind==='mamina-params')
+    const paramsMsg=existing?await this.gateway.editSystemText(peer,existing.id,'Paramètres MamiNa',paramsMeta):await this.gateway.postSystemText(peer,paramsTopicId,'Paramètres MamiNa',paramsMeta)
+    await settings.set('paramsTopicId',paramsTopicId);await settings.set('paramsMessageId',Number(paramsMsg.id));await settings.set('remoteParams',paramsMeta)
+    return {paramsTopicId,catalogTopicId,paramsMessageId:Number(paramsMsg.id),catalogManifestMessageId:Number(manifest.id)}
+  }
+
   async adminListForumDialogs() {
     return this.listForumDialogs()
   }
@@ -737,11 +814,15 @@ export class UserMaminaService {
     const step=(name,detail={})=>onStep?.({name,detail,at:new Date().toISOString()})
     try {
       step('magazine.pdf.read.start',{name:file.name,size:file.size,type:file.type})
-      const pdf=await FamileoPdf.load(file)
-      const appTitle=await settings.get('appTitle','MamiNa')
-      const magazine={...pdf.magazine,appTitle}
-      const articles=pdf.articles()
-      try { await pdf.doc?.cleanup?.(); await pdf.doc?.destroy?.() } catch {}
+      const resolver=await this.loadEmojiResolver()
+      const parsed=await FamileoGeometryParser.parse(file,{emojiResolver:resolver,onProgress:text=>this.activity(text)})
+      const g=parsed.gazette,appTitle=await settings.get('appTitle','MamiNa'),sha256=parsed.sha256
+      const slug=String(g.source?.title||'gazette').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'gazette'
+      const magazineKey=`famileo:${slug}:n${g.cover.issue_number||0}:${g.cover.date_iso||'date-unknown'}`
+      const magazine={title:g.source?.title||'Gazette Famileo',issue:g.cover.issue_number,date:g.cover.date_iso,sha256,magazineKey,magazineId:`${magazineKey}:sha256-${sha256.slice(0,12)}`,pageCount:g.source.pages,appTitle}
+      const envelope={schema:'mamina-gazette-v1',spec:'SPEC_v1_CG',sha256,gazette:g,geometry:parsed.geometry}
+      const articles=parseEnvelopeArticles(magazine.magazineId,envelope)
+      try { await parsed.doc?.cleanup?.(); await parsed.doc?.destroy?.() } catch {}
       step('magazine.pdf.read.done',{
         magazineId:magazine.magazineId,issue:magazine.issue,date:magazine.date,articles:articles.length
       })
@@ -750,6 +831,8 @@ export class UserMaminaService {
       const {topicId}=await this.gateway.createTopic(this.dialog.peer,title)
       step('magazine.topic.create.done',{topicId})
       await this.gateway.postMagazinePdf(this.dialog.peer,topicId,file,magazine,{progressCallback,onStep})
+      const parseFile=new File([JSON.stringify(envelope)],`gazette-${magazine.issue||'parse'}.json`,{type:'application/json'})
+      await this.gateway.postDocument(this.dialog.peer,topicId,parseFile,{kind:'parse',schema:'mamina-gazette-v1',spec:'SPEC_v1_CG',magazineId:magazine.magazineId,sha256})
       step('magazine.done',{topicId})
       await this.syncAll()
       return {topicId,magazine,articles}

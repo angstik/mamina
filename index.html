@@ -169,6 +169,17 @@
         <button id="adminRefreshGroups" type="button">Actualiser</button>
       </div>
 
+      <section class="admin-system-block">
+        <h3>Configuration du groupe</h3>
+        <p class="subtle">Crée/alimente les topics réservés <code>params</code> et <code>catalog</code>. Les lecteurs ne téléchargent jamais le catalogue lourd.</p>
+        <label>Ressources catalogue</label>
+        <input id="catalogShaFile" type="file" accept="application/json">
+        <input id="catalogJsonFile" type="file" accept="application/json">
+        <input id="catalogBinFile" type="file" accept="application/octet-stream,.bin">
+        <button id="adminInitSystem" type="button">Initialiser params + catalog</button>
+        <div id="adminSystemStatus" class="status"></div>
+      </section>
+
       <label for="adminTopicSelect">Sujets existants</label>
       <div class="inline-actions">
         <select id="adminTopicSelect"></select>

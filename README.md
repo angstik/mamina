@@ -191,3 +191,15 @@ Finition cosmétique finale sans modification du backend ni du protocole :
 - splash plus long avec grande image MamiNa existante, avatar et nom utilisateur agrandi.
 
 L'estimation IndexedDB est volontairement indiquée avec `≈` : elle mesure les données applicatives sérialisées, pas les frais internes du moteur IndexedDB. `navigator.storage.estimate()` fournit séparément l'usage global et le quota de l'origine.
+
+
+## v1.1.0 — Parsing Famileo v1_CG
+
+- parsing master géométrique conforme à `parse pdf/SPEC_v1_CG.md` ;
+- topic `params` lu par tous via message ciblé après découverte initiale ;
+- topic `catalog` réservé au master, ressources téléchargées uniquement lors du parsing ;
+- publication d'un PDF accompagnée d'une enveloppe `mamina-gazette-v1` JSON ;
+- lecteurs basés sur le JSON parsé, avec géométrie exacte pour article/photo/avatar/texte ;
+- catalogue et fixtures de test hors `public/`, donc absents du poids de la PWA déployée.
+
+Validation locale effectuée : goldens n°42 et n°43 strictement reproduits par le parseur de référence, tests unitaires de `checks.json`, et contrôle bas niveau des 28 boîtes de posts sur chaque PDF.

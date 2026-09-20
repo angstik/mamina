@@ -1,0 +1,1571 @@
+{
+  "source": {
+    "pages": 16,
+    "page_size_pt": [
+      595.276,
+      841.89
+    ],
+    "producer": "TCPDF 6.11.3 (http://www.tcpdf.org)",
+    "title": "La gazette de Nadia Weiss",
+    "created": "D:20260831011909+02'00'"
+  },
+  "cover": {
+    "issue_label": "N°42",
+    "issue_number": 42,
+    "date_label": "31 AOÛT 2026",
+    "date_parts": {
+      "day": 31,
+      "month": "AOÛT",
+      "year": 2026
+    },
+    "date_iso": "2026-08-31",
+    "title": "De Nadia eihri Zidung",
+    "client_code": "854397",
+    "thumbnails": [
+      {
+        "col": 0,
+        "row": 0,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 1,
+        "row": 0,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 2,
+        "row": 0,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 3,
+        "row": 0,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 0,
+        "row": 1,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 1,
+        "row": 1,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 2,
+        "row": 1,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 0,
+        "row": 4,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 1,
+        "row": 4,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 2,
+        "row": 4,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 0,
+        "row": 5,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 1,
+        "row": 5,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 2,
+        "row": 5,
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "col": 3,
+        "row": 5,
+        "src_px": [
+          437,
+          437
+        ]
+      }
+    ]
+  },
+  "posts": [
+    {
+      "page": 2,
+      "author": "ISA Gottar",
+      "date_label": "le 17 août",
+      "text": "Massacre à la tronçonneuse....Benoit est passé par là et a taillé l arbuste que je travaille depuis 3 ans en nuage !!! Pendant les vacances j ai rejoué au coiffeur pour rattraper les choses...et en bas le nouvel aménagement cailloux côté garage",
+      "lines": [
+        "Massacre à la",
+        "tronçonneuse....Benoit est passé",
+        "par là et a taillé l arbuste que je",
+        "travaille depuis 3 ans en nuage !!!",
+        "Pendant les vacances j ai rejoué au",
+        "coiffeur pour rattraper les",
+        "choses...et en bas le nouvel",
+        "aménagement cailloux côté garage"
+      ],
+      "emoji": [],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-17"
+    },
+    {
+      "page": 2,
+      "author": "Hugo Lienhart",
+      "date_label": "le 17 août",
+      "text": "Petite randonnée au Isskogel en Autriche, c'était vachement cool. Papa ne nous a pas accompagné jusqu'en haut mais maman a réussi !",
+      "lines": [
+        "Petite randonnée au Isskogel en",
+        "Autriche, c'était vachement cool.",
+        "Papa ne nous a pas accompagné",
+        "jusqu'en haut mais maman a réussi",
+        "! "
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-17"
+    },
+    {
+      "page": 3,
+      "author": "Lylou Vernier",
+      "date_label": "le 18 août",
+      "text": "Regarde ce petit bébé chat TROP MIGNON qu'on a croisé en crête, je l'aurais bien emmené dans ma valise celui la 🥰🥰",
+      "lines": [
+        "Regarde ce petit bébé chat TROP",
+        "MIGNON qu'on a croisé en crête, je",
+        "l'aurais bien emmené dans ma",
+        "valise celui la 🥰🥰"
+      ],
+      "emoji": [
+        {
+          "char": "🥰",
+          "unified": "1F970",
+          "via": "sha256"
+        },
+        {
+          "char": "🥰",
+          "unified": "1F970",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-18"
+    },
+    {
+      "page": 3,
+      "author": "Hugo Lienhart",
+      "date_label": "le 18 août",
+      "text": "Les paysages en Autriche sont quand même magnifiques !",
+      "lines": [
+        "Les paysages en Autriche sont quand même magnifiques",
+        "! "
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            426.61,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-08-18"
+    },
+    {
+      "page": 4,
+      "author": "ISA Gottar",
+      "date_label": "le 19 août",
+      "text": "Mamie regarde la médiathèque de Schweighouse, leurs fleurs sont magnifiques...dé hann kenn canicule ket !!",
+      "lines": [
+        "Mamie regarde la médiathèque de",
+        "Schweighouse, leurs fleurs sont",
+        "magnifiques...dé hann kenn",
+        "canicule ket !!"
+      ],
+      "emoji": [],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-19"
+    },
+    {
+      "page": 4,
+      "author": "Florie Lienhart",
+      "date_label": "le 19 août",
+      "text": "Regarde le Stausee en Autriche on a fait une partie de la balade autour du lac pour avoir de magnifiques paysages",
+      "lines": [
+        "Regarde le Stausee en Autriche on",
+        "a fait une partie de la balade",
+        "autour du lac pour avoir de",
+        "magnifiques paysages "
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-19"
+    },
+    {
+      "page": 5,
+      "author": "Christine Lienhart",
+      "date_label": "le 19 août",
+      "text": "Mais les vacances c'est aussi un temps plus que mitigé parfois 💦 et après l'ascension du Isskogel 🥶 Hugo et Florie se sont \"payé\" un tour de moto 😂",
+      "lines": [
+        "Mais les vacances c'est aussi un",
+        "temps plus que mitigé parfois 💦 et",
+        "après l'ascension du Isskogel 🥶",
+        "Hugo et Florie se sont \"payé\" un",
+        "tour de moto 😂"
+      ],
+      "emoji": [
+        {
+          "char": "💦",
+          "unified": "1F4A6",
+          "via": "sha256"
+        },
+        {
+          "char": "🥶",
+          "unified": "1F976",
+          "via": "sha256"
+        },
+        {
+          "char": "😂",
+          "unified": "1F602",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-19"
+    },
+    {
+      "page": 5,
+      "author": "Denis W",
+      "date_label": "le 20 août",
+      "text": "Un petit tour chez Léon pour manger des moules 🐠 pour l'anniversaire de Héloïse !! C'était un très bon moment, au milieu de la canicule et des vacances 😍.",
+      "lines": [
+        "Un petit tour chez Léon pour manger des moules 🐠 pour",
+        "l'anniversaire de Héloïse !! C'était un très bon moment,",
+        "au milieu de la canicule et des vacances 😍."
+      ],
+      "emoji": [
+        {
+          "char": "🐠",
+          "unified": "1F420",
+          "via": "sha256"
+        },
+        {
+          "char": "😍",
+          "unified": "1F60D",
+          "via": "sha256"
+        }
+      ],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            426.61,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-08-20"
+    },
+    {
+      "page": 6,
+      "author": "Antonyn Vernier",
+      "date_label": "le 20 août",
+      "text": "En pleine ascension (on le voit pas très bien mais c’est raide 😲).",
+      "lines": [
+        "En pleine ascension (on le voit pas",
+        "très bien mais c’est raide 😲)."
+      ],
+      "emoji": [
+        {
+          "char": "😲",
+          "unified": "1F632",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            919,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.59,
+            264.47,
+            380.45
+          ]
+        }
+      ],
+      "date_iso": "2026-08-20"
+    },
+    {
+      "page": 6,
+      "author": "Hugo Lienhart",
+      "date_label": "le 21 août",
+      "text": "J'ai organisé ce qu'on appelle j'en LAN chez moi cette nuit. Le principe c'est de ramener son oc et de jouer ensemble toute la nuit aux jeux vidéos",
+      "lines": [
+        "J'ai organisé ce qu'on appelle j'en",
+        "LAN chez moi cette nuit. Le",
+        "principe c'est de ramener son oc et",
+        "de jouer ensemble toute la nuit aux",
+        "jeux vidéos"
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-21"
+    },
+    {
+      "page": 7,
+      "author": "ISA Gottar",
+      "date_label": "le 22 août",
+      "text": "Activité coiffeur, bigoudis pour les 2 starlettes 🤣",
+      "lines": [
+        "Activité coiffeur, bigoudis pour les 2 starlettes 🤣"
+      ],
+      "emoji": [
+        {
+          "char": "🤣",
+          "unified": "1F923",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            927
+          ],
+          "box_pt": [
+            45.83,
+            31.18,
+            503.61,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-08-22"
+    },
+    {
+      "page": 7,
+      "author": "Morgane GOTTAR",
+      "date_label": "le 22 août",
+      "text": "Suite de l'expérience permanente 🪮 ça avait pourtant bien commencé mais enlever les bigoudis était une toute autre affaire ! J'ai du tirer si fort que j'en ai perdu des mèches de cheveux, en plus des noeuds pour un résultat mitigé 🫢 en conclusion je te laisse tes bigoudis mamie 😂",
+      "lines": [
+        "Suite de l'expérience permanente",
+        "🪮 ça avait pourtant bien",
+        "commencé mais enlever les",
+        "bigoudis était une toute autre",
+        "affaire ! J'ai du tirer si fort que j'en",
+        "ai perdu des mèches de cheveux,",
+        "en plus des noeuds pour un",
+        "résultat mitigé 🫢 en conclusion je",
+        "te laisse tes bigoudis mamie 😂"
+      ],
+      "emoji": [
+        {
+          "char": "🪮",
+          "unified": "1FAAE",
+          "via": "sha256"
+        },
+        {
+          "char": "🫢",
+          "unified": "1FAE2",
+          "via": "sha256"
+        },
+        {
+          "char": "😂",
+          "unified": "1F602",
+          "via": "sha256"
+        }
+      ],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-22"
+    },
+    {
+      "page": 8,
+      "author": "ISA Gottar",
+      "date_label": "le 23 août",
+      "text": "Notre Gribouille savoure chaque instant quand Morg est de retour....calins calins cali s",
+      "lines": [
+        "Notre Gribouille savoure chaque",
+        "instant quand Morg est de",
+        "retour....calins calins cali s"
+      ],
+      "emoji": [],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-23"
+    },
+    {
+      "page": 8,
+      "author": "Stéphanie Vernier",
+      "date_label": "le 23 août",
+      "text": "Petit tour dans la belle Alsace! Ici à Colmar",
+      "lines": [
+        "Petit tour dans la belle Alsace! Ici à",
+        "Colmar"
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-23"
+    },
+    {
+      "page": 9,
+      "author": "Denis W",
+      "date_label": "le 26 août",
+      "text": "Coucher de soleil sur la plage de Equihen dans le nord : la nature fait des choses très moches (je ne me remets pas des coulées de boue au Népal), mais aussi de très belles choses, à nous de vivre avec les premières et surtout de bien voir les secondes : il y en a partout 😘",
+      "lines": [
+        "Coucher de soleil sur la plage de Equihen dans le nord : la",
+        "nature fait des choses très moches (je ne me remets pas",
+        "des coulées de boue au Népal), mais aussi de très belles",
+        "choses, à nous de vivre avec les premières et surtout de",
+        "bien voir les secondes : il y en a partout 😘"
+      ],
+      "emoji": [
+        {
+          "char": "😘",
+          "unified": "1F618",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            31.18,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-08-26"
+    },
+    {
+      "page": 9,
+      "author": "Lylou Vernier",
+      "date_label": "le 27 août",
+      "text": "Alors tata isa on joue avec les timbres au lieu de ranger ?😂",
+      "lines": [
+        "Alors tata isa on joue avec les",
+        "timbres au lieu de ranger ?😂"
+      ],
+      "emoji": [
+        {
+          "char": "😂",
+          "unified": "1F602",
+          "via": "sha256"
+        }
+      ],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-27"
+    },
+    {
+      "page": 10,
+      "author": "Florie Lienhart",
+      "date_label": "le 27 août",
+      "text": "Voici un peu de décoration et d'ameublement pour mon appart cet été : à droite la bibliothèque finie et mise en place et à gauche j'avais une veille toile dans mon placard que j'ai peinte 😁",
+      "lines": [
+        "Voici un peu de décoration et d'ameublement pour mon",
+        "appart cet été : à droite la bibliothèque finie et mise en",
+        "place et à gauche j'avais une veille toile dans mon placard",
+        "que j'ai peinte 😁"
+      ],
+      "emoji": [
+        {
+          "char": "😁",
+          "unified": "1F601",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            31.18,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-08-27"
+    },
+    {
+      "page": 10,
+      "author": "ISA Gottar",
+      "date_label": "le 27 août",
+      "text": "Do hets gemacht ! De Hugo fresst se von de Crouty...plein de petites mains pour faire la vaisselle, du tri de papiers( y en avait marre 😜)et enfin les jeunes qui ont trouvé 1 système ingénieux pour rentrer le journal de mamie...un jetzt esch alles weder laar",
+      "lines": [
+        "Do hets gemacht ! De Hugo fresst",
+        "se von de Crouty...plein de petites",
+        "mains pour faire la vaisselle, du tri",
+        "de papiers( y en avait marre 😜)et",
+        "enfin les jeunes qui ont trouvé 1",
+        "système ingénieux pour rentrer le",
+        "journal de mamie...un jetzt esch",
+        "alles weder laar "
+      ],
+      "emoji": [
+        {
+          "char": "😜",
+          "unified": "1F61C",
+          "via": "sha256"
+        }
+      ],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-27"
+    },
+    {
+      "page": 11,
+      "author": "Morgane GOTTAR",
+      "date_label": "le 28 août",
+      "text": "Maman a acheté un nouveau coussin pour le mal de dos et il était destiné à papa. Après l'avoir déballé elle a voulu le tester et je crois qu'il a été adopté 🤭 je te dis pas comme c'était difficile pour qu'elle se lève 😂 on dirait presque qu'elle imite Gribouille 🐈‍⬛",
+      "lines": [
+        "Maman a acheté un nouveau coussin pour le mal de dos",
+        "et il était destiné à papa. Après l'avoir déballé elle a voulu",
+        "le tester et je crois qu'il a été adopté 🤭 je te dis pas",
+        "comme c'était difficile pour qu'elle se lève 😂 on dirait",
+        "presque qu'elle imite Gribouille 🐈‍⬛"
+      ],
+      "emoji": [
+        {
+          "char": "🤭",
+          "unified": "1F92D",
+          "via": "sha256"
+        },
+        {
+          "char": "😂",
+          "unified": "1F602",
+          "via": "sha256"
+        },
+        {
+          "char": "🐈‍⬛",
+          "unified": "1F408-200D-2B1B",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            31.18,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-08-28"
+    },
+    {
+      "page": 11,
+      "author": "Stéphanie Vernier",
+      "date_label": "le 28 août",
+      "text": "Le Colorado Alsacien: une petite merveille à côté de Bitche!",
+      "lines": [
+        "Le Colorado Alsacien: une petite",
+        "merveille à côté de Bitche!"
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-28"
+    },
+    {
+      "page": 12,
+      "author": "Florie Lienhart",
+      "date_label": "le 28 août",
+      "text": "Regarde ce joli coucher de soleil vendredi soir on dirait presque une flamme ! ☀️",
+      "lines": [
+        "Regarde ce joli coucher de soleil vendredi soir on dirait",
+        "presque une flamme ! ☀️"
+      ],
+      "emoji": [
+        {
+          "char": "☀️",
+          "unified": "2600-FE0F",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_below",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            1751,
+            926
+          ],
+          "box_pt": [
+            45.56,
+            31.18,
+            504.16,
+            266.62
+          ]
+        }
+      ],
+      "date_iso": "2026-08-28"
+    },
+    {
+      "page": 12,
+      "author": "Denis W",
+      "date_label": "le 29 août",
+      "text": "On fait plein de choses avec les ordinateurs et l'intelligence artificielle, mais là ... c'est que nos yeux 👀 et parfois on ne sait pas où regarder et savoir ce qui est vrai et faux. Bon, pour le bas c'est simple : au milieu c'est Olwe qui s'est alignée avec mouton et poule !?!",
+      "lines": [
+        "On fait plein de choses avec les",
+        "ordinateurs et l'intelligence",
+        "artificielle, mais là ... c'est que nos",
+        "yeux 👀 et parfois on ne sait pas où",
+        "regarder et savoir ce qui est vrai et",
+        "faux. Bon, pour le bas c'est simple :",
+        "au milieu c'est Olwe qui s'est",
+        "alignée avec mouton et poule !?!"
+      ],
+      "emoji": [
+        {
+          "char": "👀",
+          "unified": "1F440",
+          "via": "sha256"
+        }
+      ],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-29"
+    },
+    {
+      "page": 13,
+      "author": "Denis W",
+      "date_label": "le 30 août",
+      "text": "Balade dans l'île Panchout à côté de chez nous... à côté de Thésée il y a de drôles de bêtes 🐮... C'est «Ours», une vache Écossaise 😃.",
+      "lines": [
+        "Balade dans l'île Panchout à côté",
+        "de chez nous... à côté de Thésée il y",
+        "a de drôles de bêtes 🐮... C'est",
+        "«Ours», une vache Écossaise 😃."
+      ],
+      "emoji": [
+        {
+          "char": "🐮",
+          "unified": "1F42E",
+          "via": "sha256"
+        },
+        {
+          "char": "😃",
+          "unified": "1F603",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-30"
+    },
+    {
+      "page": 13,
+      "author": "Antonyn Vernier",
+      "date_label": "le 30 août",
+      "text": "La reine et le roi dans leur château du Windstein.",
+      "lines": [
+        "La reine et le roi dans leur château",
+        "du Windstein."
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            917,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.61,
+            264.46,
+            381.26
+          ]
+        }
+      ],
+      "date_iso": "2026-08-30"
+    },
+    {
+      "page": 14,
+      "author": "Tytouan Vernier",
+      "date_label": "le 30 août",
+      "text": "Les parents m’ont traîné à cham... mais bon ça va on a fait une rando en vélo électrique",
+      "lines": [
+        "Les parents m’ont traîné à cham...",
+        "mais bon ça va on a fait une rando",
+        "en vélo électrique "
+      ],
+      "emoji": [],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            31.38,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-30"
+    },
+    {
+      "page": 14,
+      "author": "ISA Gottar",
+      "date_label": "le 30 août",
+      "text": "L automne s installe doucement, dans le ciel et au jardin !",
+      "lines": [
+        "L automne s installe doucement,",
+        "dans le ciel et au jardin !"
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-30"
+    },
+    {
+      "page": 15,
+      "author": "Denis W",
+      "date_label": "le 30 août",
+      "text": "Comment ça je suis bombé ??? Utilise le bord d'une feuille pour vérifier : toutes les lignes sont complètement droites !! Et je te rassure : même moi je les vois comme ça 😄... et si quelqu'un te dis que c'est normal, on est vieux tous les deux, noo scheck-se onf de Dunderwatter 💥 ! 😂",
+      "lines": [
+        "Comment ça je suis bombé ???",
+        "Utilise le bord d'une feuille pour",
+        "vérifier : toutes les lignes sont",
+        "complètement droites !! Et je te",
+        "rassure : même moi je les vois",
+        "comme ça 😄... et si quelqu'un te",
+        "dis que c'est normal, on est vieux",
+        "tous les deux, noo scheck-se onf de",
+        "Dunderwatter 💥 !  😂"
+      ],
+      "emoji": [
+        {
+          "char": "😄",
+          "unified": "1F604",
+          "via": "sha256"
+        },
+        {
+          "char": "💥",
+          "unified": "1F4A5",
+          "via": "sha256"
+        },
+        {
+          "char": "😂",
+          "unified": "1F602",
+          "via": "sha256"
+        }
+      ],
+      "slot": "top",
+      "box_pt": [
+        45.35,
+        31.18,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            558,
+            804
+          ],
+          "box_pt": [
+            45.35,
+            31.28,
+            264.47,
+            381.07
+          ]
+        }
+      ],
+      "date_iso": "2026-08-30"
+    },
+    {
+      "page": 15,
+      "author": "Stéphanie Vernier",
+      "date_label": "le 30 août",
+      "text": "Joli panorama en Crète avec vue sur un monastère",
+      "lines": [
+        "Joli panorama en Crète avec vue",
+        "sur un monastère "
+      ],
+      "emoji": [],
+      "slot": "bottom",
+      "box_pt": [
+        45.35,
+        426.61,
+        504.57,
+        381.26
+      ],
+      "layout": "text_right",
+      "avatar": {
+        "src_px": [
+          170,
+          170
+        ]
+      },
+      "collages": [
+        {
+          "src_px": [
+            918,
+            1322
+          ],
+          "box_pt": [
+            45.35,
+            426.81,
+            264.47,
+            380.86
+          ]
+        }
+      ],
+      "date_iso": "2026-08-30"
+    }
+  ],
+  "back": {
+    "recipient": {
+      "name": "NADIA WEISS",
+      "address_lines": [
+        "2 RUE DU CHÂTEAU D'EAU",
+        "67580 MERTZWILLER"
+      ]
+    },
+    "events": [
+      {
+        "kind": "birthday",
+        "name": "Anthony Weiss",
+        "age": 22,
+        "date_label": "le 9 sept."
+      },
+      {
+        "kind": "nameday",
+        "name": "Florie",
+        "age": null,
+        "date_label": "le 5 oct."
+      },
+      {
+        "kind": "nameday",
+        "name": "Morgane",
+        "age": null,
+        "date_label": "le 8 oct."
+      },
+      {
+        "kind": "nameday",
+        "name": "Denis",
+        "age": null,
+        "date_label": "le 9 oct."
+      }
+    ],
+    "thumbnails": [
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      },
+      {
+        "src_px": [
+          437,
+          437
+        ]
+      }
+    ]
+  },
+  "stats": {
+    "posts": 28,
+    "chronological": true,
+    "date_range": [
+      "2026-08-17",
+      "2026-08-30"
+    ],
+    "emoji_occurrences": 26,
+    "contributors": [
+      "Antonyn Vernier",
+      "Christine Lienhart",
+      "Denis W",
+      "Florie Lienhart",
+      "Hugo Lienhart",
+      "ISA Gottar",
+      "Lylou Vernier",
+      "Morgane GOTTAR",
+      "Stéphanie Vernier",
+      "Tytouan Vernier"
+    ]
+  }
+}

@@ -1,5 +1,16 @@
 # CHANGELOG MamiNa
 
+## v1.1.0
+**Synthèse :** nouveau parsing géométrique v1_CG, JSON parsé publié avec chaque revue, paramètres dynamiques et catalogue master séparé.
+
+La v1.1.0 remplace le parsing heuristique du master par le pipeline géométrique défini dans `parse pdf/SPEC_v1_CG.md`. Les boîtes de posts, auteurs, dates, textes, collages, avatars et emoji sont extraits depuis géométrie, styles exacts et placements réels. Les emoji passent d'abord par SHA-256 du flux JPEG brut puis, si nécessaire, par le descripteur couleur du catalogue.
+
+Le groupe Telegram comporte désormais deux sujets réservés : `params`, lu par tous et ensuite relu directement par `message_id`, et `catalog`, consommé uniquement par le master. Le gros catalogue n'est jamais chargé par un lecteur normal et n'est pas inclus dans `public/`.
+
+Lors de la publication, le master crée toujours un topic par numéro, publie le PDF original puis un JSON `mamina-gazette-v1`. Les lecteurs utilisent ce JSON pour le texte et les géométries ; PDF.js ne sert plus à comprendre le contenu mais seulement à rendre fidèlement l'article lorsque son image n'est pas encore en cache. Cela rend les crops photo/avatar, la vue texte, le zoom et le copier-coller plus déterministes.
+
+Les ressources de validation n°42/n°43, goldens, checks et catalogues sont rangés sous `parse pdf/` et ne sont pas servis par Vite.
+
 ## v1.0.1
 **Synthèse :** ajoute les statistiques de stockage, formalise le mode C sans mot de passe persistant et enrichit le splash de bienvenue.
 

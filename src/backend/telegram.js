@@ -129,6 +129,30 @@ export class TelegramGateway {
     return { topicId, service }
   }
 
+  async messageById(peer, messageId) {
+    const rows=await this.tg.getMessages(peer, Number(messageId))
+    return rows?.[0] || null
+  }
+
+  async postSystemText(peer, topicId, humanText, meta) {
+    return this.tg.sendText(peer, withMeta(humanText, meta), { threadId: topicId, silent: true })
+  }
+
+  async editSystemText(peer, messageId, humanText, meta) {
+    return this.tg.editMessage({ chatId: peer, messageId: Number(messageId), text: withMeta(humanText, meta), shouldDispatch: true })
+  }
+
+  async postDocument(peer, topicId, file, meta, { progressCallback }={}) {
+    const media=InputMedia.document(file,{
+      fileName:file?.name||meta?.name||'data.bin',
+      fileMime:file?.type||'application/octet-stream',
+      fileSize:file?.size,
+    })
+    const uploaded=await this.tg.uploadMedia(media,{peer,progressCallback})
+    if(!uploaded?.inputMedia) throw new Error('Upload Telegram terminé sans inputMedia.')
+    return this.tg.sendMedia(peer,uploaded.inputMedia,{threadId:topicId,caption:withMeta(`📦 ${meta?.name||file?.name||'ressource'}`,meta),silent:true})
+  }
+
   async topicMessages(peer, topicId, { minId=0, limit=Infinity }={}) {
     const out=[]
     for await (const m of this.tg.iterSearchMessages({

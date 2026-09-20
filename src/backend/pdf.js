@@ -401,11 +401,15 @@ export class FamileoPdf {
     await page.render({canvas,viewport}).promise
 
     const W=canvas.width,H=canvas.height
-    const x=Math.floor(W*0.035), w=Math.floor(W*0.93)
-    let y,h
-    if(article.slot==='h'){y=Math.floor(H*0.015);h=Math.floor(H*0.475)}
-    else if(article.slot==='b'){y=Math.floor(H*0.495);h=Math.floor(H*0.465)}
-    else {y=Math.floor(H*0.015);h=Math.floor(H*0.945)}
+    let x,w,y,h
+    if(Array.isArray(article.boxPt)&&article.boxPt.length===4){
+      x=Math.max(0,Math.floor(article.boxPt[0]*scale));y=Math.max(0,Math.floor(article.boxPt[1]*scale));w=Math.min(W-x,Math.ceil(article.boxPt[2]*scale));h=Math.min(H-y,Math.ceil(article.boxPt[3]*scale))
+    } else {
+      x=Math.floor(W*0.035);w=Math.floor(W*0.93)
+      if(article.slot==='h'){y=Math.floor(H*0.015);h=Math.floor(H*0.475)}
+      else if(article.slot==='b'){y=Math.floor(H*0.495);h=Math.floor(H*0.465)}
+      else {y=Math.floor(H*0.015);h=Math.floor(H*0.945)}
+    }
 
     const out=document.createElement('canvas')
     out.width=w
