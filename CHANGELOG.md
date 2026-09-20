@@ -1,5 +1,10 @@
 # CHANGELOG MamiNa
 
+## v1.1.3
+**Synthèse :** rend A8 robuste aux noms de police génériques de Safari/PDF.js sans abandonner le contrôle typographique.
+
+Le parseur conserve l'identification exacte `SemiBold/Regular` quand PDF.js expose les noms de faces embarquées. Si Safari ne fournit qu'un nom de famille générique, il utilise le fallback prévu par la SPEC : auteur ≈14 pt, date ≈11 pt et corps ≈13,3 pt. L'erreur A8/A6 affiche maintenant toutes les combinaisons taille/police détectées dans la boîte pour faciliter un éventuel diagnostic suivant.
+
 ## v1.1.2
 **Synthèse :** corrige les dates de couverture séparées en trois lignes et ajoute la copie directe des erreurs.
 

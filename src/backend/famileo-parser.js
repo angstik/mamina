@@ -107,8 +107,31 @@ export class FamileoGeometryParser{
       assert(boxes.length>=1&&boxes.length<=2,'A4_POST_BOX_COUNT',`p${p}:${boxes.length}`)
       for(const rb of boxes){const box=[round2(rb.x0),round2(rb.top),round2(rb.width),round2(rb.height)];assert(Math.abs(box[2]-504.57)<=2&&box[3]>100,'A5_POST_BOX_SIZE',`p${p}`);const chars=d.chars.filter(x=>inside(x,box)),imgs=d.geom.images.filter(x=>inside(x,box)),emojis=[]
         for(const im of imgs.filter(x=>x.srcWidth<=80&&x.srcHeight<=80&&Math.abs(x.width-12.37)<2&&Math.abs(x.height-12.37)<2)){assert(emojiResolver,'A9_EMOJI_CATALOG_REQUIRED');const e=await emojiResolver.resolve(im.raw);assert(e.sim>=.999,'A9_EMOJI_THRESHOLD');emojis.push({x0:im.x0,yCenter:(im.top+im.bottom)/2,...e})}
-        const styles=new Set(chars.map(x=>style(x.font)).filter(x=>x==='SemiBold'||x==='Regular'));assert(styles.has('SemiBold')&&styles.has('Regular')&&styles.size===2,'A8_STYLES',`p${p}`)
-        const sem=chars.filter(x=>style(x.font)==='SemiBold'),reg=chars.filter(x=>style(x.font)==='Regular'),author=flow(sem),dateChars=reg.filter(x=>approx(x.size,11,.5)),date_label=flow(dateChars),body=reg.filter(x=>x.size>12),lines=makeLines(body,emojis),text=compact(lines.join(' '));assert(author&&/^le\s+\d{1,2}\s+[\p{L}]+\.?$/u.test(date_label),'A6_POST_HEADER',`p${p}:${author}/${date_label}`)
+        const semByStyle=chars.filter(x=>style(x.font)==='SemiBold')
+        const regByStyle=chars.filter(x=>style(x.font)==='Regular')
+        const exactStylesOK=semByStyle.length>0&&regByStyle.length>0
+
+        // Safari/PDF.js may expose a generic fontFamily (for example
+        // "sans-serif") instead of the embedded NotoSans face name. Keep the
+        // exact-style path whenever it is available; otherwise use the
+        // typographic fallback explicitly recommended by SPEC_v1_CG:
+        // author≈14 pt, date≈11 pt, body≈13.3 pt.
+        const authorChars=semByStyle.length
+          ? semByStyle
+          : chars.filter(x=>approx(x.size,14,.45))
+        const dateChars=regByStyle.length
+          ? regByStyle.filter(x=>approx(x.size,11,.55))
+          : chars.filter(x=>approx(x.size,11,.55))
+        const body=regByStyle.length
+          ? regByStyle.filter(x=>x.size>12)
+          : chars.filter(x=>x.size>=12.65&&x.size<=13.70)
+
+        const author=flow(authorChars),date_label=flow(dateChars)
+        const fallbackOK=authorChars.length>0&&dateChars.length>0&&body.length>0
+        const fontDiag=[...new Set(chars.map(x=>`${Math.round(x.size*10)/10}:${x.font||'?'}`))].join(',')
+        assert(exactStylesOK||fallbackOK,'A8_STYLES',`p${p};fonts=${fontDiag}`)
+        const lines=makeLines(body,emojis),text=compact(lines.join(' '))
+        assert(author&&/^le\s+\d{1,2}\s+[\p{L}]+\.?$/u.test(date_label),'A6_POST_HEADER',`p${p}:${author}/${date_label};fonts=${fontDiag}`)
         const avatar=imgs.find(x=>x.srcWidth===170&&x.srcHeight===170),coll=imgs.filter(x=>x.width>100&&x.srcWidth>500);assert(Boolean(avatar)&&coll.length>=1,'A7_MEDIA',`p${p}`)
         const layout=layoutFor(body,coll,box),slot=slotFor(box,d.geom.height),post={page:p,author,date_label,text,lines,emoji:emojis.map(e=>({char:e.char,unified:e.unified,via:e.via})),slot,box_pt:box,layout,avatar:{src_px:[avatar.srcWidth,avatar.srcHeight]},collages:coll.map(i=>({src_px:[i.srcWidth,i.srcHeight],box_pt:[round2(i.x0),round2(i.top),round2(i.width),round2(i.height)]}))};posts.push(post)
         geometry[`${p}:${slot}`]={avatar_box_pt:[round2(avatar.x0),round2(avatar.top),round2(avatar.width),round2(avatar.height)],body_box_pt:body.length?[round2(Math.min(...body.map(x=>x.x0))),round2(Math.min(...body.map(x=>x.top))),round2(Math.max(...body.map(x=>x.x1))-Math.min(...body.map(x=>x.x0))),round2(Math.max(...body.map(x=>x.bottom))-Math.min(...body.map(x=>x.top)))]:null}
