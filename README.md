@@ -203,3 +203,11 @@ L'estimation IndexedDB est volontairement indiquée avec `≈` : elle mesure les
 - catalogue et fixtures de test hors `public/`, donc absents du poids de la PWA déployée.
 
 Validation locale effectuée : goldens n°42 et n°43 strictement reproduits par le parseur de référence, tests unitaires de `checks.json`, et contrôle bas niveau des 28 boîtes de posts sur chaque PDF.
+
+
+## v1.1.1
+
+- fallback robuste de détection `N°<numéro>` sur la couverture Famileo ;
+- détail de diagnostic ajouté aux erreurs A11/A12 ;
+- purge automatique des données publication/outbox lorsqu'on change de groupe familial ;
+- conservation de la session Telegram, des réglages et de l'avatar utilisateur.

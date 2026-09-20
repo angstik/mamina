@@ -286,3 +286,36 @@ export async function estimateLocalStorage() {
     db.close()
   }
 }
+
+
+export async function clearPublicationCache() {
+  const db=await openDb()
+  try {
+    await new Promise((resolve,reject)=>{
+      const names=['magazines','articles','messages','readState','topics','outbox','assets']
+      const tx=db.transaction(names,'readwrite')
+      for(const name of names){
+        const store=tx.objectStore(name)
+        if(name!=='assets'){
+          store.clear()
+          continue
+        }
+        // Keep only account-level assets that are independent of the selected
+        // family group. Everything PDF/article/catalog related is group-bound.
+        const req=store.openCursor()
+        req.onsuccess=()=>{
+          const c=req.result
+          if(!c)return
+          if(c.key!=='user-avatar')c.delete()
+          c.continue()
+        }
+        req.onerror=()=>reject(req.error)
+      }
+      tx.oncomplete=resolve
+      tx.onerror=()=>reject(tx.error||new Error('Purge cache locale impossible.'))
+      tx.onabort=()=>reject(tx.error||new Error('Purge cache locale annulée.'))
+    })
+  } finally {
+    db.close()
+  }
+}

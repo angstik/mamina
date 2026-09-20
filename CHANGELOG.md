@@ -1,5 +1,12 @@
 # CHANGELOG MamiNa
 
+## v1.1.1
+**Synthèse :** corrige l’identification du numéro de couverture et isole proprement les caches lors d’un changement de groupe.
+
+La détection du numéro de gazette conserve le chemin typographique de la SPEC mais ajoute un fallback géométrique/textuel ciblé sur le motif `N°<nombre>`. Cela évite le faux `A11_ISSUE` observé dans Safari/PDF.js lorsque les métadonnées de police de la couverture diffèrent.
+
+Lorsqu’un autre groupe familial est sélectionné, MamiNa purge automatiquement les données liées à l’ancien groupe : magazines, articles, messages, états de lecture, topics, outbox et assets PDF/article/catalogue. La session Telegram, les réglages généraux et l’avatar du compte sont conservés. Cette purge évite également qu’un ancien message différé soit associé au nouveau groupe.
+
 ## v1.1.0
 **Synthèse :** nouveau parsing géométrique v1_CG, JSON parsé publié avec chaque revue, paramètres dynamiques et catalogue master séparé.
 

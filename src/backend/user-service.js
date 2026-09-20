@@ -10,7 +10,7 @@ import {
   putMessages, listMessagesByMagazine, deleteMessagesByMagazine,
   getReadState, putReadState, listReadStates,
   putAsset, getAsset, deleteAsset, pruneToMagazineIds,
-  putOutbox, getOutbox, listOutbox, deleteOutbox, countOutbox, estimateLocalStorage,
+  putOutbox, getOutbox, listOutbox, deleteOutbox, countOutbox, estimateLocalStorage, clearPublicationCache,
 } from './user-storage.js'
 import { info, warn, error as logError } from './log.js'
 
@@ -161,11 +161,22 @@ export class UserMaminaService {
 
   async selectDialog(model) {
     const next=model.dialog||model,nextId=idOfPeer(next.peer),prev=await settings.get('groupId','')
+    const changed=Boolean(prev)&&String(prev)!==String(nextId)
+
+    if(changed){
+      this.activity('Nouveau groupe · purge du cache local…')
+      await clearPublicationCache()
+      info('storage','Cache magazines purgé après changement de groupe',{previousGroupId:String(prev),nextGroupId:String(nextId)})
+    }
+
     this.dialog=next
     this.dialogModel=model.dialog?model:TelegramGateway.dialogModel(model)
     await settings.set('groupId',nextId)
+
     if(String(prev)!==String(nextId)){
-      await settings.set('paramsMessageId',0);await settings.set('paramsTopicId',0);await settings.set('remoteParams',null)
+      await settings.set('paramsMessageId',0)
+      await settings.set('paramsTopicId',0)
+      await settings.set('remoteParams',null)
     }
     this.current=null
   }

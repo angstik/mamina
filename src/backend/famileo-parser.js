@@ -49,11 +49,38 @@ export class FamileoGeometryParser{
     const pageData=[]
     for(let p=1;p<=doc.numPages;p++){onProgress?.(`Parsing PDF · page ${p}/${doc.numPages}`);const page=await doc.getPage(p),tc=await textContentCompat(page),geom=await raw.pageGeometry(p);pageData.push({page,chars:runs(tc,geom.height),geom})}
     const c=pageData[0],upright=c.chars.filter(x=>!x.rotated),rot=c.chars.filter(x=>x.rotated)
-    const date_label=flow(pick(upright,13,'Regular')),_parts=dateParts(date_label),issue_label=flow(pick(upright,25,'Regular')),issue_number=Number(issue_label.match(/\d+/)?.[0]||0)||null,title=flow(pick(upright,17,'Light')),client_code=rot.filter(x=>/Open\s*Sans/i.test(x.font)).sort((a,b)=>b.top-a.top).map(x=>x.text).join('').replace(/\D/g,'')
+    const coverLines=makeLines(upright).map(compact).filter(Boolean)
+
+    // Primary path follows the template typography. Fallbacks use the cover
+    // geometry/text pattern so PDF.js font metadata differences cannot turn a
+    // valid Famileo cover into A11_ISSUE.
+    let date_label=flow(pick(upright,13,'Regular'))
+    if(!/^\d{1,2}\s+.+\s+\d{4}$/u.test(date_label)){
+      date_label=coverLines.find(x=>/^\d{1,2}\s+[\p{L}.]+\s+\d{4}$/u.test(x))||date_label
+    }
+
+    let issue_label=flow(pick(upright,25,'Regular'))
+    if(!/\d+/.test(issue_label)){
+      issue_label=coverLines.find(x=>/^N\s*[°ºo]?\s*\d+$/iu.test(x))||''
+    }
+    const issueMatch=String(issue_label).match(/\d+/)
+    const issue_number=issueMatch?Number(issueMatch[0]):null
+    if(Number.isInteger(issue_number)) issue_label=`N°${issue_number}`
+
+    let title=flow(pick(upright,17,'Light'))
+    if(!title){
+      title=coverLines.find(x=>/^De\s+/iu.test(x))||''
+    }
+
+    let client_code=rot.filter(x=>/Open\s*Sans/i.test(x.font)).sort((a,b)=>b.top-a.top).map(x=>x.text).join('').replace(/\D/g,'')
+    if(!/^\d{6}$/.test(client_code)){
+      client_code=rot.sort((a,b)=>b.top-a.top).map(x=>x.text).join('').replace(/\D/g,'').slice(0,6)
+    }
+    const _parts=dateParts(date_label)
     const date_iso=_parts&&monthNumber(_parts.month)?iso(_parts.year,monthNumber(_parts.month),_parts.day):null
     const cols=[56.7,181.4,306.1,430.9],rowY=[62.4,187.1,547,671.7],rowN=[0,1,4,5],thumbnails=[]
     for(const im of c.geom.images.filter(x=>x.srcWidth===437&&x.srcHeight===437)){const col=cols.reduce((best,x,i)=>Math.abs(im.x0-x)<Math.abs(im.x0-cols[best])?i:best,0),ri=rowY.reduce((best,y,i)=>Math.abs(im.top-y)<Math.abs(im.top-rowY[best])?i:best,0);thumbnails.push({col,row:rowN[ri],src_px:[437,437]})}thumbnails.sort((a,b)=>a.row-b.row||a.col-b.col)
-    assert(Number.isInteger(issue_number),'A11_ISSUE');assert(/^\d{6}$/.test(client_code),'A11_CLIENT_CODE');assert(date_iso,'A12_COVER_DATE')
+    assert(Number.isInteger(issue_number),'A11_ISSUE',`lines=${coverLines.join('|')}`);assert(/^\d{6}$/.test(client_code),'A11_CLIENT_CODE',`value=${client_code}`);assert(date_iso,'A12_COVER_DATE',`label=${date_label}`)
     const posts=[],geometry={}
     for(let p=2;p<doc.numPages;p++){
       const d=pageData[p-1],boxes=d.geom.rects.filter(r=>r.width>400&&r.height>100).sort((a,b)=>a.top-b.top)
