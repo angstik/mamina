@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.6'
+const APP_VERSION='1.1.7'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -18,6 +18,8 @@ let typingState={bold:false,italic:false,underline:false,strikeThrough:false,col
 let activityTimer=null
 const homeUrls=[],readerUrls=[]
 const zoomStates=new Map()
+const focusZoomStates=new Map()
+let focusArticleKey=null,focusPhotoUrl=null
 
 const status=(id,text,ok=null)=>{const e=$(id);if(!e)return;e.textContent=text;e.className='status'+(ok===true?' ok':ok===false?' error':'')}
 const debug=e=>logError('ui',e?.stack||e?.message||String(e),e)
@@ -372,7 +374,12 @@ async function renderReader(){
     }
     installArticleGestures(v,i)
   })
-  requestAnimationFrame(()=>{d.scrollLeft=currentArticleIndex*d.clientWidth;activate(currentArticleIndex)})
+  d.classList.add('aligning')
+  requestAnimationFrame(()=>{
+    d.scrollLeft=currentArticleIndex*d.clientWidth
+    activate(currentArticleIndex)
+    requestAnimationFrame(()=>{d.scrollLeft=currentArticleIndex*d.clientWidth;d.classList.remove('aligning')})
+  })
 }
 function renderComments(a,list){
   list.innerHTML=''
@@ -409,6 +416,7 @@ async function loadVisual(i){
       const desired=Math.min(innerHeight*.58, v.clientWidth*(img.naturalHeight/img.naturalWidth))
       if(Number.isFinite(desired)&&desired>180) v.style.flexBasis=`${Math.round(desired)}px`
       v._pz?.apply()
+      if(i===currentArticleIndex){const deck=$('articleDeck');deck.scrollLeft=i*deck.clientWidth}
     }
     v.querySelector('.subtle')?.remove()
     const badge=v.querySelector('.article-source-badge')
@@ -438,7 +446,7 @@ function activate(i){
   clearTimeout(readTimer);readTimer=setTimeout(()=>service.markArticleRead(a.articleKey),1400)
 }
 let scrollTimer
-$('articleDeck').onscroll=()=>{if(!$('composerModal').hidden)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{const d=$('articleDeck'),i=Math.max(0,Math.min(displayArticles.length-1,Math.round(d.scrollLeft/d.clientWidth)));if(i!==currentArticleIndex)activate(i)},90)}
+$('articleDeck').onscroll=()=>{if(!$('composerModal').hidden)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{const d=$('articleDeck'),i=Math.max(0,Math.min(displayArticles.length-1,Math.round(d.scrollLeft/d.clientWidth))),left=i*d.clientWidth;if(Math.abs(d.scrollLeft-left)>1)d.scrollTo({left,behavior:'auto'});if(i!==currentArticleIndex)activate(i)},90)}
 function goArticle(delta){if(!$('composerModal').hidden)return;const next=Math.max(0,Math.min(displayArticles.length-1,currentArticleIndex+delta));if(next===currentArticleIndex)return;const d=$('articleDeck');d.scrollTo({left:next*d.clientWidth,behavior:'smooth'});setTimeout(()=>activate(next),190)}
 
 function clampPan(container,img,scale,tx,ty){
@@ -541,13 +549,22 @@ function cropImage(img,bounds){
   return url
 }
 function articleImg(index){return $('articleDeck').querySelector(`[data-index="${index}"] .article-visual img`)}
-function openFocusPhoto(a,index){
-  const src=cropImage(articleImg(index),defaultPhotoBounds(a))||articleImg(index)?.src
-  if(!src)return
-  $('focusTextStage').hidden=true;$('focusImageStage').hidden=false;$('focusImage').src=src;$('focusOverlay').hidden=false
-  installFocusPanZoom()
+async function openFocusPhoto(a,index){
+  try{
+    focusArticleKey=a.articleKey
+    $('focusTextStage').hidden=true
+    $('focusImageStage').hidden=false
+    $('focusOverlay').hidden=false
+    $('focusImage').removeAttribute('src')
+    const result=await service.getArticlePhotoInfo(a.articleKey)
+    if(focusPhotoUrl)URL.revokeObjectURL(focusPhotoUrl)
+    focusPhotoUrl=URL.createObjectURL(result.blob)
+    $('focusImage').src=focusPhotoUrl
+    $('focusImage').onload=()=>installFocusPanZoom(a.articleKey)
+  }catch(e){debug(e);setArticleBadge('Photo indisponible')}
 }
 function openFocusText(a,index){
+  focusArticleKey=a.articleKey
   $('focusImageStage').hidden=true;$('focusTextStage').hidden=false
   $('focusAuthor').textContent=a.authorName||'Article'
   $('focusArticleDate').textContent=a.articleDateLabel||''
@@ -556,12 +573,15 @@ function openFocusText(a,index){
   if(av){$('focusAuthorAvatar').src=av;$('focusAuthorAvatar').hidden=false}else $('focusAuthorAvatar').hidden=true
   $('focusOverlay').hidden=false
 }
-function closeFocus(){$('focusOverlay').hidden=true;$('focusImage').style.transform='';$('focusImage').src=''}
-let focusTap=0
-$('focusOverlay').addEventListener('pointerup',e=>{
-  if(e.target.closest('.focus-text-stage'))return
-  const n=Date.now();if(n-focusTap<350){closeFocus();focusTap=0}else focusTap=n
-})
+function closeFocus(){
+  $('focusOverlay').hidden=true
+  $('focusImage').style.transform=''
+  $('focusImage').onload=null
+  $('focusImage').removeAttribute('src')
+  if(focusPhotoUrl){URL.revokeObjectURL(focusPhotoUrl);focusPhotoUrl=null}
+  focusArticleKey=null
+}
+$('focusCloseButton').onclick=closeFocus
 $('focusTextStage').addEventListener('dblclick',e=>{e.preventDefault();closeFocus()})
 let focusTextTap={time:0,x:0,y:0}
 $('focusTextStage').addEventListener('touchend',e=>{
@@ -575,13 +595,51 @@ $('focusTextStage').addEventListener('copy',()=>{
   const txt=getSelection()?.toString()||''
   if(txt){lastArticleCopy={text:txt,at:Date.now()}}
 })
-function installFocusPanZoom(){
+function installFocusPanZoom(articleKey){
   const stage=$('focusImageStage'),img=$('focusImage')
-  let st={scale:1,tx:0,ty:0},pinch=null,start=null,lastMove=null,raf=null
-  const apply=()=>{const c=clampPan(stage,img,st.scale,st.tx,st.ty);st.tx=c.tx;st.ty=c.ty;img.style.transform=`translate(${st.tx}px,${st.ty}px) scale(${st.scale})`}
-  stage.ontouchstart=e=>{if(raf)cancelAnimationFrame(raf);if(e.touches.length===2){const[a,b]=e.touches;pinch={d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),scale:st.scale}}else if(e.touches.length===1){const t=e.touches[0];start={x:t.clientX,y:t.clientY,tx:st.tx,ty:st.ty};lastMove={x:t.clientX,y:t.clientY,time:performance.now(),vx:0,vy:0}}}
-  stage.ontouchmove=e=>{if(e.touches.length===2&&pinch){e.preventDefault();const[a,b]=e.touches;st.scale=Math.max(1,Math.min(5,pinch.scale*Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)/pinch.d));apply()}else if(e.touches.length===1&&start&&st.scale>1){e.preventDefault();const t=e.touches[0],now=performance.now(),dt=Math.max(1,now-lastMove.time);st.tx=start.tx+t.clientX-start.x;st.ty=start.ty+t.clientY-start.y;lastMove={x:t.clientX,y:t.clientY,time:now,vx:(t.clientX-lastMove.x)/dt,vy:(t.clientY-lastMove.y)/dt};apply()}}
-  stage.ontouchend=()=>{if(st.scale>1&&lastMove){let vx=lastMove.vx*18,vy=lastMove.vy*18;const inertia=()=>{vx*=.91;vy*=.91;st.tx+=vx;st.ty+=vy;apply();if(Math.abs(vx)+Math.abs(vy)>.35)raf=requestAnimationFrame(inertia)};raf=requestAnimationFrame(inertia)}start=null;pinch=null}
+  let st={...(focusZoomStates.get(articleKey)||{scale:1,tx:0,ty:0})},pinch=null,start=null,lastMove=null,raf=null,lastTap=0
+  const persist=()=>focusZoomStates.set(articleKey,{scale:st.scale,tx:st.tx,ty:st.ty})
+  const apply=()=>{const c=clampPan(stage,img,st.scale,st.tx,st.ty);st.tx=c.tx;st.ty=c.ty;img.style.transform=`translate(${st.tx}px,${st.ty}px) scale(${st.scale})`;persist()}
+  const reset=()=>{st={scale:1,tx:0,ty:0};apply()}
+  apply()
+  stage.ontouchstart=e=>{
+    if(e.target.closest('#focusCloseButton'))return
+    if(raf)cancelAnimationFrame(raf)
+    if(e.touches.length===2){const[a,b]=e.touches;pinch={d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),scale:st.scale}}
+    else if(e.touches.length===1){const t=e.touches[0];start={x:t.clientX,y:t.clientY,tx:st.tx,ty:st.ty,time:performance.now()};lastMove={x:t.clientX,y:t.clientY,time:performance.now(),vx:0,vy:0}}
+  }
+  stage.ontouchmove=e=>{
+    if(e.touches.length===2&&pinch){e.preventDefault();const[a,b]=e.touches;st.scale=Math.max(1,Math.min(5,pinch.scale*Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)/pinch.d));apply()}
+    else if(e.touches.length===1&&start&&st.scale>1){e.preventDefault();const t=e.touches[0],now=performance.now(),dt=Math.max(1,now-lastMove.time);st.tx=start.tx+t.clientX-start.x;st.ty=start.ty+t.clientY-start.y;lastMove={x:t.clientX,y:t.clientY,time:now,vx:(t.clientX-lastMove.x)/dt,vy:(t.clientY-lastMove.y)/dt};apply()}
+  }
+  stage.ontouchend=e=>{
+    if(start&&e.changedTouches?.length){
+      const t=e.changedTouches[0],dx=t.clientX-start.x,dy=t.clientY-start.y,dur=performance.now()-start.time
+      if(Math.abs(dx)<14&&Math.abs(dy)<14&&dur<280){
+        const now=Date.now()
+        if(now-lastTap<330){
+          e.preventDefault()
+          if(st.scale>1.02)reset()
+          else{
+            const r=stage.getBoundingClientRect(),zx=t.clientX-r.left,zy=t.clientY-r.top,next=2.5
+            st.scale=next;st.tx=(r.width/2-zx)*(next-1);st.ty=(r.height/2-zy)*(next-1);apply()
+          }
+          lastTap=0
+        }else lastTap=now
+      }else if(st.scale>1&&lastMove){
+        let vx=lastMove.vx*18,vy=lastMove.vy*18
+        const inertia=()=>{vx*=.91;vy*=.91;st.tx+=vx;st.ty+=vy;apply();if(Math.abs(vx)+Math.abs(vy)>.35)raf=requestAnimationFrame(inertia)}
+        raf=requestAnimationFrame(inertia)
+      }
+    }
+    start=null;pinch=null
+  }
+  stage.onpointerdown=e=>{if(e.pointerType==='mouse')stage.setPointerCapture?.(e.pointerId)}
+  let mouse=null
+  stage.onpointermove=e=>{if(e.pointerType!=='mouse'||!mouse||st.scale<=1)return;st.tx=mouse.tx+e.clientX-mouse.x;st.ty=mouse.ty+e.clientY-mouse.y;apply()}
+  stage.onpointerup=e=>{if(e.pointerType!=='mouse')return;if(mouse){mouse=null;return}const now=Date.now();if(now-lastTap<330){if(st.scale>1.02)reset();else{const r=stage.getBoundingClientRect(),next=2.5;st.scale=next;st.tx=(r.width/2-(e.clientX-r.left))*(next-1);st.ty=(r.height/2-(e.clientY-r.top))*(next-1);apply()}lastTap=0}else lastTap=now}
+  stage.onpointerdown=e=>{if(e.pointerType==='mouse'){mouse={x:e.clientX,y:e.clientY,tx:st.tx,ty:st.ty};stage.setPointerCapture?.(e.pointerId)}}
+  stage.ondblclick=e=>{e.preventDefault();if(st.scale>1.02)reset();else{const r=stage.getBoundingClientRect(),next=2.5;st.scale=next;st.tx=(r.width/2-(e.clientX-r.left))*(next-1);st.ty=(r.height/2-(e.clientY-r.top))*(next-1);apply()}}
 }
 
 function formatBytes(value){

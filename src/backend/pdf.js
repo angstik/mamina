@@ -392,6 +392,30 @@ export class FamileoPdf {
     return out
   }
 
+  async renderArticlePhoto(article, scale=2.4) {
+    const collages=Array.isArray(article?.collages)?article.collages.filter(c=>Array.isArray(c?.box_pt)&&c.box_pt.length===4):[]
+    if(!collages.length) throw new Error('Zone photo indisponible pour cet article.')
+    const page=await this.doc.getPage(article.page)
+    const viewport=page.getViewport({scale})
+    const canvas=document.createElement('canvas')
+    canvas.width=Math.ceil(viewport.width)
+    canvas.height=Math.ceil(viewport.height)
+    await page.render({canvas,viewport}).promise
+
+    const x0=Math.min(...collages.map(c=>c.box_pt[0]))
+    const y0=Math.min(...collages.map(c=>c.box_pt[1]))
+    const x1=Math.max(...collages.map(c=>c.box_pt[0]+c.box_pt[2]))
+    const y1=Math.max(...collages.map(c=>c.box_pt[1]+c.box_pt[3]))
+    const x=Math.max(0,Math.floor(x0*scale)),y=Math.max(0,Math.floor(y0*scale))
+    const w=Math.max(1,Math.min(canvas.width-x,Math.ceil((x1-x0)*scale)))
+    const h=Math.max(1,Math.min(canvas.height-y,Math.ceil((y1-y0)*scale)))
+    const out=document.createElement('canvas')
+    out.width=w;out.height=h
+    out.getContext('2d').drawImage(canvas,x,y,w,h,0,0,w,h)
+    try { canvas.width=1;canvas.height=1;page.cleanup?.() } catch {}
+    return out
+  }
+
   async renderArticle(article, scale=1.8) {
     const page=await this.doc.getPage(article.page)
     const viewport=page.getViewport({scale})

@@ -716,7 +716,7 @@ export class UserMaminaService {
   }
 
   async migrateDerivedArticleGeometry(force=false) {
-    const target='article-geometry-v2'
+    const target='article-geometry-v3'
     if(!force && await settings.get('derivedArticleGeometryVersion','')===target)return {updated:0,cleared:0}
     let updated=0,missing=0
     for(const magazine of await listMagazines()){
@@ -728,7 +728,7 @@ export class UserMaminaService {
         if(articles.length){await replaceArticles(magazine.magazineId,articles);updated++}
       }catch(e){warn('cache.migration','Géométrie article non reconstruite',{magazineId:magazine.magazineId,message:e?.message||String(e)})}
     }
-    const cleared=await deleteAssetsByPrefix('article:')
+    const cleared=(await deleteAssetsByPrefix('article:'))+(await deleteAssetsByPrefix('photo:'))
     // If some old magazines have no parse sidecar, run again after a future sync.
     if(!missing)await settings.set('derivedArticleGeometryVersion',target)
     info('cache.migration','Géométries article actualisées',{updated,missing,cleared})
@@ -789,6 +789,30 @@ export class UserMaminaService {
 
   async getArticleImage(articleKey) {
     return (await this.getArticleImageInfo(articleKey)).blob
+  }
+
+  async getArticlePhotoInfo(articleKey) {
+    if(!this.current) throw new Error('Aucune revue ouverte.')
+    const assetKey=`photo:${articleKey}`
+    const cached=await getAsset(assetKey)
+    if(cached) return {blob:cached,source:'local-photo'}
+
+    const task=async()=>{
+      const secondCheck=await getAsset(assetKey)
+      if(secondCheck) return {blob:secondCheck,source:'local-photo'}
+      const article=this.current?.articles.find(a=>a.articleKey===articleKey)
+      if(!article) throw new Error('Article inconnu.')
+      if(!article.collages?.length) throw new Error('Zone photo indisponible.')
+      this.activity('Préparation de la photo…')
+      const pdf=await this.ensureCurrentPdf()
+      const canvas=await pdf.renderArticlePhoto(article)
+      const blob=await canvasBlob(canvas,'image/jpeg',.92)
+      if(this.current?.magazine?.fullyCached) await putAsset(assetKey,blob)
+      return {blob,source:'PDF-photo'}
+    }
+    const result=this.renderChain.then(task,task)
+    this.renderChain=result.then(()=>undefined,()=>undefined)
+    return result
   }
 
   async warmArticleImages(articleKeys=[]) {

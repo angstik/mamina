@@ -1,5 +1,14 @@
 # CHANGELOG MamiNa
 
+## v1.1.7
+**Synthèse :** stabilise le snap horizontal, utilise la zone collage exacte pour le plein écran photo et rend son zoom/pan persistant, y compris depuis la vue Message.
+
+La vue Article force désormais chaque page à occuper exactement 100 % de la largeur et recale le deck après rendu/scroll afin d’éviter les états intermédiaires montrant deux articles. Le deck reste masqué pendant son alignement initial.
+
+Le plein écran photo n’utilise plus un recadrage du JPEG d’article : il demande au PDF un rendu dédié du rectangle exact du collage issu du parsing. L’avatar est donc hors zone par construction.
+
+Le zoom plein écran conserve son état par article, accepte pinch, double-tap, pan et inertie. Le focus passe au-dessus du composer, donc le même fonctionnement est disponible depuis la vue Message.
+
 ## v1.1.6
 **Synthèse :** force la migration des géométries/caches des revues existantes, utilise les placements exacts pour le cadrage et mémorise le vrai mot de passe MamiNa selon `params`.
 
