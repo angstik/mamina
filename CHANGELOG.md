@@ -1,5 +1,12 @@
 # CHANGELOG MamiNa
 
+## v1.1.4
+**Synthèse :** simplifie le parsing runtime : le PDF reste le rendu, le texte et les boîtes sont prioritaires, les enrichissements deviennent non bloquants.
+
+Le profil strict A1…A12 reste utilisé comme contrat de validation, mais la publication MamiNa fonctionne désormais en mode tolérant. L'adresse/les événements du dos, avatars, styles exacts, emoji et autres enrichissements produisent des warnings au lieu d'empêcher la création du topic. Une publication n'est bloquée que si le PDF est illisible, trop court ou ne contient aucune boîte de post exploitable.
+
+Le fallback texte peut désormais reconstruire auteur/date/corps à partir des lignes visuelles quand les styles PDF.js sont insuffisants. Les warnings apparaissent dans la trace de publication et restent copiables avec le bouton ajouté en v1.1.2.
+
 ## v1.1.3
 **Synthèse :** rend A8 robuste aux noms de police génériques de Safari/PDF.js sans abandonner le contrôle typographique.
 

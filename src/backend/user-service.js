@@ -827,6 +827,10 @@ export class UserMaminaService {
       step('magazine.pdf.read.start',{name:file.name,size:file.size,type:file.type})
       const resolver=await this.loadEmojiResolver()
       const parsed=await FamileoGeometryParser.parse(file,{emojiResolver:resolver,onProgress:text=>this.activity(text)})
+      if(parsed.warnings?.length){
+        step('magazine.pdf.read.warnings',{count:parsed.warnings.length,warnings:parsed.warnings})
+        warn('pdf.parse','Parsing Famileo tolérant',{warnings:parsed.warnings})
+      }
       const g=parsed.gazette,appTitle=await settings.get('appTitle','MamiNa'),sha256=parsed.sha256
       const slug=String(g.source?.title||'gazette').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'gazette'
       const magazineKey=`famileo:${slug}:n${g.cover.issue_number||0}:${g.cover.date_iso||'date-unknown'}`

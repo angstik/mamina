@@ -43,9 +43,11 @@ export function resolveYears(posts,coverIso){let bound=new Date(`${coverIso}T12:
 
 export class FamileoGeometryParser{
   static async parse(input,{emojiResolver=null,onProgress=null}={}){
+    const warnings=[]
+    const soft=(cond,code,detail='')=>{if(!cond)warnings.push({code,detail})}
     const bytes=input instanceof Uint8Array?input:new Uint8Array(await input.arrayBuffer()),raw=await RawPdfIndex.load(bytes),doc=await pdfjsLib.getDocument({data:bytes.slice()}).promise,metadata=await doc.getMetadata().catch(()=>({info:{}})),info=metadata?.info||{}
     const source={pages:doc.numPages,page_size_pt:[Math.round(raw.pages[0].width*1000)/1000,Math.round(raw.pages[0].height*100)/100],producer:info.Producer||null,title:info.Title||null,created:info.CreationDate||null}
-    assert(Math.abs(source.page_size_pt[0]-595.276)<=1&&Math.abs(source.page_size_pt[1]-841.89)<=1,'A1_PAGE_SIZE');assert(String(source.producer||'').startsWith('TCPDF'),'A2_PRODUCER');assert(source.pages>=3,'A3_PAGES')
+    soft(Math.abs(source.page_size_pt[0]-595.276)<=1&&Math.abs(source.page_size_pt[1]-841.89)<=1,'A1_PAGE_SIZE');soft(String(source.producer||'').startsWith('TCPDF'),'A2_PRODUCER');assert(source.pages>=3,'A3_PAGES')
     const pageData=[]
     for(let p=1;p<=doc.numPages;p++){onProgress?.(`Parsing PDF · page ${p}/${doc.numPages}`);const page=await doc.getPage(p),tc=await textContentCompat(page),geom=await raw.pageGeometry(p);pageData.push({page,chars:runs(tc,geom.height),geom})}
     const c=pageData[0],upright=c.chars.filter(x=>!x.rotated),rot=c.chars.filter(x=>x.rotated)
@@ -100,13 +102,21 @@ export class FamileoGeometryParser{
     const date_iso=_parts&&monthNumber(_parts.month)?iso(_parts.year,monthNumber(_parts.month),_parts.day):null
     const cols=[56.7,181.4,306.1,430.9],rowY=[62.4,187.1,547,671.7],rowN=[0,1,4,5],thumbnails=[]
     for(const im of c.geom.images.filter(x=>x.srcWidth===437&&x.srcHeight===437)){const col=cols.reduce((best,x,i)=>Math.abs(im.x0-x)<Math.abs(im.x0-cols[best])?i:best,0),ri=rowY.reduce((best,y,i)=>Math.abs(im.top-y)<Math.abs(im.top-rowY[best])?i:best,0);thumbnails.push({col,row:rowN[ri],src_px:[437,437]})}thumbnails.sort((a,b)=>a.row-b.row||a.col-b.col)
-    assert(Number.isInteger(issue_number),'A11_ISSUE',`lines=${coverLines.join('|')}`);assert(/^\d{6}$/.test(client_code),'A11_CLIENT_CODE',`value=${client_code}`);assert(date_iso,'A12_COVER_DATE',`label=${date_label};lines=${coverLines.join('|')}`)
+    soft(Number.isInteger(issue_number),'A11_ISSUE',`lines=${coverLines.join('|')}`);soft(/^\d{6}$/.test(client_code),'A11_CLIENT_CODE',`value=${client_code}`);soft(Boolean(date_iso),'A12_COVER_DATE',`label=${date_label};lines=${coverLines.join('|')}`)
     const posts=[],geometry={}
     for(let p=2;p<doc.numPages;p++){
       const d=pageData[p-1],boxes=d.geom.rects.filter(r=>r.width>400&&r.height>100).sort((a,b)=>a.top-b.top)
-      assert(boxes.length>=1&&boxes.length<=2,'A4_POST_BOX_COUNT',`p${p}:${boxes.length}`)
-      for(const rb of boxes){const box=[round2(rb.x0),round2(rb.top),round2(rb.width),round2(rb.height)];assert(Math.abs(box[2]-504.57)<=2&&box[3]>100,'A5_POST_BOX_SIZE',`p${p}`);const chars=d.chars.filter(x=>inside(x,box)),imgs=d.geom.images.filter(x=>inside(x,box)),emojis=[]
-        for(const im of imgs.filter(x=>x.srcWidth<=80&&x.srcHeight<=80&&Math.abs(x.width-12.37)<2&&Math.abs(x.height-12.37)<2)){assert(emojiResolver,'A9_EMOJI_CATALOG_REQUIRED');const e=await emojiResolver.resolve(im.raw);assert(e.sim>=.999,'A9_EMOJI_THRESHOLD');emojis.push({x0:im.x0,yCenter:(im.top+im.bottom)/2,...e})}
+      soft(boxes.length>=1&&boxes.length<=2,'A4_POST_BOX_COUNT',`p${p}:${boxes.length}`)
+      if(!boxes.length)continue
+      for(const rb of boxes){const box=[round2(rb.x0),round2(rb.top),round2(rb.width),round2(rb.height)];soft(Math.abs(box[2]-504.57)<=2&&box[3]>100,'A5_POST_BOX_SIZE',`p${p}:${box.join(',')}`);const chars=d.chars.filter(x=>inside(x,box)),imgs=d.geom.images.filter(x=>inside(x,box)),emojis=[]
+        for(const im of imgs.filter(x=>x.srcWidth<=80&&x.srcHeight<=80&&Math.abs(x.width-12.37)<2&&Math.abs(x.height-12.37)<2)){
+          if(!emojiResolver){soft(false,'A9_EMOJI_CATALOG_REQUIRED',`p${p}`);continue}
+          try{
+            const e=await emojiResolver.resolve(im.raw)
+            if(e?.sim>=.999)emojis.push({x0:im.x0,yCenter:(im.top+im.bottom)/2,...e})
+            else soft(false,'A9_EMOJI_THRESHOLD',`p${p};sim=${e?.sim??'null'}`)
+          }catch(e){soft(false,'A9_EMOJI_UNKNOWN',`p${p};${e?.message||e}`)}
+        }
         const semByStyle=chars.filter(x=>style(x.font)==='SemiBold')
         const regByStyle=chars.filter(x=>style(x.font)==='Regular')
         const exactStylesOK=semByStyle.length>0&&regByStyle.length>0
@@ -126,22 +136,39 @@ export class FamileoGeometryParser{
           ? regByStyle.filter(x=>x.size>12)
           : chars.filter(x=>x.size>=12.65&&x.size<=13.70)
 
-        const author=flow(authorChars),date_label=flow(dateChars)
+        let author=flow(authorChars),postDateLabel=flow(dateChars)
         const fallbackOK=authorChars.length>0&&dateChars.length>0&&body.length>0
         const fontDiag=[...new Set(chars.map(x=>`${Math.round(x.size*10)/10}:${x.font||'?'}`))].join(',')
-        assert(exactStylesOK||fallbackOK,'A8_STYLES',`p${p};fonts=${fontDiag}`)
-        const lines=makeLines(body,emojis),text=compact(lines.join(' '))
-        assert(author&&/^le\s+\d{1,2}\s+[\p{L}]+\.?$/u.test(date_label),'A6_POST_HEADER',`p${p}:${author}/${date_label};fonts=${fontDiag}`)
-        const avatar=imgs.find(x=>x.srcWidth===170&&x.srcHeight===170),coll=imgs.filter(x=>x.width>100&&x.srcWidth>500);assert(Boolean(avatar)&&coll.length>=1,'A7_MEDIA',`p${p}`)
-        const layout=layoutFor(body,coll,box),slot=slotFor(box,d.geom.height),post={page:p,author,date_label,text,lines,emoji:emojis.map(e=>({char:e.char,unified:e.unified,via:e.via})),slot,box_pt:box,layout,avatar:{src_px:[avatar.srcWidth,avatar.srcHeight]},collages:coll.map(i=>({src_px:[i.srcWidth,i.srcHeight],box_pt:[round2(i.x0),round2(i.top),round2(i.width),round2(i.height)]}))};posts.push(post)
-        geometry[`${p}:${slot}`]={avatar_box_pt:[round2(avatar.x0),round2(avatar.top),round2(avatar.width),round2(avatar.height)],body_box_pt:body.length?[round2(Math.min(...body.map(x=>x.x0))),round2(Math.min(...body.map(x=>x.top))),round2(Math.max(...body.map(x=>x.x1))-Math.min(...body.map(x=>x.x0))),round2(Math.max(...body.map(x=>x.bottom))-Math.min(...body.map(x=>x.top)))]:null}
+        soft(exactStylesOK||fallbackOK,'A8_STYLES',`p${p};fonts=${fontDiag}`)
+
+        // Last-resort text-only fallback: use visible typographic lines.
+        const visibleLines=makeLines(chars).map(compact).filter(Boolean)
+        const dateLineIndex=visibleLines.findIndex(x=>/^le\s+\d{1,2}\s+[\p{L}]+\.?$/u.test(x))
+        if(!author&&dateLineIndex>0)author=visibleLines[dateLineIndex-1]
+        if(!/^le\s+\d{1,2}\s+[\p{L}]+\.?$/u.test(postDateLabel)&&dateLineIndex>=0)postDateLabel=visibleLines[dateLineIndex]
+
+        let lines=body.length?makeLines(body,emojis):[]
+        if(!lines.length){
+          lines=visibleLines.filter((_,i)=>i!==dateLineIndex&&i!==dateLineIndex-1)
+        }
+        const text=compact(lines.join(' '))
+        soft(Boolean(author)&&/^le\s+\d{1,2}\s+[\p{L}]+\.?$/u.test(postDateLabel),'A6_POST_HEADER',`p${p}:${author}/${postDateLabel};fonts=${fontDiag}`)
+
+        const avatar=imgs.find(x=>x.srcWidth===170&&x.srcHeight===170)||null
+        const coll=imgs.filter(x=>x.width>100&&x.srcWidth>500)
+        soft(Boolean(avatar)&&coll.length>=1,'A7_MEDIA',`p${p};avatar=${Boolean(avatar)};collages=${coll.length}`)
+
+        const layout=layoutFor(body,coll,box),slot=slotFor(box,d.geom.height),post={page:p,author:author||'',date_label:postDateLabel||'',text,lines,emoji:emojis.map(e=>({char:e.char,unified:e.unified,via:e.via})),slot,box_pt:box,layout,avatar:avatar?{src_px:[avatar.srcWidth,avatar.srcHeight]}:null,collages:coll.map(i=>({src_px:[i.srcWidth,i.srcHeight],box_pt:[round2(i.x0),round2(i.top),round2(i.width),round2(i.height)]}))};posts.push(post)
+        geometry[`${p}:${slot}`]={avatar_box_pt:avatar?[round2(avatar.x0),round2(avatar.top),round2(avatar.width),round2(avatar.height)]:null,body_box_pt:body.length?[round2(Math.min(...body.map(x=>x.x0))),round2(Math.min(...body.map(x=>x.top))),round2(Math.max(...body.map(x=>x.x1))-Math.min(...body.map(x=>x.x0))),round2(Math.max(...body.map(x=>x.bottom))-Math.min(...body.map(x=>x.top)))]:null}
       }
     }
-    resolveYears(posts,date_iso);assert(posts.every(p=>!p.date_iso||p.date_iso<=date_iso),'A12_POST_DATE')
+    assert(posts.length>0,'NO_POSTS')
+    if(date_iso){resolveYears(posts,date_iso);soft(posts.every(p=>!p.date_iso||p.date_iso<=date_iso),'A12_POST_DATE')}
+    else for(const post of posts)post.date_iso=null
     const backD=pageData.at(-1),addrLines=makeLines(backD.chars.filter(x=>approx(x.size,10,.5)&&style(x.font)==='Regular'&&x.x0>250)).map(x=>x.trim()).filter(Boolean),events=[],seen=new Set()
     for(const r of backD.geom.rects){if(Math.abs(r.width-107.7)>=2||Math.abs(r.height-107.7)>=2||!r.fill)continue;const key=`${round2(r.x0)}:${round2(r.top)}`;if(seen.has(key))continue;seen.add(key);const kind=colorClose(r.fillColor,CYAN)?'birthday':colorClose(r.fillColor,NAVY)?'nameday':null;if(!kind)continue;const box=[r.x0,r.top,r.width,r.height],cs=backD.chars.filter(x=>inside(x,box)),name=flow(pick(cs,11,'Bold',.5)),detail=makeLines(pick(cs,11,'SemiBold',.5));let age=null,dl=null;for(const l of detail){const a=l.trim().match(/^(\d+)\s*ans?\b/i);if(a)age=Number(a[1]);if(/^le\s/i.test(l.trim()))dl=l.trim()}if(name)events.push({kind,name,age:kind==='birthday'?age:null,date_label:dl})}
-    const back={recipient:{name:addrLines[0]||null,address_lines:addrLines.slice(1)},events,thumbnails:backD.geom.images.filter(x=>x.srcWidth===437&&x.srcHeight===437).map(x=>({src_px:[437,437]}))};assert(back.recipient.name&&back.events.length,'A10_BACK')
+    const back={recipient:{name:addrLines[0]||null,address_lines:addrLines.slice(1)},events,thumbnails:backD.geom.images.filter(x=>x.srcWidth===437&&x.srcHeight===437).map(x=>({src_px:[437,437]}))};soft(back.recipient.name&&back.events.length,'A10_BACK')
     const dates=posts.map(p=>p.date_iso).filter(Boolean),stats={posts:posts.length,chronological:dates.every((d,i)=>i===0||dates[i-1]<=d),date_range:[dates.length?[...dates].sort()[0]:null,dates.length?[...dates].sort().at(-1):null],emoji_occurrences:posts.reduce((n,p)=>n+p.emoji.length,0),contributors:[...new Set(posts.map(p=>p.author.trim()))].sort()}
-    const gazette={source,cover:{issue_label,issue_number,date_label,date_parts:_parts,date_iso,title,client_code,thumbnails},posts,back,stats};return {gazette,geometry,sha256:await sha256Hex(bytes),doc,raw}
+    const gazette={source,cover:{issue_label,issue_number,date_label,date_parts:_parts,date_iso,title,client_code,thumbnails},posts,back,stats};return {gazette,geometry,warnings,sha256:await sha256Hex(bytes),doc,raw}
   }
 }

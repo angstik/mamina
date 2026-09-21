@@ -215,3 +215,58 @@ Contrat : `parse pdf/tests/checks.json`, `golden/gazette-42.json`, `golden/gazet
 Les deux fixtures de référence sont incluses dans `tests/fixtures/` pour les tests de développement mais ne sont pas servies par Vite et ne font donc pas partie du poids de la PWA déployée.
 
 Conformité : JSON `gazette` strictement égal aux goldens (sauf `emoji[].via`) + tests unitaires de `checks.json`. Les ressources lourdes du catalogue sont dans `parse pdf/catalog-publish/` et ne sont pas dans `public/`.
+
+---
+
+## 11. Profil de validation vs profil d'exécution MamiNa
+
+Les invariants A1…A12 restent le **contrat strict de validation du gabarit** et
+des goldens. Ils sont destinés aux tests du parseur et à la détection des
+évolutions de Famileo.
+
+La PWA MamiNa utilise cependant un profil d'exécution **tolérant et minimum
+utile**. Son objectif prioritaire est de permettre la publication et la lecture
+d'une revue même si un enrichissement secondaire n'est plus extractible.
+
+### 11.1 Données indispensables en production
+
+Une publication n'est bloquée que si :
+
+- le fichier ne peut pas être lu comme PDF ;
+- il contient moins de 3 pages ;
+- aucune boîte de post exploitable n'est détectée.
+
+Le rendu visuel reste le PDF original. Le JSON sert principalement à exposer :
+
+- la géométrie de chaque boîte de post ;
+- auteur, date et texte lorsque disponibles ;
+- le texte copiable ;
+- les rectangles de collage lorsqu'ils sont détectables ;
+- les métadonnées de revue lorsqu'elles sont détectables.
+
+### 11.2 Enrichissements non bloquants
+
+En production, les échecs A1, A2, A4…A12 deviennent des **warnings** lorsqu'une
+lecture utile reste possible. En particulier, ne doivent jamais empêcher la
+publication :
+
+- adresse et événements du dos (`A10`) ;
+- avatar ou collage non reconnu (`A7`) ;
+- nom exact des styles de police (`A8`) ;
+- emoji non résolu (`A9`) ;
+- numéro/date/client de couverture non résolus (`A11/A12`) ;
+- variation géométrique compatible avec une boîte de post (`A5`).
+
+Le master journalise ces warnings afin qu'ils puissent être diagnostiqués sans
+rendre la revue inutilisable.
+
+### 11.3 Fallback texte
+
+Si les noms exacts de police ne sont pas disponibles, utiliser les tailles
+typographiques observées. Si cela échoue encore, reconstruire les lignes
+visibles par géométrie, repérer une ligne de date `^le ...`, prendre la ligne
+précédente comme auteur et conserver les autres lignes comme corps.
+
+Cette stratégie reflète le besoin produit : **le PDF porte la mise en page ; le
+parseur doit surtout rendre les lettres sélectionnables et copiables**.
+
