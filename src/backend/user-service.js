@@ -9,7 +9,7 @@ import {
   putTopicState, getTopicState, replaceArticles, listArticles,
   putMessages, listMessagesByMagazine, deleteMessagesByMagazine,
   getReadState, putReadState, listReadStates,
-  putAsset, getAsset, deleteAsset, pruneToMagazineIds,
+  putAsset, getAsset, deleteAsset, deleteAssetsByPrefix, pruneToMagazineIds,
   putOutbox, getOutbox, listOutbox, deleteOutbox, countOutbox, estimateLocalStorage, clearPublicationCache,
 } from './user-storage.js'
 import { info, warn, error as logError } from './log.js'
@@ -33,20 +33,11 @@ function unionBounds(list=[]){
   if(!rows.length)return null
   return cleanBounds({x0:Math.min(...rows.map(b=>b.x0)),y0:Math.min(...rows.map(b=>b.y0)),x1:Math.max(...rows.map(b=>b.x1)),y1:Math.max(...rows.map(b=>b.y1))})
 }
-function expandBounds(b,padX=.018,padY=.02){return cleanBounds(b?{x0:b.x0-padX,y0:b.y0-padY,x1:b.x1+padX,y1:b.y1+padY}:null)}
+function expandBounds(b,padX=.006,padY=.008){return cleanBounds(b?{x0:b.x0-padX,y0:b.y0-padY,x1:b.x1+padX,y1:b.y1+padY}:null)}
 function renormBounds(b,outer){
   if(!b||!outer)return b||null
   const w=Math.max(.0001,outer.x1-outer.x0),h=Math.max(.0001,outer.y1-outer.y0)
   return cleanBounds({x0:(b.x0-outer.x0)/w,y0:(b.y0-outer.y0)/h,x1:(b.x1-outer.x0)/w,y1:(b.y1-outer.y0)/h})
-}
-function adjustAvatarBounds(b,layout){
-  if(!b)return null
-  const w=b.x1-b.x0,h=b.y1-b.y0
-  let out={x0:b.x0+.04*w,y0:b.y0+.04*h,x1:b.x1-.04*w,y1:b.y1-.04*h}
-  if(layout==='text_below') out={x0:out.x0+.08*w,y0:out.y0,x1:out.x1+.08*w,y1:out.y1}
-  else if(layout==='text_right') out={x0:out.x0+.05*w,y0:out.y0-.06*h,x1:out.x1+.05*w,y1:out.y1-.06*h}
-  else out={x0:out.x0+.03*w,y0:out.y0-.02*h,x1:out.x1+.03*w,y1:out.y1-.02*h}
-  return cleanBounds(out)||cleanBounds(b)
 }
 function postArticle(magazineId,post,sidecar={}){
   const slot=slotCode(post.slot),box=post.box_pt||[0,0,1,1],collages=post.collages||[],g=sidecar[`${post.page}:${post.slot}`]||{}
@@ -58,12 +49,12 @@ function postArticle(magazineId,post,sidecar={}){
   const rawPhotoBounds=union?cleanBounds({x0:(union.x0-box[0])/box[2],y0:(union.y0-box[1])/box[3],x1:(union.x1-box[0])/box[2],y1:(union.y1-box[1])/box[3]}):null
   let rawTextBounds=norm(g.body_box_pt)
   if(!rawTextBounds&&rawPhotoBounds) rawTextBounds=post.layout==='text_right'?{x0:Math.max(0,rawPhotoBounds.x1),y0:0,x1:1,y1:1}:{x0:0,y0:Math.max(0,rawPhotoBounds.y1),x1:1,y1:1}
-  const rawAvatarBounds=adjustAvatarBounds(norm(g.avatar_box_pt),post.layout)
-  const renderBounds=expandBounds(unionBounds([rawPhotoBounds,rawTextBounds,rawAvatarBounds]),.01,.012)||{x0:0,y0:0,x1:1,y1:1}
-  const photoBounds=renormBounds(rawPhotoBounds,renderBounds)
-  const textBounds=renormBounds(rawTextBounds,renderBounds)
-  const avatarBounds=renormBounds(rawAvatarBounds,renderBounds)
-  return {magazineId,articleKey:`${magazineId}:p${String(post.page).padStart(2,'0')}:${slot}`,page:post.page,slot,pageText:post.text,articleText:post.text,authorName:post.author,articleDateLabel:post.date_label,bodyText:post.text,lines:post.lines||[],dateIso:post.date_iso||null,layout:post.layout,boxPt:post.box_pt,renderBounds,collages:post.collages||[],textBounds,photoBounds,avatarBounds}
+  // avatar_box_pt comes directly from the placed 170×170 XObject: it is the
+  // authoritative square. Do not apply layout-dependent offsets.
+  const rawAvatarBounds=norm(g.avatar_box_pt)
+  // Article view contains only useful content, not the decorative box margins.
+  const renderBounds=expandBounds(unionBounds([rawPhotoBounds,rawTextBounds,rawAvatarBounds]))||{x0:0,y0:0,x1:1,y1:1}
+  return {magazineId,articleKey:`${magazineId}:p${String(post.page).padStart(2,'0')}:${slot}`,page:post.page,slot,pageText:post.text,articleText:post.text,authorName:post.author,articleDateLabel:post.date_label,bodyText:post.text,lines:post.lines||[],dateIso:post.date_iso||null,layout:post.layout,boxPt:post.box_pt,renderBounds,collages:post.collages||[],textBounds:renormBounds(rawTextBounds,renderBounds),photoBounds:renormBounds(rawPhotoBounds,renderBounds),avatarBounds:renormBounds(rawAvatarBounds,renderBounds)}
 }
 function parseEnvelopeArticles(magazineId,envelope){const gazette=envelope?.gazette||envelope;return (gazette?.posts||[]).map(p=>postArticle(magazineId,p,envelope?.geometry||{}))}
 
@@ -266,6 +257,7 @@ export class UserMaminaService {
     for(const old of before) if(!keepIds.includes(old.magazineId)){ await deleteAsset(`cover:${old.magazineId}`); await deleteAsset(`pdf:${old.magazineId}`); await deleteAsset(`staging-pdf:${old.magazineId}`); await deleteMessagesByMagazine(old.magazineId); await replaceArticles(old.magazineId,[]) }
     await pruneToMagazineIds(keepIds)
     await settings.set('magazineOrder',found.map(m=>m.magazineId))
+    try { await this.migrateDerivedArticleGeometry() } catch(e) { warn('cache.migration','Migration différée',{message:e?.message||String(e)}) }
     return this.magazineSummaries()
   }
 
@@ -512,8 +504,14 @@ export class UserMaminaService {
     let rows
     if(magazine.fullyCached && bytes) {
       rows=await listMessagesByMagazine(magazineId)
+      let articles=await listArticles(magazineId)
+      if(!articles.length){
+        const parsedBytes=await getAsset(`parse:${magazineId}`)
+        if(parsedBytes){try{articles=parseEnvelopeArticles(magazineId,JSON.parse(new TextDecoder().decode(parsedBytes)))}catch{}}
+      }
       const pdf=await FamileoPdf.load(bytes,{trace:(scope,message,detail)=>info(scope,message,detail)})
-      this.current={magazine,pdf,articles:pdf.articles(),rows}
+      if(!articles.length)articles=pdf.articles()
+      this.current={magazine,pdf,articles,rows}
     } else {
       const raw=await this.gateway.topicMessages(this.dialog.peer,magazine.topicId,{limit:Infinity})
       const models=raw.map(TelegramGateway.messageModel)
@@ -717,6 +715,26 @@ export class UserMaminaService {
     return sent
   }
 
+  async migrateDerivedArticleGeometry(force=false) {
+    const target='article-geometry-v2'
+    if(!force && await settings.get('derivedArticleGeometryVersion','')===target)return {updated:0,cleared:0}
+    let updated=0,missing=0
+    for(const magazine of await listMagazines()){
+      const bytes=await getAsset(`parse:${magazine.magazineId}`)
+      if(!bytes){missing++;continue}
+      try{
+        const envelope=JSON.parse(new TextDecoder().decode(bytes))
+        const articles=parseEnvelopeArticles(magazine.magazineId,envelope)
+        if(articles.length){await replaceArticles(magazine.magazineId,articles);updated++}
+      }catch(e){warn('cache.migration','Géométrie article non reconstruite',{magazineId:magazine.magazineId,message:e?.message||String(e)})}
+    }
+    const cleared=await deleteAssetsByPrefix('article:')
+    // If some old magazines have no parse sidecar, run again after a future sync.
+    if(!missing)await settings.set('derivedArticleGeometryVersion',target)
+    info('cache.migration','Géométries article actualisées',{updated,missing,cleared})
+    return {updated,missing,cleared}
+  }
+
   async pendingCount() { return countOutbox() }
   async storageStats() { return estimateLocalStorage() }
   async pendingForArticle(articleKey) { return getOutbox(articleKey) }
@@ -824,6 +842,32 @@ export class UserMaminaService {
     const [shaB,jsonB,binB]=await Promise.all([load('sha256'),load('json'),load('bin')]);return new EmojiResolver({shaJson:JSON.parse(new TextDecoder().decode(shaB)),catalogJson:JSON.parse(new TextDecoder().decode(jsonB)),catalogBin:binB,set:params.parser?.emojiSet||'apple',threshold:Number(params.parser?.emojiThreshold||.999)})
   }
 
+  async adminSaveParams({storagePassword=true}={}) {
+    if(!this.dialog)throw new Error('Aucun groupe sélectionné.')
+    const peer=this.dialog.peer
+    let topics=await this.gateway.topics(peer)
+    let topic=topics.find(x=>exactTopic(x,PARAMS_TOPIC))
+    let paramsTopicId
+    if(topic)paramsTopicId=topicIdOf(topic)
+    else {
+      const created=await this.gateway.createTopic(peer,PARAMS_TOPIC)
+      paramsTopicId=created.topicId
+      topics=await this.gateway.topics(peer)
+    }
+    const rows=await this.gateway.topicMessages(peer,paramsTopicId,{limit:50})
+    const existing=[...rows].reverse().find(m=>TelegramGateway.messageModel(m).meta?.kind==='mamina-params')||null
+    const previous=existing?TelegramGateway.messageModel(existing).meta:(await settings.get('remoteParams',null)||{})
+    const enabled=Boolean(storagePassword)
+    const paramsMeta={...previous,kind:'mamina-params',version:Number(previous?.version||1),storagePassword:enabled,auth:{...(previous?.auth||{}),storePassword:enabled}}
+    const paramsMsg=existing
+      ? await this.gateway.editSystemText(peer,existing.id,'Paramètres MamiNa',paramsMeta)
+      : await this.gateway.postSystemText(peer,paramsTopicId,'Paramètres MamiNa',paramsMeta)
+    await settings.set('paramsTopicId',paramsTopicId)
+    await settings.set('paramsMessageId',Number(paramsMsg.id))
+    await settings.set('remoteParams',paramsMeta)
+    return {paramsTopicId,paramsMessageId:Number(paramsMsg.id),params:paramsMeta}
+  }
+
   async adminInitializeSystem({shaFile,catalogJsonFile,catalogBinFile}={}) {
     if(!this.dialog)throw new Error('Aucun groupe sélectionné.')
     if(!shaFile||!catalogJsonFile||!catalogBinFile)throw new Error('Sélectionne les 3 fichiers catalogue.')
@@ -898,36 +942,22 @@ export class UserMaminaService {
     return title
   }
 
-  async telegramPasswordStorageEnabled() {
+  async maminaPasswordStorageEnabled() {
     const remote=await settings.get('remoteParams',null)
-    const flag=remote?.auth?.storePassword
-    if(typeof flag==='boolean') return flag
-    if(typeof remote?.storagePassword==='boolean') return remote.storagePassword
+    if(typeof remote?.storagePassword==='boolean')return remote.storagePassword
+    if(typeof remote?.auth?.storePassword==='boolean')return remote.auth.storePassword
     return true
   }
-  async getStoredTelegramPassword() {
-    if(!await this.telegramPasswordStorageEnabled()) return ''
-    return await settings.get('telegramPassword','') || ''
-  }
-  async storeTelegramPassword(value) {
-    if(!await this.telegramPasswordStorageEnabled()) { await settings.set('telegramPassword',''); return '' }
-    const password=String(value||'')
-    await settings.set('telegramPassword',password)
-    return password
-  }
-  async clearStoredTelegramPassword() { await settings.set('telegramPassword','') }
 
   async getSettings() {
-    const rememberTelegramPassword=await this.telegramPasswordStorageEnabled()
-    if(!rememberTelegramPassword) await settings.set('telegramPassword','')
+    const storagePassword=await this.maminaPasswordStorageEnabled()
     return {
       reactionOrder:await settings.get('reactionOrder','asc'),
       articleOrderMode:await settings.get('articleOrderMode','magazine'),
       recentColors:await settings.get('recentColors',[]),
       appTitle:await settings.get('appTitle','MamiNa'),
       theme:await settings.get('theme','system'),
-      rememberTelegramPassword,
-      hasStoredTelegramPassword:Boolean(await settings.get('telegramPassword','')),
+      storagePassword,
     }
   }
   async setReactionOrder(order) {

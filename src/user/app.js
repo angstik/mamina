@@ -2,9 +2,10 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.5'
+const APP_VERSION='1.1.6'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
+const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
 const $=id=>document.getElementById(id)
 const service=new UserMaminaService()
 
@@ -15,7 +16,6 @@ let telegramState='offline',reconnecting=false,lastConnectedAt=Number(localStora
 let currentColor='#000000',savedRange=null,lastArticleCopy={text:'',at:0}
 let typingState={bold:false,italic:false,underline:false,strikeThrough:false,color:null}
 let activityTimer=null
-let pendingTelegramPassword='',usedStoredTelegramPassword=false
 const homeUrls=[],readerUrls=[]
 const zoomStates=new Map()
 
@@ -68,9 +68,12 @@ async function loadSettings(){
   $('reactionOrder').value=reactionOrder
   $('themeSelect').value=c.theme
   $('adminAppTitle').value=c.appTitle
-  $('rememberTelegramPassword').textContent=c.rememberTelegramPassword?'Activée':'Désactivée'
-  $('storedTelegramPasswordState').textContent=c.rememberTelegramPassword?(c.hasStoredTelegramPassword?'Mot de passe enregistré localement.':'Aucun mot de passe mémorisé.'):'Piloté par params : stockage désactivé.'
-  $('clearStoredTelegramPassword').disabled=!c.hasStoredTelegramPassword
+  $('adminStoragePassword').checked=Boolean(c.storagePassword)
+  if(!c.storagePassword)localStorage.removeItem(STORED_PASSWORD_KEY)
+  const hasStored=Boolean(localStorage.getItem(STORED_PASSWORD_KEY))
+  $('rememberMaminaPassword').textContent=c.storagePassword?'Activé':'Désactivé'
+  $('storedMaminaPasswordState').textContent=c.storagePassword?(hasStored?'Mot de passe mémorisé sur cet appareil.':'Aucun mot de passe mémorisé.'):'Piloté par params : stockage désactivé.'
+  $('clearStoredMaminaPassword').disabled=!hasStored
   $('appVersion').textContent=APP_VERSION
 }
 function elapsed(ms){const s=Math.floor(ms/1000);if(s<60)return`${s}s`;const m=Math.floor(s/60);if(m<60)return`${m}m`;return`${Math.floor(m/60)}h`}
@@ -124,6 +127,7 @@ async function init(){
   $('networkState').textContent=navigator.onLine?'En ligne':'Hors ligne'
   const previousBeat=Number(localStorage.getItem(HEARTBEAT_KEY)||0)
   await showWelcomeSplash()
+  try{await service.migrateDerivedArticleGeometry()}catch(e){debug(e)}
   await localHome()
   renderLogs()
   connectionClock=setInterval(refreshPills,1000)
@@ -132,14 +136,13 @@ async function init(){
     if(previousBeat && Date.now()-previousBeat<30000) info('lifecycle','Reprise automatique après rechargement probable',{saved})
     await openMagazine(saved.magazineId,saved.articleKey,true)
   }
+  const cfg=await service.getSettings()
+  const stored=cfg.storagePassword?localStorage.getItem(STORED_PASSWORD_KEY)||'':''
+  if(stored){$('password').value=stored;setTimeout(()=>$('start').click(),120)}
 }
 init()
 
-async function askTelegram(kind){
-  if(kind==='password'){
-    const saved=await service.getStoredTelegramPassword()
-    if(saved){usedStoredTelegramPassword=true;pendingTelegramPassword='';return saved}
-  }
+function askTelegram(kind){
   const modal=$('telegramAuthModal'),input=$('telegramAuthInput'),title=$('telegramAuthTitle'),hint=$('telegramAuthHint')
   const cfg={
     phone:{title:'Numéro Telegram',type:'tel',autocomplete:'tel',inputmode:'tel',placeholder:'06 12 34 56 78',hint:'Si tu saisis un numéro français sans +, MamiNa ajoute automatiquement +33.'},
@@ -149,7 +152,7 @@ async function askTelegram(kind){
   title.textContent=cfg.title;hint.textContent=cfg.hint;input.type=cfg.type;input.autocomplete=cfg.autocomplete;input.inputMode=cfg.inputmode;input.placeholder=cfg.placeholder;input.value=''
   return new Promise((resolve,reject)=>{
     const clean=()=>{$('telegramAuthForm').onsubmit=null;$('telegramAuthCancel').onclick=null}
-    $('telegramAuthForm').onsubmit=e=>{e.preventDefault();const v=input.value.trim();if(!v)return;if(kind==='password'){pendingTelegramPassword=v;usedStoredTelegramPassword=false}clean();modal.close();resolve(v)}
+    $('telegramAuthForm').onsubmit=e=>{e.preventDefault();const v=input.value.trim();if(!v)return;clean();modal.close();resolve(v)}
     $('telegramAuthCancel').onclick=()=>{clean();modal.close();reject(new Error('Connexion Telegram annulée.'))}
     modal.showModal();setTimeout(()=>input.focus(),70)
   })
@@ -161,13 +164,13 @@ $('start').onclick=async()=>{
   try{
     status('setupStatus','Déverrouillage…')
     showActivity('Déverrouillage des accès…')
-    await service.unlock($('password').value)
+    const maminaPassword=$('password').value
+    await service.unlock(maminaPassword)
+    if(await service.maminaPasswordStorageEnabled())localStorage.setItem(STORED_PASSWORD_KEY,maminaPassword)
+    else localStorage.removeItem(STORED_PASSWORD_KEY)
     $('setup').hidden=true
     await localHome()
     const me=await service.login()
-    if(pendingTelegramPassword) await service.storeTelegramPassword(pendingTelegramPassword)
-    else if(!await service.telegramPasswordStorageEnabled()) await service.clearStoredTelegramPassword()
-    pendingTelegramPassword='';usedStoredTelegramPassword=false
     await showWelcomeSplash(true)
     const {models,selected}=await service.restoreOrSelectDialog()
     if(!selected){
@@ -180,8 +183,6 @@ $('start').onclick=async()=>{
     }
     startNetwork()
   }catch(e){
-    if(usedStoredTelegramPassword){try{await service.clearStoredTelegramPassword()}catch{} usedStoredTelegramPassword=false}
-    pendingTelegramPassword=''
     debug(e);$('setup').hidden=false;status('setupStatus','Erreur : '+(e.message||e),false)
   }finally{$('start').disabled=false}
 }
@@ -688,7 +689,7 @@ $('openSettingsHome').onclick=()=>{
 }
 $('closeSettings').onclick=()=>{$('settingsView').hidden=true}
 $('refreshStorageStats').onclick=refreshStorageStats
-$('clearStoredTelegramPassword').onclick=async()=>{try{await service.clearStoredTelegramPassword();await loadSettings();status('storageStatus','Mot de passe Telegram supprimé.',true)}catch(e){status('storageStatus','Suppression impossible : '+(e.message||e),false)}}
+$('clearStoredMaminaPassword').onclick=async()=>{localStorage.removeItem(STORED_PASSWORD_KEY);$('password').value='';await loadSettings();status('storageStatus','Mot de passe MamiNa supprimé de cet appareil.',true)}
 $('themeSelect').onchange=async()=>{applyTheme($('themeSelect').value);await service.setTheme($('themeSelect').value)}
 $('reactionOrder').onchange=async()=>{reactionOrder=$('reactionOrder').value;await service.setReactionOrder(reactionOrder);if(currentModel)await rebuild(currentArticle()?.articleKey)}
 $('forceUpdate').onclick=async()=>{
@@ -739,6 +740,7 @@ $('copyAdminError').onclick=async()=>{
     status('adminStatus','Copie impossible : '+(e.message||e),false)
   }
 }
+$('adminSaveParams').onclick=async()=>{try{$('adminSaveParams').disabled=true;status('adminParamsStatus','Mise à jour params…');const r=await service.adminSaveParams({storagePassword:$('adminStoragePassword').checked});if(!$('adminStoragePassword').checked)localStorage.removeItem(STORED_PASSWORD_KEY);status('adminParamsStatus',`OK · message ${r.paramsMessageId}`,true);await loadSettings()}catch(e){rememberAdminError(e,'Mise à jour params');status('adminParamsStatus','Erreur : '+e.message,false)}finally{$('adminSaveParams').disabled=false}}
 $('adminInitSystem').onclick=async()=>{try{const sha=$('catalogShaFile').files?.[0],json=$('catalogJsonFile').files?.[0],bin=$('catalogBinFile').files?.[0];$('adminInitSystem').disabled=true;$('copyAdminError').hidden=true;lastAdminErrorText='';status('adminSystemStatus','Publication params/catalog…');const r=await service.adminInitializeSystem({shaFile:sha,catalogJsonFile:json,catalogBinFile:bin});status('adminSystemStatus',`OK · params ${r.paramsTopicId}, catalog ${r.catalogTopicId}`,true);await $('adminRefreshTopics').onclick?.()}catch(e){rememberAdminError(e,'Initialisation params/catalog');status('adminSystemStatus','Erreur : '+e.message,false)}finally{$('adminInitSystem').disabled=false}}
 $('adminRefreshGroups').onclick=async()=>{try{adminGroups=await service.adminListForumDialogs();const s=$('adminGroupSelect');s.innerHTML='';adminGroups.forEach((g,i)=>{const o=document.createElement('option');o.value=i;o.textContent=g.title;s.appendChild(o)});const recipe=adminGroups.findIndex(g=>String(g.title||'').trim().toLowerCase()==='famileo_recette');if(recipe>=0){s.value=String(recipe);await service.selectDialog(adminGroups[recipe])}status('adminStatus',`${adminGroups.length} groupes avec sujets.${recipe>=0?' famileo_recette sélectionné.':''}`,true)}catch(e){status('adminStatus','Erreur : '+e.message,false)}}
 $('adminGroupSelect').onchange=async()=>{const g=adminGroups[+$('adminGroupSelect').value];if(g){await service.selectDialog(g);await refreshPending()}}

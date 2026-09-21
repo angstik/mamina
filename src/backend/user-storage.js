@@ -186,6 +186,28 @@ export async function deleteAsset(key) {
   return transact('assets','readwrite',s=>s.delete(key))
 }
 
+export async function deleteAssetsByPrefix(prefix) {
+  const wanted=String(prefix||'')
+  if(!wanted)return 0
+  const db=await openDb()
+  let deleted=0
+  try {
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction('assets','readwrite'),store=tx.objectStore('assets'),req=store.openCursor()
+      req.onsuccess=()=>{
+        const c=req.result
+        if(!c)return
+        if(String(c.key||'').startsWith(wanted)){c.delete();deleted++}
+        c.continue()
+      }
+      req.onerror=()=>reject(req.error)
+      tx.oncomplete=resolve
+      tx.onerror=()=>reject(tx.error||req.error)
+    })
+    return deleted
+  } finally { db.close() }
+}
+
 export async function pruneToMagazineIds(keepIds) {
   const keep=new Set(keepIds)
   const all=await listMagazines()

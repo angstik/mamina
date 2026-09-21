@@ -139,13 +139,13 @@
 
     <section class="panel">
       <h2>Sécurité de connexion</h2>
-      <p><strong>Mot de passe MamiNa : jamais stocké.</strong></p>
-      <p class="subtle">Le mot de passe 2FA Telegram peut maintenant être mémorisé localement si les paramètres distants l’autorisent.</p>
+      <p><strong>Mot de passe MamiNa</strong></p>
+      <p class="subtle">Il peut être mémorisé en clair dans le localStorage de cet appareil pour éviter sa ressaisie. Le topic <code>params</code> peut l’autoriser ou l’interdire avec <code>storagePassword</code>.</p>
       <div class="storage-grid">
-        <div><span>Stockage mot de passe Telegram</span><strong id="rememberTelegramPassword">—</strong></div>
-        <div><span>État local</span><strong id="storedTelegramPasswordState">—</strong></div>
+        <div><span>Stockage mot de passe MamiNa</span><strong id="rememberMaminaPassword">—</strong></div>
+        <div><span>État local</span><strong id="storedMaminaPasswordState">—</strong></div>
       </div>
-      <button id="clearStoredTelegramPassword" type="button" class="secondary">Effacer le mot de passe Telegram mémorisé</button>
+      <button id="clearStoredMaminaPassword" type="button" class="secondary">Effacer le mot de passe MamiNa mémorisé</button>
     </section>
 
     <section class="panel">
@@ -177,6 +177,9 @@
       <section class="admin-system-block">
         <h3>Configuration du groupe</h3>
         <p class="subtle">Crée/alimente les topics réservés <code>params</code> et <code>catalog</code>. Les lecteurs ne téléchargent jamais le catalogue lourd.</p>
+        <label class="check-row"><input id="adminStoragePassword" type="checkbox" checked> Mémoriser le mot de passe MamiNa sur l’appareil</label>
+        <button id="adminSaveParams" type="button">Publier / mettre à jour params</button>
+        <div id="adminParamsStatus" class="status"></div>
         <label>Ressources catalogue</label>
         <input id="catalogShaFile" type="file" accept="application/json">
         <input id="catalogJsonFile" type="file" accept="application/json">

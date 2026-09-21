@@ -1,5 +1,16 @@
 # CHANGELOG MamiNa
 
+## v1.1.6
+**Synthèse :** force la migration des géométries/caches des revues existantes, utilise les placements exacts pour le cadrage et mémorise le vrai mot de passe MamiNa selon `params`.
+
+La 1.1.5 ne recalculait pas les articles déjà indexés et réutilisait les JPEG `article:*` antérieurs. La 1.1.6 reconstruit les articles depuis le sidecar `parse:*`, invalide tous les anciens JPEG d’articles une fois, puis les régénère avec le nouveau cadrage.
+
+Les avatars ne reçoivent plus de correction empirique liée au layout : leur carré vient directement du placement XObject parsé. Les zones photo restent issues des collages et sont renormalisées après suppression des marges de l’article.
+
+Le mot de passe mémorisé est désormais le mot de passe MamiNa de déchiffrement, stocké uniquement dans `localStorage`. `params.storagePassword` (ou `auth.storePassword`) pilote son activation ; la valeur par défaut est `true`. Il est automatiquement réutilisé au démarrage et reste effaçable depuis Réglages.
+
+L’administration permet en plus de publier ou modifier le topic `params` séparément, sans republier le catalogue. La case `Mémoriser le mot de passe MamiNa` écrit directement `storagePassword: true/false` dans le message canonique.
+
 ## v1.1.5
 **Synthèse :** recadre les articles et photos, corrige le recentrage des avatars et mémorise localement le mot de passe Telegram 2FA selon `params`.
 
