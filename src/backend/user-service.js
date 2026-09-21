@@ -22,17 +22,48 @@ function rowMetaText(message) { return message?.text || message?.caption || '' }
 const PARAMS_TOPIC='params', CATALOG_TOPIC='catalog'
 function exactTopic(topic,name){return String(topic?.title||'').trim().toLowerCase()===name}
 function slotCode(slot){return slot==='top'?'h':slot==='bottom'?'b':'p'}
+function clamp01(n){return Math.max(0,Math.min(1,Number(n)||0))}
+function cleanBounds(b){
+  if(!b)return null
+  const x0=clamp01(b.x0),y0=clamp01(b.y0),x1=clamp01(b.x1),y1=clamp01(b.y1)
+  return x1>x0&&y1>y0?{x0,y0,x1,y1}:null
+}
+function unionBounds(list=[]){
+  const rows=list.filter(Boolean)
+  if(!rows.length)return null
+  return cleanBounds({x0:Math.min(...rows.map(b=>b.x0)),y0:Math.min(...rows.map(b=>b.y0)),x1:Math.max(...rows.map(b=>b.x1)),y1:Math.max(...rows.map(b=>b.y1))})
+}
+function expandBounds(b,padX=.018,padY=.02){return cleanBounds(b?{x0:b.x0-padX,y0:b.y0-padY,x1:b.x1+padX,y1:b.y1+padY}:null)}
+function renormBounds(b,outer){
+  if(!b||!outer)return b||null
+  const w=Math.max(.0001,outer.x1-outer.x0),h=Math.max(.0001,outer.y1-outer.y0)
+  return cleanBounds({x0:(b.x0-outer.x0)/w,y0:(b.y0-outer.y0)/h,x1:(b.x1-outer.x0)/w,y1:(b.y1-outer.y0)/h})
+}
+function adjustAvatarBounds(b,layout){
+  if(!b)return null
+  const w=b.x1-b.x0,h=b.y1-b.y0
+  let out={x0:b.x0+.04*w,y0:b.y0+.04*h,x1:b.x1-.04*w,y1:b.y1-.04*h}
+  if(layout==='text_below') out={x0:out.x0+.08*w,y0:out.y0,x1:out.x1+.08*w,y1:out.y1}
+  else if(layout==='text_right') out={x0:out.x0+.05*w,y0:out.y0-.06*h,x1:out.x1+.05*w,y1:out.y1-.06*h}
+  else out={x0:out.x0+.03*w,y0:out.y0-.02*h,x1:out.x1+.03*w,y1:out.y1-.02*h}
+  return cleanBounds(out)||cleanBounds(b)
+}
 function postArticle(magazineId,post,sidecar={}){
   const slot=slotCode(post.slot),box=post.box_pt||[0,0,1,1],collages=post.collages||[],g=sidecar[`${post.page}:${post.slot}`]||{}
   const union=collages.length?{
     x0:Math.min(...collages.map(x=>x.box_pt[0])),y0:Math.min(...collages.map(x=>x.box_pt[1])),
     x1:Math.max(...collages.map(x=>x.box_pt[0]+x.box_pt[2])),y1:Math.max(...collages.map(x=>x.box_pt[1]+x.box_pt[3])),
   }:null
-  const norm=b=>b?{x0:(b[0]-box[0])/box[2],y0:(b[1]-box[1])/box[3],x1:(b[0]+b[2]-box[0])/box[2],y1:(b[1]+b[3]-box[1])/box[3]}:null
-  const photoBounds=union?{x0:(union.x0-box[0])/box[2],y0:(union.y0-box[1])/box[3],x1:(union.x1-box[0])/box[2],y1:(union.y1-box[1])/box[3]}:null
-  let textBounds=norm(g.body_box_pt)
-  if(!textBounds&&photoBounds) textBounds=post.layout==='text_right'?{x0:Math.max(0,photoBounds.x1),y0:0,x1:1,y1:1}:{x0:0,y0:Math.max(0,photoBounds.y1),x1:1,y1:1}
-  return {magazineId,articleKey:`${magazineId}:p${String(post.page).padStart(2,'0')}:${slot}`,page:post.page,slot,pageText:post.text,articleText:post.text,authorName:post.author,articleDateLabel:post.date_label,bodyText:post.text,lines:post.lines||[],dateIso:post.date_iso||null,layout:post.layout,boxPt:post.box_pt,collages:post.collages||[],textBounds,photoBounds,avatarBounds:norm(g.avatar_box_pt)}
+  const norm=b=>cleanBounds(b?{x0:(b[0]-box[0])/box[2],y0:(b[1]-box[1])/box[3],x1:(b[0]+b[2]-box[0])/box[2],y1:(b[1]+b[3]-box[1])/box[3]}:null)
+  const rawPhotoBounds=union?cleanBounds({x0:(union.x0-box[0])/box[2],y0:(union.y0-box[1])/box[3],x1:(union.x1-box[0])/box[2],y1:(union.y1-box[1])/box[3]}):null
+  let rawTextBounds=norm(g.body_box_pt)
+  if(!rawTextBounds&&rawPhotoBounds) rawTextBounds=post.layout==='text_right'?{x0:Math.max(0,rawPhotoBounds.x1),y0:0,x1:1,y1:1}:{x0:0,y0:Math.max(0,rawPhotoBounds.y1),x1:1,y1:1}
+  const rawAvatarBounds=adjustAvatarBounds(norm(g.avatar_box_pt),post.layout)
+  const renderBounds=expandBounds(unionBounds([rawPhotoBounds,rawTextBounds,rawAvatarBounds]),.01,.012)||{x0:0,y0:0,x1:1,y1:1}
+  const photoBounds=renormBounds(rawPhotoBounds,renderBounds)
+  const textBounds=renormBounds(rawTextBounds,renderBounds)
+  const avatarBounds=renormBounds(rawAvatarBounds,renderBounds)
+  return {magazineId,articleKey:`${magazineId}:p${String(post.page).padStart(2,'0')}:${slot}`,page:post.page,slot,pageText:post.text,articleText:post.text,authorName:post.author,articleDateLabel:post.date_label,bodyText:post.text,lines:post.lines||[],dateIso:post.date_iso||null,layout:post.layout,boxPt:post.box_pt,renderBounds,collages:post.collages||[],textBounds,photoBounds,avatarBounds}
 }
 function parseEnvelopeArticles(magazineId,envelope){const gazette=envelope?.gazette||envelope;return (gazette?.posts||[]).map(p=>postArticle(magazineId,p,envelope?.geometry||{}))}
 
@@ -802,7 +833,7 @@ export class UserMaminaService {
     const post=async(file,role)=>this.gateway.postDocument(peer,catalogTopicId,file,{kind:'catalog-file',role,name:file.name})
     const [shaMsg,jsonMsg,binMsg]=await Promise.all([post(shaFile,'sha256'),post(catalogJsonFile,'json'),post(catalogBinFile,'bin')])
     const manifest=await this.gateway.postSystemText(peer,catalogTopicId,'Catalogue MamiNa',{kind:'mamina-catalog-manifest',version:1,files:{sha256:Number(shaMsg.id),json:Number(jsonMsg.id),bin:Number(binMsg.id)}})
-    const paramsMeta={kind:'mamina-params',version:1,parser:{spec:'SPEC_v1_CG',emojiSet:'apple',emojiThreshold:.999},catalog:{topicId:catalogTopicId,manifestMessageId:Number(manifest.id)}}
+    const paramsMeta={kind:'mamina-params',version:1,parser:{spec:'SPEC_v1_CG',emojiSet:'apple',emojiThreshold:.999},catalog:{topicId:catalogTopicId,manifestMessageId:Number(manifest.id)},storagePassword:true,auth:{storePassword:true}}
     const oldParams=await this.gateway.topicMessages(peer,paramsTopicId,{limit:50})
     const existing=[...oldParams].reverse().find(m=>TelegramGateway.messageModel(m).meta?.kind==='mamina-params')
     const paramsMsg=existing?await this.gateway.editSystemText(peer,existing.id,'Paramètres MamiNa',paramsMeta):await this.gateway.postSystemText(peer,paramsTopicId,'Paramètres MamiNa',paramsMeta)
@@ -867,13 +898,36 @@ export class UserMaminaService {
     return title
   }
 
+  async telegramPasswordStorageEnabled() {
+    const remote=await settings.get('remoteParams',null)
+    const flag=remote?.auth?.storePassword
+    if(typeof flag==='boolean') return flag
+    if(typeof remote?.storagePassword==='boolean') return remote.storagePassword
+    return true
+  }
+  async getStoredTelegramPassword() {
+    if(!await this.telegramPasswordStorageEnabled()) return ''
+    return await settings.get('telegramPassword','') || ''
+  }
+  async storeTelegramPassword(value) {
+    if(!await this.telegramPasswordStorageEnabled()) { await settings.set('telegramPassword',''); return '' }
+    const password=String(value||'')
+    await settings.set('telegramPassword',password)
+    return password
+  }
+  async clearStoredTelegramPassword() { await settings.set('telegramPassword','') }
+
   async getSettings() {
+    const rememberTelegramPassword=await this.telegramPasswordStorageEnabled()
+    if(!rememberTelegramPassword) await settings.set('telegramPassword','')
     return {
       reactionOrder:await settings.get('reactionOrder','asc'),
       articleOrderMode:await settings.get('articleOrderMode','magazine'),
       recentColors:await settings.get('recentColors',[]),
       appTitle:await settings.get('appTitle','MamiNa'),
       theme:await settings.get('theme','system'),
+      rememberTelegramPassword,
+      hasStoredTelegramPassword:Boolean(await settings.get('telegramPassword','')),
     }
   }
   async setReactionOrder(order) {

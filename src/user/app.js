@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.4'
+const APP_VERSION='1.1.5'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const $=id=>document.getElementById(id)
@@ -15,6 +15,7 @@ let telegramState='offline',reconnecting=false,lastConnectedAt=Number(localStora
 let currentColor='#000000',savedRange=null,lastArticleCopy={text:'',at:0}
 let typingState={bold:false,italic:false,underline:false,strikeThrough:false,color:null}
 let activityTimer=null
+let pendingTelegramPassword='',usedStoredTelegramPassword=false
 const homeUrls=[],readerUrls=[]
 const zoomStates=new Map()
 
@@ -67,6 +68,9 @@ async function loadSettings(){
   $('reactionOrder').value=reactionOrder
   $('themeSelect').value=c.theme
   $('adminAppTitle').value=c.appTitle
+  $('rememberTelegramPassword').textContent=c.rememberTelegramPassword?'Activée':'Désactivée'
+  $('storedTelegramPasswordState').textContent=c.rememberTelegramPassword?(c.hasStoredTelegramPassword?'Mot de passe enregistré localement.':'Aucun mot de passe mémorisé.'):'Piloté par params : stockage désactivé.'
+  $('clearStoredTelegramPassword').disabled=!c.hasStoredTelegramPassword
   $('appVersion').textContent=APP_VERSION
 }
 function elapsed(ms){const s=Math.floor(ms/1000);if(s<60)return`${s}s`;const m=Math.floor(s/60);if(m<60)return`${m}m`;return`${Math.floor(m/60)}h`}
@@ -131,7 +135,11 @@ async function init(){
 }
 init()
 
-function askTelegram(kind){
+async function askTelegram(kind){
+  if(kind==='password'){
+    const saved=await service.getStoredTelegramPassword()
+    if(saved){usedStoredTelegramPassword=true;pendingTelegramPassword='';return saved}
+  }
   const modal=$('telegramAuthModal'),input=$('telegramAuthInput'),title=$('telegramAuthTitle'),hint=$('telegramAuthHint')
   const cfg={
     phone:{title:'Numéro Telegram',type:'tel',autocomplete:'tel',inputmode:'tel',placeholder:'06 12 34 56 78',hint:'Si tu saisis un numéro français sans +, MamiNa ajoute automatiquement +33.'},
@@ -141,7 +149,7 @@ function askTelegram(kind){
   title.textContent=cfg.title;hint.textContent=cfg.hint;input.type=cfg.type;input.autocomplete=cfg.autocomplete;input.inputMode=cfg.inputmode;input.placeholder=cfg.placeholder;input.value=''
   return new Promise((resolve,reject)=>{
     const clean=()=>{$('telegramAuthForm').onsubmit=null;$('telegramAuthCancel').onclick=null}
-    $('telegramAuthForm').onsubmit=e=>{e.preventDefault();const v=input.value.trim();if(!v)return;clean();modal.close();resolve(v)}
+    $('telegramAuthForm').onsubmit=e=>{e.preventDefault();const v=input.value.trim();if(!v)return;if(kind==='password'){pendingTelegramPassword=v;usedStoredTelegramPassword=false}clean();modal.close();resolve(v)}
     $('telegramAuthCancel').onclick=()=>{clean();modal.close();reject(new Error('Connexion Telegram annulée.'))}
     modal.showModal();setTimeout(()=>input.focus(),70)
   })
@@ -157,6 +165,9 @@ $('start').onclick=async()=>{
     $('setup').hidden=true
     await localHome()
     const me=await service.login()
+    if(pendingTelegramPassword) await service.storeTelegramPassword(pendingTelegramPassword)
+    else if(!await service.telegramPasswordStorageEnabled()) await service.clearStoredTelegramPassword()
+    pendingTelegramPassword='';usedStoredTelegramPassword=false
     await showWelcomeSplash(true)
     const {models,selected}=await service.restoreOrSelectDialog()
     if(!selected){
@@ -169,6 +180,8 @@ $('start').onclick=async()=>{
     }
     startNetwork()
   }catch(e){
+    if(usedStoredTelegramPassword){try{await service.clearStoredTelegramPassword()}catch{} usedStoredTelegramPassword=false}
+    pendingTelegramPassword=''
     debug(e);$('setup').hidden=false;status('setupStatus','Erreur : '+(e.message||e),false)
   }finally{$('start').disabled=false}
 }
@@ -495,6 +508,14 @@ function installArticleGestures(container,index){
 }
 function defaultPhotoBounds(a){
   if(a.photoBounds)return a.photoBounds
+  if(a.layout==='text_below'){
+    const limit=a.textBounds?Math.max(.42,Math.min(.78,a.textBounds.y0-.03)):.68
+    return {x0:0,y0:0,x1:1,y1:limit}
+  }
+  if(a.layout==='text_right'){
+    const limit=a.textBounds?Math.max(.38,Math.min(.7,a.textBounds.x0-.03)):.56
+    return {x0:0,y0:0,x1:limit,y1:1}
+  }
   return a.slot==='h'?{x0:0,y0:0,x1:.54,y1:1}:a.slot==='b'?{x0:0,y0:0,x1:1,y1:.65}:{x0:0,y0:0,x1:.55,y1:1}
 }
 function handleDoubleTap(container,index,clientX,clientY){
@@ -667,6 +688,7 @@ $('openSettingsHome').onclick=()=>{
 }
 $('closeSettings').onclick=()=>{$('settingsView').hidden=true}
 $('refreshStorageStats').onclick=refreshStorageStats
+$('clearStoredTelegramPassword').onclick=async()=>{try{await service.clearStoredTelegramPassword();await loadSettings();status('storageStatus','Mot de passe Telegram supprimé.',true)}catch(e){status('storageStatus','Suppression impossible : '+(e.message||e),false)}}
 $('themeSelect').onchange=async()=>{applyTheme($('themeSelect').value);await service.setTheme($('themeSelect').value)}
 $('reactionOrder').onchange=async()=>{reactionOrder=$('reactionOrder').value;await service.setReactionOrder(reactionOrder);if(currentModel)await rebuild(currentArticle()?.articleKey)}
 $('forceUpdate').onclick=async()=>{

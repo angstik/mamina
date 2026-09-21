@@ -403,7 +403,10 @@ export class FamileoPdf {
     const W=canvas.width,H=canvas.height
     let x,w,y,h
     if(Array.isArray(article.boxPt)&&article.boxPt.length===4){
-      x=Math.max(0,Math.floor(article.boxPt[0]*scale));y=Math.max(0,Math.floor(article.boxPt[1]*scale));w=Math.min(W-x,Math.ceil(article.boxPt[2]*scale));h=Math.min(H-y,Math.ceil(article.boxPt[3]*scale))
+      const rb=article.renderBounds&&typeof article.renderBounds==='object'?article.renderBounds:null
+      const bx=article.boxPt[0],by=article.boxPt[1],bw=article.boxPt[2],bh=article.boxPt[3]
+      const rx=bx+bw*(rb?.x0??0),ry=by+bh*(rb?.y0??0),rw=bw*((rb?.x1??1)-(rb?.x0??0)),rh=bh*((rb?.y1??1)-(rb?.y0??0))
+      x=Math.max(0,Math.floor(rx*scale));y=Math.max(0,Math.floor(ry*scale));w=Math.min(W-x,Math.ceil(rw*scale));h=Math.min(H-y,Math.ceil(rh*scale))
     } else {
       x=Math.floor(W*0.035);w=Math.floor(W*0.93)
       if(article.slot==='h'){y=Math.floor(H*0.015);h=Math.floor(H*0.475)}

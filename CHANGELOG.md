@@ -1,5 +1,14 @@
 # CHANGELOG MamiNa
 
+## v1.1.5
+**Synthèse :** recadre les articles et photos, corrige le recentrage des avatars et mémorise localement le mot de passe Telegram 2FA selon `params`.
+
+Le recadrage d’image de la vue article utilise maintenant un cadre utile calculé à partir des collages, de la zone texte et de l’avatar. Les marges de page superflues disparaissent dans la vue article, et les zooms photo utilisent les vraies zones photo issues du parsing quand elles sont disponibles.
+
+Les avatars affichés dans la vue texte sont recentrés de façon plus fiable, avec un ajustement spécifique aux layouts `text_below` et `text_right`.
+
+Le topic `params` peut maintenant piloter le stockage du mot de passe Telegram 2FA via `storagePassword` ou `auth.storePassword`. Par défaut, le stockage est activé. Le mot de passe mémorisé reste local à l’appareil et peut être effacé depuis l’écran Réglages.
+
 ## v1.1.4
 **Synthèse :** simplifie le parsing runtime : le PDF reste le rendu, le texte et les boîtes sont prioritaires, les enrichissements deviennent non bloquants.
 

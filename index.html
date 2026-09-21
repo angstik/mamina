@@ -140,7 +140,12 @@
     <section class="panel">
       <h2>Sécurité de connexion</h2>
       <p><strong>Mot de passe MamiNa : jamais stocké.</strong></p>
-      <p class="subtle">Une simple perte de réseau ou de connexion Telegram ne redemande pas le mot de passe : les accès déjà déchiffrés restent en mémoire tant que la PWA n’a pas réellement été rechargée ou arrêtée. Après un vrai redémarrage de l’application, le mot de passe est demandé à nouveau.</p>
+      <p class="subtle">Le mot de passe 2FA Telegram peut maintenant être mémorisé localement si les paramètres distants l’autorisent.</p>
+      <div class="storage-grid">
+        <div><span>Stockage mot de passe Telegram</span><strong id="rememberTelegramPassword">—</strong></div>
+        <div><span>État local</span><strong id="storedTelegramPasswordState">—</strong></div>
+      </div>
+      <button id="clearStoredTelegramPassword" type="button" class="secondary">Effacer le mot de passe Telegram mémorisé</button>
     </section>
 
     <section class="panel">
