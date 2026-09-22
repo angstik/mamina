@@ -1,5 +1,14 @@
 # CHANGELOG MamiNa
 
+## v1.1.9
+**Synthèse :** affine les réactions animées : transitions emoji progressives, amplitudes de taille renforcées, effet explosion, replay manuel et interface compacte.
+
+Les changements d’emoji sont maintenant fondus progressivement autour des moitiés/tiers du trajet. Les modes petit/grand utilisent des amplitudes plus éloignées. Un nouveau mode `Explosion` anime 9 emoji panachés qui jaillissent depuis le début de la courbe dans toutes les directions pendant que leur centre progresse vers la fin du tracé.
+
+La flèche d’ordre des messages rejoint le bouton `Revue/Récent` dans l’en-tête. Un bouton `✨` apparaît sur la ligne `Article n/N · page…` lorsqu’une animation existe et permet de la rejouer ; il est neutralisé pendant une lecture en cours.
+
+Les boutons `＋` et `♥` sont légèrement plus petits, plus transparents et plus bas. Les commandes de réaction animée sont regroupées sur la même ligne que les emoji sélectionnés, sous forme d’icônes uniquement.
+
 ## v1.1.8
 **Synthèse :** ajoute les réactions emoji animées avec tracé Bézier, prévisualisation, taille/dynamique et message Telegram technique.
 

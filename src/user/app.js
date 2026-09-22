@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.8'
+const APP_VERSION='1.1.9'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -20,6 +20,7 @@ const homeUrls=[],readerUrls=[]
 const zoomStates=new Map()
 const playedMotionVisits=new Set()
 let motionVisitToken=0,motionPlaybackTimer=null,motionDraft=null,motionPrevZoom=null,motionDraw=null
+const activeMotionArticles=new Set()
 const MOTION_EMOJI=['❤️','😍','🥰','😘','😂','🤣','😊','😁','🤭','😲','😮','😢','😭','😡','🤩','🥳','👏','🙌','👍','👎','🙏','💪','🔥','✨','⭐','💯','🎉','🎈','🌹','🌸','☀️','🌈','🐈','🐕','🍀','☕','🍰','🎂','💋']
 const focusZoomStates=new Map()
 let focusArticleKey=null,focusPhotoUrl=null
@@ -204,6 +205,7 @@ function startNetwork(){
       const byKey=new Map(fresh.articles.map(a=>[a.articleKey,a]))
       displayArticles=displayArticles.map(a=>byKey.has(a.articleKey)?{...a,...byKey.get(a.articleKey)}:a)
       rerenderCommentOrderOnly()
+      updateMotionReplayHeader()
       await refreshPending()
     }
   }
@@ -348,6 +350,18 @@ $('articleOrderButton').onclick=async()=>{
   await renderReader()
 }
 
+$('messageOrderHeader').onclick=async()=>{
+  reactionOrder=reactionOrder==='asc'?'desc':'asc'
+  $('messageOrderHeader').textContent=reactionOrder==='asc'?'↑':'↓'
+  await service.setReactionOrder(reactionOrder)
+  rerenderCommentOrderOnly()
+}
+$('motionReplayHeader').onclick=()=>{
+  const a=currentArticle()
+  if(!a?.motions?.length||activeMotionArticles.has(a.articleKey))return
+  playArticleMotions(a,currentArticleIndex,{force:true})
+}
+
 function renderMarkup(t=''){
   let s=esc(t)
   s=s.replace(/\[mark\]([\s\S]*?)\[\/mark\]/g,'<mark style="background:#dff1ff">$1</mark>')
@@ -362,21 +376,17 @@ async function renderReader(){
   freeUrls(readerUrls)
   $('readerDate').textContent=fmtShort(currentModel.magazine.date)
   updateArticleOrderButton()
+  $('messageOrderHeader').textContent=reactionOrder==='asc'?'↑':'↓'
   const d=$('articleDeck');d.innerHTML=''
   displayArticles.forEach((a,i)=>{
     const p=document.createElement('section');p.className='article-page';p.dataset.index=i
     const v=document.createElement('div');v.className='article-visual'
-    v.innerHTML=`<div class="subtle">Chargement…</div><span class="article-source-badge" hidden></span><div class="article-actions"><button class="article-float message-order" title="Ordre des messages">${reactionOrder==='asc'?'↑':'↓'}</button><button class="article-float add-motion" title="Réaction animée">♥</button><button class="article-float add-message" title="Ajouter">＋</button></div><svg class="motion-draw-layer" hidden aria-hidden="true"><path class="motion-draw-path"></path></svg><div class="motion-play-layer" aria-hidden="true"></div>`
+    v.innerHTML=`<div class="subtle">Chargement…</div><span class="article-source-badge" hidden></span><div class="article-actions"><button class="article-float add-motion" title="Réaction animée">♥</button><button class="article-float add-message" title="Ajouter">＋</button></div><svg class="motion-draw-layer" hidden aria-hidden="true"><path class="motion-draw-path"></path></svg><div class="motion-play-layer" aria-hidden="true"></div>`
     p.appendChild(v)
     const list=document.createElement('div');list.className='reaction-list';renderComments(a,list);p.appendChild(list)
     d.appendChild(p)
     v.querySelector('.add-message').onclick=()=>openComposer(a.articleKey)
     v.querySelector('.add-motion').onclick=()=>openMotionComposer(i)
-    v.querySelector('.message-order').onclick=async()=>{
-      reactionOrder=reactionOrder==='asc'?'desc':'asc'
-      await service.setReactionOrder(reactionOrder)
-      rerenderCommentOrderOnly()
-    }
     installArticleGestures(v,i)
   })
   d.classList.add('aligning')
@@ -404,8 +414,6 @@ function rerenderCommentOrderOnly(){
     const page=$('articleDeck').querySelector(`[data-index="${i}"]`)
     const list=page?.querySelector('.reaction-list')
     if(list)renderComments(displayArticles[i],list)
-    const button=page?.querySelector('.message-order')
-    if(button)button.textContent=reactionOrder==='asc'?'↑':'↓'
   }
   const list=$('articleDeck').querySelector(`[data-index="${currentArticleIndex}"] .reaction-list`)
   if(list)requestAnimationFrame(()=>{list.scrollTop=reactionOrder==='asc'?list.scrollHeight:0})
@@ -443,6 +451,7 @@ function activate(i){
   currentArticleIndex=i
   saveReaderState(currentArticle()?.articleKey)
   $('readerPage').textContent=`Article ${i+1}/${displayArticles.length} · p${currentArticle().page}-${currentArticle().slot}`
+  updateMotionReplayHeader()
   ;[i,i-1,i+1].forEach(loadVisual)
   setTimeout(()=>warmAround(i),0)
   const a=currentArticle(),list=$('articleDeck').querySelector(`[data-index="${i}"] .reaction-list`)
@@ -541,11 +550,22 @@ function motionPointAt(curve,t){
   return [u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0],u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1]]
 }
 function motionScaleAt(mode,t){
-  if(mode==='grow')return .65+.70*t
-  if(mode==='shrink')return 1.35-.70*t
-  if(mode==='pulse')return .65+.70*Math.sin(Math.PI*t)
-  if(mode==='inverse-pulse')return 1.35-.70*Math.sin(Math.PI*t)
+  const small=.42,big=1.70,range=big-small
+  if(mode==='grow')return small+range*t
+  if(mode==='shrink')return big-range*t
+  if(mode==='pulse')return small+range*Math.sin(Math.PI*t)
+  if(mode==='inverse-pulse')return big-range*Math.sin(Math.PI*t)
   return 1
+}
+function motionEmojiBlend(emojis,t){
+  if(emojis.length<=1)return {a:emojis[0]||'',b:'',mix:0}
+  const boundaries=emojis.length===2?[.5]:[1/3,2/3],window=.085
+  for(let i=0;i<boundaries.length;i++){
+    const b=boundaries[i],from=Math.max(0,b-window),to=Math.min(1,b+window)
+    if(t>=from&&t<=to)return {a:emojis[i],b:emojis[i+1],mix:(t-from)/Math.max(.001,to-from)}
+  }
+  const idx=emojis.length===2?(t<.5?0:1):Math.min(2,Math.floor(t*3))
+  return {a:emojis[idx],b:'',mix:0}
 }
 function renderedImageRect(img){
   const er=img.getBoundingClientRect(),bw=Math.max(1,img.clientWidth||er.width),bh=Math.max(1,img.clientHeight||er.height),nw=Math.max(1,img.naturalWidth||bw),nh=Math.max(1,img.naturalHeight||bh)
@@ -630,6 +650,7 @@ function closeMotionComposer({restoreZoom=true}={}){
   motionDraft=null;motionPrevZoom=null
   $('motionComposer').hidden=true
   $('articleDeck').classList.remove('motion-active')
+  updateMotionReplayHeader()
 }
 function startMotionDrawing(){
   if(!motionDraft?.emoji?.length)return
@@ -674,27 +695,69 @@ function finishMotionDrawing(){
   updateMotionPanel();drawFittedCurve(motionDraft.index,motionDraft.curve)
   setTimeout(()=>playMotionPreview(),140)
 }
-function playMotion(motion,index,{preview=false,delay=0}={}){
+function motionParticleEmoji(emojis,i){return emojis[i%emojis.length]}
+function playExplosionMotion(motion,index,{delay=0}={}){
   const v=motionVisual(index),img=motionImage(index),layer=v?.querySelector('.motion-play-layer')
   if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
   const emojis=(motion.emoji||[]).map(codepointsToString).filter(Boolean)
   if(!emojis.length)return Promise.resolve()
-  const span=document.createElement('span');span.className='motion-play-emoji';span.textContent=emojis[0];layer.appendChild(span)
-  const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(92,(Number(motion.size)||.075)*rect.width)),duration=Math.max(900,Math.min(3000,Number(motion.duration)||1800)),mode=motion.scale||'stable'
-  span.style.fontSize=`${size}px`
+  const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(96,(Number(motion.size)||.075)*rect.width)),duration=Math.max(900,Math.min(3000,Number(motion.duration)||1800))
+  const spans=Array.from({length:9},(_,i)=>{const e=document.createElement('span');e.className='motion-play-emoji';e.textContent=motionParticleEmoji(emojis,i);e.style.fontSize=`${size}px`;layer.appendChild(e);return e})
+  return new Promise(resolve=>{
+    const start=performance.now()+delay
+    const frame=now=>{
+      if(now<start){requestAnimationFrame(frame);return}
+      const t=Math.min(1,(now-start)/duration),ease=1-Math.pow(1-t,3),pt=motionPointAt(motion.curve,t),cx=rect.left+pt[0]*rect.width,cy=rect.top+pt[1]*rect.height
+      const burst=Math.min(rect.width,rect.height)*(.05+.16*Math.sin(Math.min(1,t/.72)*Math.PI/2))*ease
+      for(let i=0;i<spans.length;i++){
+        const angle=(Math.PI*2*i/spans.length)-Math.PI/2
+        const wobble=Math.sin((t*3+i)*Math.PI)*burst*.10
+        const r=burst*(.82+((i%3)*.12))
+        const x=cx+Math.cos(angle)*r+Math.cos(angle+Math.PI/2)*wobble,y=cy+Math.sin(angle)*r+Math.sin(angle+Math.PI/2)*wobble
+        const sc=.48+1.12*Math.sin(Math.min(1,t/.55)*Math.PI/2),opacity=t>.82?Math.max(0,(1-t)/.18):1
+        spans[i].style.opacity=String(opacity);spans[i].style.transform=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`
+      }
+      if(t<1&&spans.some(e=>document.body.contains(e)))requestAnimationFrame(frame);else{spans.forEach(e=>e.remove());resolve()}
+    }
+    requestAnimationFrame(frame)
+  })
+}
+function playMotion(motion,index,{preview=false,delay=0}={}){
+  if(motion?.scale==='explosion')return playExplosionMotion(motion,index,{delay})
+  const v=motionVisual(index),img=motionImage(index),layer=v?.querySelector('.motion-play-layer')
+  if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
+  const emojis=(motion.emoji||[]).map(codepointsToString).filter(Boolean)
+  if(!emojis.length)return Promise.resolve()
+  const spanA=document.createElement('span'),spanB=document.createElement('span')
+  spanA.className='motion-play-emoji blend';spanB.className='motion-play-emoji blend';spanA.textContent=emojis[0];spanB.textContent='';layer.append(spanA,spanB)
+  const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(96,(Number(motion.size)||.075)*rect.width)),duration=Math.max(900,Math.min(3000,Number(motion.duration)||1800)),mode=motion.scale||'stable'
+  spanA.style.fontSize=`${size}px`;spanB.style.fontSize=`${size}px`
   return new Promise(resolve=>{
     const start=performance.now()+delay
     const frame=now=>{
       if(now<start){requestAnimationFrame(frame);return}
       const t=Math.min(1,(now-start)/duration),pt=motionPointAt(motion.curve,t),x=rect.left+pt[0]*rect.width,y=rect.top+pt[1]*rect.height
-      const ei=emojis.length===1?0:emojis.length===2?(t<.5?0:1):Math.min(2,Math.floor(t*3))
-      if(span.textContent!==emojis[ei])span.textContent=emojis[ei]
-      const sc=motionScaleAt(mode,t),opacity=t>.88?Math.max(0,(1-t)/.12):1
-      span.style.opacity=String(opacity);span.style.transform=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`
-      if(t<1&&document.body.contains(span))requestAnimationFrame(frame);else{span.remove();resolve()}
+      const blend=motionEmojiBlend(emojis,t),fade=t>.88?Math.max(0,(1-t)/.12):1,sc=motionScaleAt(mode,t),base=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`
+      if(spanA.textContent!==blend.a)spanA.textContent=blend.a
+      if(spanB.textContent!==blend.b)spanB.textContent=blend.b
+      spanA.style.opacity=String(fade*(1-blend.mix));spanB.style.opacity=String(fade*blend.mix)
+      spanA.style.transform=base;spanB.style.transform=base
+      if(t<1&&document.body.contains(spanA))requestAnimationFrame(frame);else{spanA.remove();spanB.remove();resolve()}
     }
     requestAnimationFrame(frame)
   })
+}
+function playArticleMotions(article,index,{force=false}={}){
+  const rows=article?.motions||[],key=article?.articleKey
+  if(!key||!rows.length||activeMotionArticles.has(key))return Promise.resolve(false)
+  activeMotionArticles.add(key);updateMotionReplayHeader()
+  const jobs=rows.map((r,i)=>playMotion(r.motion||r.meta?.motion,index,{delay:i*80}))
+  return Promise.all(jobs).finally(()=>{activeMotionArticles.delete(key);updateMotionReplayHeader()}).then(()=>true)
+}
+function updateMotionReplayHeader(){
+  const b=$('motionReplayHeader'),a=currentArticle(),has=Boolean(a?.motions?.length)
+  b.hidden=!has||!$('composerModal').hidden||!$('motionComposer').hidden
+  b.disabled=!has||activeMotionArticles.has(a?.articleKey)
 }
 function playMotionPreview(){
   if(!motionDraft?.curve)return
@@ -704,16 +767,16 @@ function playMotionPreview(){
 }
 function scheduleArticleMotions(article,index){
   clearTimeout(motionPlaybackTimer)
+  updateMotionReplayHeader()
   if(!(article.motions||[]).length)return
   const token=++motionVisitToken,key=`${token}:${article.articleKey}`
   motionPlaybackTimer=setTimeout(()=>{
     if(currentArticleIndex!==index||currentArticle()?.articleKey!==article.articleKey||!$('motionComposer').hidden||!$('composerModal').hidden||!$('focusOverlay').hidden)return
     const v=motionVisual(index)
     if(!v||Math.abs((v._pz?.scale||1)-1)>.02){scheduleArticleMotions(article,index);return}
-    if(playedMotionVisits.has(key))return
+    if(playedMotionVisits.has(key)||activeMotionArticles.has(article.articleKey))return
     playedMotionVisits.add(key)
-    const rows=article.motions||[]
-    rows.forEach((r,i)=>playMotion(r.motion||r.meta?.motion,index,{delay:i*80}))
+    playArticleMotions(article,index)
   },2000)
 }
 $('motionCancel').onclick=()=>closeMotionComposer({restoreZoom:true})

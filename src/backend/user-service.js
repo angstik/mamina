@@ -603,7 +603,7 @@ export class UserMaminaService {
       emoji,
       curve:Object.fromEntries(['p0','p1','p2','p3'].map((k,i)=>[k,points[i].map(n=>Math.max(0,Math.min(1,Number(n))))])),
       size:Math.max(.035,Math.min(.16,Number(motion.size)||.075)),
-      scale:['stable','grow','shrink','pulse','inverse-pulse'].includes(motion.scale)?motion.scale:'stable',
+      scale:['stable','grow','shrink','pulse','inverse-pulse','explosion'].includes(motion.scale)?motion.scale:'stable',
       duration:Math.max(900,Math.min(3000,Math.round(Number(motion.duration)||1800))),
     }
     const full=await this.gateway.topicMessages(this.dialog.peer,Number(this.current.magazine.topicId),{limit:Infinity})
