@@ -1,5 +1,18 @@
 # CHANGELOG MamiNa
 
+## v1.1.8
+**Synthèse :** ajoute les réactions emoji animées avec tracé Bézier, prévisualisation, taille/dynamique et message Telegram technique.
+
+La vue Article dispose désormais d’un bouton cœur à côté du bouton `＋`. Il ouvre un sélecteur d’emoji Unicode standards : 1 à 3 emoji peuvent être choisis dans l’ordre souhaité.
+
+Le geste de dessin est visible pendant le tracé. Il fonctionne quel que soit le zoom/pan courant, sans déplacer l’image, puis est converti dans le repère intrinsèque normalisé de l’article et ajusté en courbe de Bézier cubique.
+
+Avant envoi, on peut rejouer le résultat, refaire le tracé, modifier les emoji, régler leur taille et choisir une dynamique : stable, agrandissement, rapetissement, petit-grand-petit ou grand-petit-grand. La vitesse est calculée à partir de la longueur du geste.
+
+L’envoi produit un message technique `kind=motion`, `type=emoji`, lié à la racine de l’article et masqué de la liste des commentaires. À la lecture, les animations sont déclenchées après 2 secondes de présence sur l’article lorsque le zoom est à 1:1 ; elles sont légèrement décalées entre elles et ne rejouent qu’une fois par visite.
+
+Validation : syntaxe des fichiers JS modifiés OK, 105 références DOM sans manque ni doublon, tests PDF 26 contrôles / 0 échec, contrôles ciblés Bézier/emoji/protocole/zoom OK. Aucun test Safari/iPhone réel n’a été exécuté dans cet environnement.
+
 ## v1.1.7
 **Synthèse :** stabilise le snap horizontal, utilise la zone collage exacte pour le plein écran photo et rend son zoom/pan persistant, y compris depuis la vue Message.
 

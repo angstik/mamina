@@ -262,6 +262,19 @@ export class TelegramGateway {
     })
   }
 
+  async postEmojiMotion(peer, topicId, rootId, articleKey, motion) {
+    return this.tg.sendText(peer, withMeta('❤️ Animation emoji', {
+      kind:'motion',
+      type:'emoji',
+      articleKey,
+      motion,
+    }), {
+      threadId: topicId,
+      replyTo: rootId,
+      silent: true,
+    })
+  }
+
   async postImageComment(peer, topicId, rootId, articleKey, file, text='', progressCallback) {
     return this.tg.sendMedia(peer, InputMedia.photo(file), {
       threadId: topicId,

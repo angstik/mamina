@@ -80,6 +80,7 @@ function resolveRowsToArticles(rows, articles) {
   for (const [ak,list] of roots) for (const root of list) rootById.set(root.id,ak)
   const rowById = new Map(rows.map(r=>[r.id,r]))
   const byArticle = new Map(articles.map(a=>[a.articleKey,[]]))
+  const motionsBy = new Map(articles.map(a=>[a.articleKey,[]]))
 
   const resolveArticle = row => {
     if (row.meta?.articleKey && articleKeys.has(row.meta.articleKey)) return row.meta.articleKey
@@ -93,13 +94,18 @@ function resolveRowsToArticles(rows, articles) {
   }
 
   for (const row of rows) {
+    const ak=resolveArticle(row)
+    if(!ak)continue
+    if (row.meta?.kind === 'motion' && row.meta?.type === 'emoji' && motionsBy.has(ak)) {
+      motionsBy.get(ak).push({ ...row, articleKey:ak, motion:row.meta.motion||null })
+      continue
+    }
     if (row.meta?.kind === 'message' || (!row.meta && row.replyToId)) {
-      const ak = resolveArticle(row)
-      if (!ak || !byArticle.has(ak)) continue
+      if (!byArticle.has(ak)) continue
       byArticle.get(ak).push({ ...row, articleKey:ak, displayText:stripMeta(row.text) })
     }
   }
-  return { roots, byArticle }
+  return { roots, byArticle, motionsBy }
 }
 
 export class UserMaminaService {
@@ -443,7 +449,8 @@ export class UserMaminaService {
     const all=[...existing.map(x=>({...x})),...rows]
     const resolved=resolveRowsToArticles(all,articles)
     const comments=[...resolved.byArticle.values()].flat()
-    const payload=comments.map(c=>({
+    const motions=[...resolved.motionsBy.values()].flat()
+    const payload=[...comments,...motions].map(c=>({
       ...c,
       key:`${magazine.magazineId}:${c.id}`,
       magazineId:magazine.magazineId,
@@ -528,7 +535,7 @@ export class UserMaminaService {
       const pdf=await FamileoPdf.load(bytes,{trace:(scope,message,detail)=>info(scope,message,detail)})
       if(!articles.length)articles=pdf.articles()
       const resolved=resolveRowsToArticles(models,articles)
-      rows=[...resolved.byArticle.values()].flat()
+      rows=[...resolved.byArticle.values(),...resolved.motionsBy.values()].flat()
       this.current={magazine,pdf,articles,rows}
     }
     return this.currentView()
@@ -539,7 +546,12 @@ export class UserMaminaService {
     const {magazine,pdf,articles,rows}=this.current
     const read=await this.readMap()
     const commentsBy=new Map(articles.map(a=>[a.articleKey,[]]))
-    for(const row of rows) if(row.articleKey && commentsBy.has(row.articleKey)) commentsBy.get(row.articleKey).push(row)
+    const motionsBy=new Map(articles.map(a=>[a.articleKey,[]]))
+    for(const row of rows){
+      if(!row.articleKey)continue
+      if(row.meta?.kind==='motion'&&motionsBy.has(row.articleKey))motionsBy.get(row.articleKey).push(row)
+      else if(commentsBy.has(row.articleKey))commentsBy.get(row.articleKey).push(row)
+    }
     const outbox=await listOutbox()
     const pendingBy=new Map(outbox.map(x=>[x.articleKey,x]))
     const withState=articles.map(a=>{
@@ -555,15 +567,16 @@ export class UserMaminaService {
         displayText:pending.text,
         text:pending.text,
       })
+      const motions=(motionsBy.get(a.articleKey)||[]).sort((x,y)=>x.id-y.id)
       const lastRead=read.get(a.articleKey)||0
-      return {...a,comments,lastReadMessageId:lastRead,unreadCount:comments.filter(c=>!c.isOutgoing&&c.id>lastRead).length}
+      return {...a,comments,motions,lastReadMessageId:lastRead,unreadCount:comments.filter(c=>!c.isOutgoing&&c.id>lastRead).length}
     })
     return {magazine,articles:withState,pdf}
   }
 
   async markArticleRead(articleKey) {
     if(!this.current) return
-    const rows=this.current.rows.filter(r=>r.articleKey===articleKey && !r.isOutgoing)
+    const rows=this.current.rows.filter(r=>r.articleKey===articleKey && r.meta?.kind!=='motion' && !r.isOutgoing)
     if(!rows.length) return
     const max=Math.max(...rows.map(r=>r.id))
     await putReadState(articleKey,max)
@@ -574,6 +587,33 @@ export class UserMaminaService {
       await putMagazine({...magazine,unreadCount:unread})
       this.current.magazine={...magazine,unreadCount:unread}
     }
+  }
+
+  async postEmojiMotion(articleKey,motion) {
+    if(!this.current) throw new Error('Aucune revue ouverte.')
+    const article=this.current.articles.find(a=>a.articleKey===articleKey)
+    if(!article) throw new Error('Article inconnu.')
+    if(!this.gateway||!this.dialog||this.gateway.connectionState!=='connected') throw new Error('Connexion Telegram requise pour envoyer l’animation.')
+    const emoji=Array.isArray(motion?.emoji)?motion.emoji.slice(0,3):[]
+    if(emoji.length<1) throw new Error('Choisis au moins un emoji.')
+    const points=['p0','p1','p2','p3'].map(k=>motion?.curve?.[k])
+    if(points.some(p=>!Array.isArray(p)||p.length!==2||p.some(n=>!Number.isFinite(Number(n))))) throw new Error('Trajectoire invalide.')
+    const normalized={
+      version:1,
+      emoji,
+      curve:Object.fromEntries(['p0','p1','p2','p3'].map((k,i)=>[k,points[i].map(n=>Math.max(0,Math.min(1,Number(n))))])),
+      size:Math.max(.035,Math.min(.16,Number(motion.size)||.075)),
+      scale:['stable','grow','shrink','pulse','inverse-pulse'].includes(motion.scale)?motion.scale:'stable',
+      duration:Math.max(900,Math.min(3000,Math.round(Number(motion.duration)||1800))),
+    }
+    const full=await this.gateway.topicMessages(this.dialog.peer,Number(this.current.magazine.topicId),{limit:Infinity})
+    const {rootId}=await this.gateway.ensureRoot(this.dialog.peer,Number(this.current.magazine.topicId),this.current.magazine,article,full)
+    const sent=await this.gateway.postEmojiMotion(this.dialog.peer,Number(this.current.magazine.topicId),rootId,articleKey,normalized)
+    const row=TelegramGateway.messageModel(sent)
+    const payload={...row,articleKey,motion:normalized,key:`${this.current.magazine.magazineId}:${row.id}`,magazineId:this.current.magazine.magazineId,topicKey:this.current.magazine.topicKey}
+    await putMessages([payload])
+    this.current.rows=[...this.current.rows.filter(r=>r.id!==payload.id),payload].sort((a,b)=>a.id-b.id)
+    return this.currentView()
   }
 
   async queueText(articleKey,text) {

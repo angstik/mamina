@@ -215,6 +215,38 @@
   </div>
 </section>
 
+<div id="motionComposer" class="motion-composer" hidden>
+  <div id="motionPanel" class="motion-panel">
+    <div class="motion-head">
+      <strong id="motionTitle">Réaction animée</strong>
+      <span id="motionHint" class="subtle">Choisis 1 à 3 emoji</span>
+    </div>
+    <div id="motionSelected" class="motion-selected" aria-label="Emoji sélectionnés"></div>
+    <div id="motionEmojiGrid" class="motion-emoji-grid" aria-label="Sélection d’emoji"></div>
+    <div id="motionControls" class="motion-controls" hidden>
+      <label class="motion-range">Taille <input id="motionSize" type="range" min="4" max="14" step="1" value="8"><span id="motionSizeLabel">8</span></label>
+      <label>Dynamique
+        <select id="motionScaleMode">
+          <option value="stable">Stable</option>
+          <option value="grow">Agrandit</option>
+          <option value="shrink">Rétrécit</option>
+          <option value="pulse">Petit → grand → petit</option>
+          <option value="inverse-pulse">Grand → petit → grand</option>
+        </select>
+      </label>
+    </div>
+    <div class="motion-actions">
+      <button id="motionReplay" type="button" hidden>▶️ Rejouer</button>
+      <button id="motionRedraw" type="button" hidden>✏️ Refaire</button>
+      <span class="toolbar-spacer"></span>
+      <button id="motionCancel" type="button" class="secondary">❌</button>
+      <button id="motionNext" type="button">Tracer</button>
+      <button id="motionSend" type="button" hidden>✅ Envoyer</button>
+    </div>
+    <div id="motionStatus" class="status"></div>
+  </div>
+</div>
+
 <div id="composerModal" class="composer-overlay" hidden>
   <div id="composerSheet" class="composer-sheet">
     <div id="composerText" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Écrire un message…"></div>

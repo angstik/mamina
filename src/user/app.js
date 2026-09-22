@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.7'
+const APP_VERSION='1.1.8'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -18,6 +18,9 @@ let typingState={bold:false,italic:false,underline:false,strikeThrough:false,col
 let activityTimer=null
 const homeUrls=[],readerUrls=[]
 const zoomStates=new Map()
+const playedMotionVisits=new Set()
+let motionVisitToken=0,motionPlaybackTimer=null,motionDraft=null,motionPrevZoom=null,motionDraw=null
+const MOTION_EMOJI=['❤️','😍','🥰','😘','😂','🤣','😊','😁','🤭','😲','😮','😢','😭','😡','🤩','🥳','👏','🙌','👍','👎','🙏','💪','🔥','✨','⭐','💯','🎉','🎈','🌹','🌸','☀️','🌈','🐈','🐕','🍀','☕','🍰','🎂','💋']
 const focusZoomStates=new Map()
 let focusArticleKey=null,focusPhotoUrl=null
 
@@ -300,6 +303,7 @@ async function openMagazine(id,preferredArticleKey=null,restoring=false){
   }
 }
 $('back').onclick=async()=>{
+  if(!$('motionComposer').hidden){closeMotionComposer({restoreZoom:true});return}
   if(!$('composerModal').hidden)return
   clearReaderState();$('reader').hidden=true;$('home').hidden=false
   freeUrls(readerUrls);zoomStates.clear();await service.closeMagazine();currentModel=null;await localHome()
@@ -362,11 +366,12 @@ async function renderReader(){
   displayArticles.forEach((a,i)=>{
     const p=document.createElement('section');p.className='article-page';p.dataset.index=i
     const v=document.createElement('div');v.className='article-visual'
-    v.innerHTML=`<div class="subtle">Chargement…</div><span class="article-source-badge" hidden></span><div class="article-actions"><button class="article-float message-order" title="Ordre des messages">${reactionOrder==='asc'?'↑':'↓'}</button><button class="article-float add-message" title="Ajouter">＋</button></div>`
+    v.innerHTML=`<div class="subtle">Chargement…</div><span class="article-source-badge" hidden></span><div class="article-actions"><button class="article-float message-order" title="Ordre des messages">${reactionOrder==='asc'?'↑':'↓'}</button><button class="article-float add-motion" title="Réaction animée">♥</button><button class="article-float add-message" title="Ajouter">＋</button></div><svg class="motion-draw-layer" hidden aria-hidden="true"><path class="motion-draw-path"></path></svg><div class="motion-play-layer" aria-hidden="true"></div>`
     p.appendChild(v)
     const list=document.createElement('div');list.className='reaction-list';renderComments(a,list);p.appendChild(list)
     d.appendChild(p)
     v.querySelector('.add-message').onclick=()=>openComposer(a.articleKey)
+    v.querySelector('.add-motion').onclick=()=>openMotionComposer(i)
     v.querySelector('.message-order').onclick=async()=>{
       reactionOrder=reactionOrder==='asc'?'desc':'asc'
       await service.setReactionOrder(reactionOrder)
@@ -444,10 +449,11 @@ function activate(i){
   const unread=(a.comments||[]).filter(c=>!c.pending&&!c.isOutgoing&&c.id>a.lastReadMessageId).sort((x,y)=>x.id-y.id)
   requestAnimationFrame(()=>{if(unread.length)list.querySelector(`[data-message-id="${unread[0].id}"]`)?.scrollIntoView({block:'start'});else list.scrollTop=reactionOrder==='asc'?list.scrollHeight:0})
   clearTimeout(readTimer);readTimer=setTimeout(()=>service.markArticleRead(a.articleKey),1400)
+  scheduleArticleMotions(a,i)
 }
 let scrollTimer
-$('articleDeck').onscroll=()=>{if(!$('composerModal').hidden)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{const d=$('articleDeck'),i=Math.max(0,Math.min(displayArticles.length-1,Math.round(d.scrollLeft/d.clientWidth))),left=i*d.clientWidth;if(Math.abs(d.scrollLeft-left)>1)d.scrollTo({left,behavior:'auto'});if(i!==currentArticleIndex)activate(i)},90)}
-function goArticle(delta){if(!$('composerModal').hidden)return;const next=Math.max(0,Math.min(displayArticles.length-1,currentArticleIndex+delta));if(next===currentArticleIndex)return;const d=$('articleDeck');d.scrollTo({left:next*d.clientWidth,behavior:'smooth'});setTimeout(()=>activate(next),190)}
+$('articleDeck').onscroll=()=>{if(!$('composerModal').hidden||!$('motionComposer').hidden)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{const d=$('articleDeck'),i=Math.max(0,Math.min(displayArticles.length-1,Math.round(d.scrollLeft/d.clientWidth))),left=i*d.clientWidth;if(Math.abs(d.scrollLeft-left)>1)d.scrollTo({left,behavior:'auto'});if(i!==currentArticleIndex)activate(i)},90)}
+function goArticle(delta){if(!$('composerModal').hidden||!$('motionComposer').hidden)return;const next=Math.max(0,Math.min(displayArticles.length-1,currentArticleIndex+delta));if(next===currentArticleIndex)return;const d=$('articleDeck');d.scrollTo({left:next*d.clientWidth,behavior:'smooth'});setTimeout(()=>activate(next),190)}
 
 function clampPan(container,img,scale,tx,ty){
   if(!img||scale<=1)return {tx:0,ty:0}
@@ -469,9 +475,11 @@ function installArticleGestures(container,index){
     im.style.transform=`translate(${st.tx}px,${st.ty}px) scale(${st.scale})`;persist()
   }
   const reset=()=>{st={scale:1,tx:0,ty:0};apply()}
-  container._pz={get scale(){return st.scale},reset,apply}
+  const setState=next=>{st={scale:Math.max(1,Math.min(4,Number(next?.scale)||1)),tx:Number(next?.tx)||0,ty:Number(next?.ty)||0};apply()}
+  container._pz={get scale(){return st.scale},reset,apply,snapshot:()=>({...st}),setState}
 
   container.addEventListener('touchstart',e=>{
+    if(motionDraw?.v===container)return
     if(e.target.closest('button'))return
     if(raf)cancelAnimationFrame(raf)
     if(e.touches.length===1){
@@ -482,6 +490,7 @@ function installArticleGestures(container,index){
     }
   },{passive:true})
   container.addEventListener('touchmove',e=>{
+    if(motionDraw?.v===container)return
     if(e.touches.length===2&&pinch){
       e.preventDefault()
       const[a,b]=e.touches
@@ -496,9 +505,10 @@ function installArticleGestures(container,index){
     }
   },{passive:false})
   container.addEventListener('touchend',e=>{
+    if(motionDraw?.v===container){start=null;pinch=null;return}
     if(start&&e.changedTouches?.length){
       const t=e.changedTouches[0],dx=t.clientX-start.x,dy=t.clientY-start.y,dur=performance.now()-start.time
-      if($('composerModal').hidden&&st.scale===1&&Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.15){goArticle(dx<0?1:-1);start=null;pinch=null;return}
+      if($('composerModal').hidden&&$('motionComposer').hidden&&st.scale===1&&Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.15){goArticle(dx<0?1:-1);start=null;pinch=null;return}
       if(st.scale>1&&lastMove){
         let vx=lastMove.vx*18,vy=lastMove.vy*18
         const inertia=()=>{
@@ -515,6 +525,217 @@ function installArticleGestures(container,index){
     start=null;pinch=null
   })
 }
+
+function motionPage(index=currentArticleIndex){return $('articleDeck').querySelector(`[data-index="${index}"]`)}
+function motionVisual(index=currentArticleIndex){return motionPage(index)?.querySelector('.article-visual')}
+function motionImage(index=currentArticleIndex){return motionVisual(index)?.querySelector('img')}
+function clamp01Motion(n){return Math.max(0,Math.min(1,Number(n)||0))}
+function codepointsToString(value){
+  if(typeof value!=='string')return''
+  if(!/^[0-9A-F]+(?:-[0-9A-F]+)*$/i.test(value))return value
+  try{return value.split('-').map(x=>String.fromCodePoint(parseInt(x,16))).join('')}catch{return''}
+}
+function stringToCodepoints(value){return Array.from(String(value||'')).map(ch=>ch.codePointAt(0).toString(16).toUpperCase()).join('-')}
+function motionPointAt(curve,t){
+  const u=1-t,p0=curve.p0,p1=curve.p1,p2=curve.p2,p3=curve.p3
+  return [u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0],u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1]]
+}
+function motionScaleAt(mode,t){
+  if(mode==='grow')return .65+.70*t
+  if(mode==='shrink')return 1.35-.70*t
+  if(mode==='pulse')return .65+.70*Math.sin(Math.PI*t)
+  if(mode==='inverse-pulse')return 1.35-.70*Math.sin(Math.PI*t)
+  return 1
+}
+function renderedImageRect(img){
+  const er=img.getBoundingClientRect(),bw=Math.max(1,img.clientWidth||er.width),bh=Math.max(1,img.clientHeight||er.height),nw=Math.max(1,img.naturalWidth||bw),nh=Math.max(1,img.naturalHeight||bh)
+  const fit=Math.min(bw/nw,bh/nh),rw=nw*fit,rh=nh*fit,ratioW=rw/bw,ratioH=rh/bh,w=er.width*ratioW,h=er.height*ratioH
+  return {left:er.left+(er.width-w)/2,top:er.top+(er.height-h)/2,width:w,height:h,right:er.left+(er.width+w)/2,bottom:er.top+(er.height+h)/2}
+}
+function imageRectInContainer(container,img){
+  const cr=container.getBoundingClientRect(),ir=renderedImageRect(img)
+  return {left:ir.left-cr.left,top:ir.top-cr.top,width:ir.width,height:ir.height,screen:ir}
+}
+function fitBezier(points){
+  if(points.length<2)return null
+  const pts=[]
+  let prev=null,total=0
+  for(const p of points){
+    if(prev){const d=Math.hypot(p.x-prev.x,p.y-prev.y);if(d<2.5)continue;total+=d}
+    pts.push({...p,s:total});prev=p
+  }
+  if(pts.length<2||total<8)return null
+  const p0=[pts[0].nx,pts[0].ny],p3=[pts.at(-1).nx,pts.at(-1).ny]
+  let aa=0,ab=0,bb=0,rx1=0,rx2=0,ry1=0,ry2=0
+  for(const p of pts){
+    const t=total?p.s/total:0,u=1-t,a=3*u*u*t,b=3*u*t*t
+    const cx=u*u*u*p0[0]+t*t*t*p3[0],cy=u*u*u*p0[1]+t*t*t*p3[1]
+    aa+=a*a;ab+=a*b;bb+=b*b;rx1+=a*(p.nx-cx);rx2+=b*(p.nx-cx);ry1+=a*(p.ny-cy);ry2+=b*(p.ny-cy)
+  }
+  const det=aa*bb-ab*ab
+  let p1,p2
+  if(Math.abs(det)>1e-8){
+    p1=[(rx1*bb-rx2*ab)/det,(ry1*bb-ry2*ab)/det]
+    p2=[(aa*rx2-ab*rx1)/det,(aa*ry2-ab*ry1)/det]
+  }else{
+    const one=pts[Math.max(1,Math.floor((pts.length-1)/3))],two=pts[Math.max(1,Math.floor((pts.length-1)*2/3))]
+    p1=[one.nx,one.ny];p2=[two.nx,two.ny]
+  }
+  const clampP=p=>p.map(clamp01Motion)
+  const duration=Math.max(1100,Math.min(2500,Math.round(900+total*1.65)))
+  return {curve:{p0:clampP(p0),p1:clampP(p1),p2:clampP(p2),p3:clampP(p3)},duration}
+}
+function renderMotionSelection(){
+  const host=$('motionSelected');host.innerHTML=''
+  for(const [i,e] of (motionDraft?.emoji||[]).entries()){
+    const b=document.createElement('button');b.type='button';b.textContent=e;b.title='Retirer';b.onclick=()=>{motionDraft.emoji.splice(i,1);renderMotionSelection();updateMotionPanel()};host.appendChild(b)
+  }
+  if(!host.children.length)host.innerHTML='<span class="subtle">Aucun emoji sélectionné</span>'
+}
+function populateMotionEmoji(){
+  const host=$('motionEmojiGrid');if(host.children.length)return
+  for(const e of MOTION_EMOJI){const b=document.createElement('button');b.type='button';b.textContent=e;b.onclick=()=>{if(!motionDraft||motionDraft.emoji.length>=3)return;motionDraft.emoji.push(e);renderMotionSelection();updateMotionPanel()};host.appendChild(b)}
+}
+function updateMotionPanel(){
+  const ready=Boolean(motionDraft?.curve),hasEmoji=Boolean(motionDraft?.emoji?.length)
+  $('motionControls').hidden=!ready
+  $('motionReplay').hidden=!ready
+  $('motionRedraw').hidden=!ready
+  $('motionSend').hidden=!ready
+  $('motionNext').hidden=ready
+  $('motionNext').disabled=!hasEmoji
+  $('motionEmojiGrid').hidden=false
+  $('motionTitle').textContent=ready?'Prévisualisation':'Réaction animée'
+  $('motionHint').textContent=ready?'Rejoue, ajuste ou envoie':hasEmoji?'Ajoute jusqu’à 3 emoji puis trace':'Choisis 1 à 3 emoji'
+}
+function openMotionComposer(index){
+  if(!$('composerModal').hidden||!$('focusOverlay').hidden)return
+  const a=displayArticles[index],v=motionVisual(index)
+  if(!a||!v)return
+  clearTimeout(motionPlaybackTimer)
+  motionPrevZoom=v._pz?.snapshot?.()||{scale:1,tx:0,ty:0}
+  motionDraft={articleKey:a.articleKey,index,emoji:[],curve:null,size:.08,scale:'stable',duration:1800}
+  populateMotionEmoji();renderMotionSelection();updateMotionPanel()
+  $('motionSize').value='8';$('motionSizeLabel').textContent='8';$('motionScaleMode').value='stable';$('motionStatus').textContent=''
+  $('motionComposer').hidden=false
+  $('articleDeck').classList.add('motion-active')
+  v.classList.add('motion-mode')
+}
+function closeMotionComposer({restoreZoom=true}={}){
+  if(!motionDraft)return
+  const v=motionVisual(motionDraft.index)
+  stopMotionDrawing()
+  v?.classList.remove('motion-mode')
+  if(restoreZoom&&motionPrevZoom)v?._pz?.setState?.(motionPrevZoom)
+  motionDraft=null;motionPrevZoom=null
+  $('motionComposer').hidden=true
+  $('articleDeck').classList.remove('motion-active')
+}
+function startMotionDrawing(){
+  if(!motionDraft?.emoji?.length)return
+  const v=motionVisual(motionDraft.index),img=motionImage(motionDraft.index),svg=v?.querySelector('.motion-draw-layer'),path=svg?.querySelector('.motion-draw-path')
+  if(!v||!img||!svg||!path)return
+  $('motionPanel').style.opacity='.72'
+  $('motionHint').textContent='Trace la trajectoire sur l’article'
+  svg.hidden=false;svg.classList.add('active');path.setAttribute('d','')
+  motionDraw={v,img,svg,path,points:[],pointerId:null}
+  const push=e=>{
+    const ir=renderedImageRect(img),cr=v.getBoundingClientRect(),nx=(e.clientX-ir.left)/Math.max(1,ir.width),ny=(e.clientY-ir.top)/Math.max(1,ir.height)
+    if(nx<0||nx>1||ny<0||ny>1)return
+    motionDraw.points.push({x:e.clientX-cr.left,y:e.clientY-cr.top,nx,ny})
+    path.setAttribute('d',motionDraw.points.map((p,i)=>`${i?'L':'M'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' '))
+  }
+  svg.onpointerdown=e=>{e.preventDefault();motionDraw.pointerId=e.pointerId;svg.setPointerCapture?.(e.pointerId);motionDraw.points=[];push(e)}
+  svg.onpointermove=e=>{if(motionDraw?.pointerId!==e.pointerId)return;e.preventDefault();push(e)}
+  svg.onpointerup=e=>{if(motionDraw?.pointerId!==e.pointerId)return;e.preventDefault();push(e);finishMotionDrawing()}
+  svg.onpointercancel=()=>stopMotionDrawing()
+}
+function stopMotionDrawing(){
+  const d=motionDraw
+  if(!d)return
+  d.svg.classList.remove('active');d.svg.hidden=true;d.path.setAttribute('d','');d.svg.onpointerdown=d.svg.onpointermove=d.svg.onpointerup=d.svg.onpointercancel=null
+  motionDraw=null;$('motionPanel').style.opacity=''
+}
+function drawFittedCurve(index,curve,ms=650){
+  const v=motionVisual(index),img=motionImage(index),svg=v?.querySelector('.motion-draw-layer'),path=svg?.querySelector('.motion-draw-path')
+  if(!v||!img||!svg||!path)return
+  const r=imageRectInContainer(v,img),p=k=>[r.left+curve[k][0]*r.width,r.top+curve[k][1]*r.height]
+  const a=p('p0'),b=p('p1'),c=p('p2'),d=p('p3')
+  path.setAttribute('d',`M ${a[0]} ${a[1]} C ${b[0]} ${b[1]}, ${c[0]} ${c[1]}, ${d[0]} ${d[1]}`);svg.hidden=false
+  setTimeout(()=>{if(!motionDraw){svg.hidden=true;path.setAttribute('d','')}},ms)
+}
+function finishMotionDrawing(){
+  const d=motionDraw;if(!d)return
+  const fit=fitBezier(d.points)
+  stopMotionDrawing()
+  if(!fit){status('motionStatus','Trace trop court. Recommence.',false);return}
+  motionDraft.curve=fit.curve;motionDraft.duration=fit.duration
+  const v=motionVisual(motionDraft.index);v?._pz?.reset?.()
+  updateMotionPanel();drawFittedCurve(motionDraft.index,motionDraft.curve)
+  setTimeout(()=>playMotionPreview(),140)
+}
+function playMotion(motion,index,{preview=false,delay=0}={}){
+  const v=motionVisual(index),img=motionImage(index),layer=v?.querySelector('.motion-play-layer')
+  if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
+  const emojis=(motion.emoji||[]).map(codepointsToString).filter(Boolean)
+  if(!emojis.length)return Promise.resolve()
+  const span=document.createElement('span');span.className='motion-play-emoji';span.textContent=emojis[0];layer.appendChild(span)
+  const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(92,(Number(motion.size)||.075)*rect.width)),duration=Math.max(900,Math.min(3000,Number(motion.duration)||1800)),mode=motion.scale||'stable'
+  span.style.fontSize=`${size}px`
+  return new Promise(resolve=>{
+    const start=performance.now()+delay
+    const frame=now=>{
+      if(now<start){requestAnimationFrame(frame);return}
+      const t=Math.min(1,(now-start)/duration),pt=motionPointAt(motion.curve,t),x=rect.left+pt[0]*rect.width,y=rect.top+pt[1]*rect.height
+      const ei=emojis.length===1?0:emojis.length===2?(t<.5?0:1):Math.min(2,Math.floor(t*3))
+      if(span.textContent!==emojis[ei])span.textContent=emojis[ei]
+      const sc=motionScaleAt(mode,t),opacity=t>.88?Math.max(0,(1-t)/.12):1
+      span.style.opacity=String(opacity);span.style.transform=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`
+      if(t<1&&document.body.contains(span))requestAnimationFrame(frame);else{span.remove();resolve()}
+    }
+    requestAnimationFrame(frame)
+  })
+}
+function playMotionPreview(){
+  if(!motionDraft?.curve)return
+  motionDraft.size=Number($('motionSize').value)/100
+  motionDraft.scale=$('motionScaleMode').value
+  playMotion({...motionDraft,emoji:motionDraft.emoji.map(stringToCodepoints)},motionDraft.index,{preview:true})
+}
+function scheduleArticleMotions(article,index){
+  clearTimeout(motionPlaybackTimer)
+  if(!(article.motions||[]).length)return
+  const token=++motionVisitToken,key=`${token}:${article.articleKey}`
+  motionPlaybackTimer=setTimeout(()=>{
+    if(currentArticleIndex!==index||currentArticle()?.articleKey!==article.articleKey||!$('motionComposer').hidden||!$('composerModal').hidden||!$('focusOverlay').hidden)return
+    const v=motionVisual(index)
+    if(!v||Math.abs((v._pz?.scale||1)-1)>.02){scheduleArticleMotions(article,index);return}
+    if(playedMotionVisits.has(key))return
+    playedMotionVisits.add(key)
+    const rows=article.motions||[]
+    rows.forEach((r,i)=>playMotion(r.motion||r.meta?.motion,index,{delay:i*80}))
+  },2000)
+}
+$('motionCancel').onclick=()=>closeMotionComposer({restoreZoom:true})
+$('motionNext').onclick=()=>{status('motionStatus','',null);startMotionDrawing()}
+$('motionRedraw').onclick=()=>{motionDraft.curve=null;updateMotionPanel();startMotionDrawing()}
+$('motionReplay').onclick=playMotionPreview
+$('motionSize').oninput=()=>{$('motionSizeLabel').textContent=$('motionSize').value;if(motionDraft){motionDraft.size=Number($('motionSize').value)/100}}
+$('motionScaleMode').onchange=()=>{if(motionDraft)motionDraft.scale=$('motionScaleMode').value}
+$('motionSend').onclick=async()=>{
+  if(!motionDraft?.curve)return
+  const button=$('motionSend')
+  try{
+    button.disabled=true;status('motionStatus','Envoi…')
+    motionDraft.size=Number($('motionSize').value)/100;motionDraft.scale=$('motionScaleMode').value
+    const payload={version:1,emoji:motionDraft.emoji.map(stringToCodepoints),curve:motionDraft.curve,size:motionDraft.size,scale:motionDraft.scale,duration:motionDraft.duration}
+    currentModel=await service.postEmojiMotion(motionDraft.articleKey,payload)
+    const fresh=currentModel.articles.find(a=>a.articleKey===motionDraft.articleKey),idx=displayArticles.findIndex(a=>a.articleKey===motionDraft.articleKey)
+    if(fresh&&idx>=0)displayArticles[idx]={...displayArticles[idx],...fresh}
+    closeMotionComposer({restoreZoom:false});setArticleBadge('Animation envoyée')
+  }catch(e){debug(e);status('motionStatus','Erreur : '+(e.message||e),false)}finally{button.disabled=false}
+}
+
 function defaultPhotoBounds(a){
   if(a.photoBounds)return a.photoBounds
   if(a.layout==='text_below'){
