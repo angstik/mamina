@@ -128,6 +128,44 @@ export class UserMaminaService {
   setActivityListener(fn) { this.onActivity=typeof fn==='function'?fn:null }
   activity(text, detail=null) { try { this.onActivity?.({text,detail,at:new Date().toISOString()}) } catch {} }
 
+  async cacheMotionAvatars(rawMessages=[],models=null) {
+    const rows=models||rawMessages.map(TelegramGateway.messageModel)
+    const seen=new Set()
+    for(let i=0;i<rows.length;i++){
+      const row=rows[i]
+      if(row?.meta?.kind!=='motion'||row.meta?.type!=='emoji'||!row.senderId||seen.has(row.senderId))continue
+      seen.add(row.senderId)
+      const key=`sender-avatar:${row.senderId}`
+      if(await getAsset(key))continue
+      const bytes=await this.gateway?.senderAvatar(rawMessages[i]).catch(()=>null)
+      if(bytes?.byteLength)await putAsset(key,new Uint8Array(bytes))
+    }
+  }
+
+  async motionAuthorAvatar(senderId,{isOutgoing=false}={}) {
+    if(isOutgoing){
+      const own=await getAsset('user-avatar')
+      if(own)return own
+    }
+    if(!senderId)return null
+    const bytes=await getAsset(`sender-avatar:${Number(senderId)}`)
+    return bytes ? new Blob([bytes],{type:'image/jpeg'}) : null
+  }
+
+  async ensureMotionCount(magazine) {
+    if(Number.isFinite(Number(magazine?.motionCount)))return magazine
+    if(!this.gateway||!this.dialog||!magazine?.topicId)return {...magazine,motionCount:0}
+    try{
+      const raw=await this.gateway.topicMessages(this.dialog.peer,magazine.topicId,{limit:Infinity})
+      const rows=raw.map(TelegramGateway.messageModel)
+      await this.cacheMotionAvatars(raw,rows)
+      const motionCount=rows.filter(r=>r.meta?.kind==='motion'&&r.meta?.type==='emoji').length
+      const next={...magazine,motionCount}
+      await putMagazine(next)
+      return next
+    }catch(e){warn('motion.count','Comptage animations indisponible',{magazineId:magazine?.magazineId,message:e?.message||String(e)});return {...magazine,motionCount:0}}
+  }
+
   async unlock(password) {
     const blob=await loadEncryptedSecret()
     const creds=await decryptCredentials(blob,password)
@@ -253,6 +291,7 @@ export class UserMaminaService {
     for(const m of cached) if(!found.some(x=>x.magazineId===m.magazineId)) found.push(m)
     found.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || b.topicId-a.topicId)
     found=found.slice(0,10)
+    for(let i=0;i<found.length;i++)if(!Number.isFinite(Number(found[i]?.motionCount)))found[i]=await this.ensureMotionCount(found[i])
     if(found.length) await settings.set('appTitle',String(found[0].appTitle||'MamiNa'))
 
     for(const m of found.slice(0,2)) await this.ensureFullCache(m)
@@ -308,6 +347,7 @@ export class UserMaminaService {
     })
 
     const resolved=resolveRowsToArticles(rows,articles)
+    await this.cacheMotionAvatars(raw,rows)
 
     info('sync.discover','Rendu couverture',{topicId:tid})
     if(!pdf) pdf=await FamileoPdf.load(bytes)
@@ -330,12 +370,13 @@ export class UserMaminaService {
 
     const read=await this.readMap()
     const comments=[...resolved.byArticle.values()].flat()
+    const motions=[...resolved.motionsBy.values()].flat()
     const unread=comments.filter(c=>!c.isOutgoing && c.id>(read.get(c.articleKey)||0)).length
     const record={
       ...magazine,
       appTitle:String(pdfRow.meta?.appTitle||'MamiNa'),
       topicId:tid, topicKey:key, topicTitle:topic.title||'', pdfMessageId:pdfRow.id,
-      reactionCount:comments.length, unreadCount:unread, fullyCached:false,
+      reactionCount:comments.length, motionCount:motions.length, unreadCount:unread, fullyCached:false,
       lastMessageId:rows.reduce((m,r)=>Math.max(m,r.id),0), updatedAt:new Date().toISOString(),
     }
     this.activity('Base locale · index revue')
@@ -358,15 +399,18 @@ export class UserMaminaService {
     const raw=await this.gateway.topicMessages(peer,magazine.topicId,{minId:cursor,limit:Infinity})
     this.activity(raw.length?`Telegram · ${raw.length} nouveau${raw.length>1?'x':''} message${raw.length>1?'s':''}`:'Telegram · aucun nouveau message')
     if(!raw.length){info('sync.known','Aucun nouveau message',{magazineId:magazine.magazineId,cursor});return magazine}
-    const rows=raw.map(TelegramGateway.messageModel).filter(r=>r.id>cursor)
+    const models=raw.map(TelegramGateway.messageModel)
+    await this.cacheMotionAvatars(raw,models)
+    const rows=models.filter(r=>r.id>cursor)
     const messages=rows.filter(r=>r.meta?.kind==='message')
+    const motionAdd=rows.filter(r=>r.meta?.kind==='motion'&&r.meta?.type==='emoji').length
     let unreadAdd=0
     for(const m of messages) {
       if(m.isOutgoing) continue
       const rs=await getReadState(m.meta?.articleKey||'')
       if(m.id>Number(rs?.lastReadMessageId||0)) unreadAdd++
     }
-    const next={...magazine,reactionCount:Number(magazine.reactionCount||0)+messages.length,unreadCount:Number(magazine.unreadCount||0)+unreadAdd,lastMessageId:Math.max(cursor,...rows.map(r=>r.id)),updatedAt:new Date().toISOString()}
+    const next={...magazine,reactionCount:Number(magazine.reactionCount||0)+messages.length,motionCount:Number(magazine.motionCount||0)+motionAdd,unreadCount:Number(magazine.unreadCount||0)+unreadAdd,lastMessageId:Math.max(cursor,...rows.map(r=>r.id)),updatedAt:new Date().toISOString()}
     this.activity('Base locale · mise à jour des messages')
     await putMagazine(next)
     await putTopicState({topicKey:magazine.topicKey,topicId:magazine.topicId,cursor:next.lastMessageId,updatedAt:next.updatedAt})
@@ -389,6 +433,7 @@ export class UserMaminaService {
     if(!pdfBytes || !fresh.fullyCached) {
       raw=await this.gateway.topicMessages(this.dialog.peer,fresh.topicId,{limit:Infinity})
       rows=raw.map(TelegramGateway.messageModel)
+      await this.cacheMotionAvatars(raw,rows)
       const pdfIdx=rows.findIndex(r=>r.meta?.kind==='pdf')
       if(pdfIdx<0) throw new Error(`PDF Mamina introuvable dans ${fresh.topicTitle}.`)
       if(!pdfBytes) pdfBytes=await this.gateway.downloadMessageMedia(raw[pdfIdx])
@@ -418,8 +463,9 @@ export class UserMaminaService {
     await this.persistResolvedMessages(fresh,articles,rows)
     const resolved=resolveRowsToArticles(rows,articles)
     const comments=[...resolved.byArticle.values()].flat()
+    const motions=[...resolved.motionsBy.values()].flat()
     const unread=await this.countUnread(comments)
-    const next={...fresh,reactionCount:comments.length,unreadCount:unread,fullyCached:true,lastMessageId:rows.reduce((m,r)=>Math.max(m,r.id),0),updatedAt:new Date().toISOString()}
+    const next={...fresh,reactionCount:comments.length,motionCount:motions.length,unreadCount:unread,fullyCached:true,lastMessageId:rows.reduce((m,r)=>Math.max(m,r.id),0),updatedAt:new Date().toISOString()}
     await putMagazine(next)
     await putTopicState({topicKey:next.topicKey,topicId:next.topicId,cursor:next.lastMessageId,updatedAt:next.updatedAt})
     return next
@@ -472,7 +518,14 @@ export class UserMaminaService {
 
   async magazineSummaries(rows=null) {
     const magazines=(rows||await listMagazines()).slice(0,10)
-    return Promise.all(magazines.map(async m=>({...m,cover:await getAsset(`cover:${m.magazineId}`)})))
+    return Promise.all(magazines.map(async m=>{
+      let motionCount=Number.isFinite(Number(m.motionCount))?Number(m.motionCount):null
+      if(motionCount==null){
+        const local=await listMessagesByMagazine(m.magazineId)
+        motionCount=local.filter(r=>r.meta?.kind==='motion'&&r.meta?.type==='emoji').length
+      }
+      return {...m,motionCount,cover:await getAsset(`cover:${m.magazineId}`)}
+    }))
   }
 
   async openMagazineLocalFirst(magazineId) {
@@ -603,16 +656,19 @@ export class UserMaminaService {
       emoji,
       curve:Object.fromEntries(['p0','p1','p2','p3'].map((k,i)=>[k,points[i].map(n=>Math.max(0,Math.min(1,Number(n))))])),
       size:Math.max(.035,Math.min(.16,Number(motion.size)||.075)),
-      scale:['stable','grow','shrink','pulse','inverse-pulse','explosion'].includes(motion.scale)?motion.scale:'stable',
-      duration:Math.max(900,Math.min(3000,Math.round(Number(motion.duration)||1800))),
+      scale:['stable','grow','shrink','pulse','inverse-pulse','explosion','rain','random'].includes(motion.scale)?motion.scale:'stable',
+      duration:Math.max(1200,Math.min(4500,Math.round(Number(motion.duration)||2200))),
     }
     const full=await this.gateway.topicMessages(this.dialog.peer,Number(this.current.magazine.topicId),{limit:Infinity})
     const {rootId}=await this.gateway.ensureRoot(this.dialog.peer,Number(this.current.magazine.topicId),this.current.magazine,article,full)
     const sent=await this.gateway.postEmojiMotion(this.dialog.peer,Number(this.current.magazine.topicId),rootId,articleKey,normalized)
     const row=TelegramGateway.messageModel(sent)
+    await this.cacheMotionAvatars([sent],[row])
     const payload={...row,articleKey,motion:normalized,key:`${this.current.magazine.magazineId}:${row.id}`,magazineId:this.current.magazine.magazineId,topicKey:this.current.magazine.topicKey}
     await putMessages([payload])
     this.current.rows=[...this.current.rows.filter(r=>r.id!==payload.id),payload].sort((a,b)=>a.id-b.id)
+    const magazine=await getMagazine(this.current.magazine.magazineId)
+    if(magazine){const next={...magazine,motionCount:Number(magazine.motionCount||0)+1};await putMagazine(next);this.current.magazine=next}
     return this.currentView()
   }
 

@@ -67,6 +67,7 @@
     <span id="pendingReader" class="pending-count zero">0</span>
     <button id="connectionPillReader" class="connection-pill unknown" type="button" title="Connexion Telegram">—</button>
     <div id="readerPage" class="reader-page subtle"></div>
+    <div id="motionAuthorsHeader" class="motion-authors-header" aria-label="Auteurs des animations" hidden></div>
     <button id="motionReplayHeader" class="motion-replay-header" type="button" title="Rejouer les animations" aria-label="Rejouer les animations" hidden>✨</button>
   </header>
   <div id="activityReader" class="activity-strip" hidden></div>
@@ -227,13 +228,14 @@
       <div id="motionSelected" class="motion-selected" aria-label="Emoji sélectionnés"></div>
       <div class="motion-inline-actions">
         <button id="motionReplay" type="button" title="Rejouer" aria-label="Rejouer" hidden>▶️</button>
-        <button id="motionRedraw" type="button" title="Refaire le tracé" aria-label="Refaire le tracé" hidden>↺</button>
+        <button id="motionRedraw" type="button" title="Refaire le tracé" aria-label="Refaire le tracé" hidden>🖊️</button>
         <button id="motionCancel" type="button" class="secondary" title="Annuler" aria-label="Annuler">✕</button>
         <button id="motionNext" type="button" title="Tracer" aria-label="Tracer">🖊️</button>
         <button id="motionSend" type="button" title="Envoyer" aria-label="Envoyer" hidden>✓</button>
       </div>
     </div>
-    <div id="motionEmojiGrid" class="motion-emoji-grid" aria-label="Sélection d’emoji"></div>
+    <div id="motionEmojiGrid" class="motion-emoji-grid" aria-label="Emoji récents et fréquents"></div>
+    <input id="motionEmojiInput" class="motion-native-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Saisie depuis le clavier emoji">
     <div id="motionControls" class="motion-controls" hidden>
       <label class="motion-range">Taille <input id="motionSize" type="range" min="4" max="14" step="1" value="8"><span id="motionSizeLabel">8</span></label>
       <label>Dynamique
@@ -244,6 +246,8 @@
           <option value="pulse">Petit → grand → petit</option>
           <option value="inverse-pulse">Grand → petit → grand</option>
           <option value="explosion">Explosion</option>
+          <option value="rain">Pluie</option>
+          <option value="random">Aléatoire</option>
         </select>
       </label>
     </div>

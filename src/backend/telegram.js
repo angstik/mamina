@@ -61,6 +61,15 @@ export class TelegramGateway {
     }
   }
 
+  async senderAvatar(message) {
+    try {
+      return message?.sender?.photo ? await this.tg.downloadAsBuffer(message.sender.photo) : null
+    } catch(e) {
+      warn('telegram.profile','Avatar expéditeur indisponible',{message:e?.message||String(e)})
+      return null
+    }
+  }
+
   async logout() { await this.tg.logOut(); this.self = null }
 
   onConnectionState(handler) {

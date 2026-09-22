@@ -1,5 +1,16 @@
 # CHANGELOG MamiNa
 
+## v1.1.10
+**Synthèse :** clavier emoji natif, récents/fréquents, pluie/aléatoire, auteurs pendant lecture et compteur ✨ par revue.
+
+La palette locale n'est plus un catalogue fixe : elle affiche jusqu'à 6 emoji récents puis les plus fréquents, avec valeurs par défaut au premier usage. Un bouton clavier donne le focus à une saisie native afin d'utiliser le clavier emoji du smartphone, y compris variantes Unicode et séquences composées.
+
+Les animations durent un peu plus longtemps et les amplitudes petit/grand sont renforcées. Deux modes multiples sont ajoutés : `pluie` (9 emoji répartis sur la courbe et projetés selon la normale vers sa concavité) et `aléatoire` (7 emoji partant de points répartis aléatoirement le long de la courbe avec des trajectoires dérivées de celle-ci). Le retracé utilise le même crayon que le premier tracé.
+
+Pendant la lecture, les avatars Telegram disponibles des auteurs des animations apparaissent dans la ligne Article n/N, avec initiale de secours. Les avatars sont mis en cache uniquement pour les messages d'animation.
+
+La vue Magazines affiche désormais `✨ N` pour chaque revue. Le compteur est maintenu à la synchronisation et initialisé une fois pour les revues existantes.
+
 ## v1.1.9
 **Synthèse :** affine les réactions animées : transitions emoji progressives, amplitudes de taille renforcées, effet explosion, replay manuel et interface compacte.
 
