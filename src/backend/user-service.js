@@ -135,11 +135,27 @@ export class UserMaminaService {
 
   async _listPendingMotions() {
     const rows=await settings.get('pendingEmojiMotions',[])
-    return Array.isArray(rows)?rows.filter(Boolean):[]
+    if(!Array.isArray(rows))return[]
+    return rows.filter(Boolean).map(item=>({...item,motion:{...(item.motion||{}),clientId:String(item.motion?.clientId||item.id||'')}}))
   }
 
   async _savePendingMotions(rows=[]) {
     await settings.set('pendingEmojiMotions',Array.isArray(rows)?rows.filter(Boolean):[])
+  }
+
+  async _listPendingTopicOps() {
+    const rows=await settings.get('pendingTopicOps',[])
+    return Array.isArray(rows)?rows.filter(Boolean):[]
+  }
+
+  async _savePendingTopicOps(rows=[]) {
+    await settings.set('pendingTopicOps',Array.isArray(rows)?rows.filter(Boolean):[])
+  }
+
+  async _queueTopicOp(op) {
+    const rows=await this._listPendingTopicOps()
+    rows.push({id:`op:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,createdAt:new Date().toISOString(),...op})
+    await this._savePendingTopicOps(rows)
   }
 
   _pendingMotionRow(item,ordinal=0) {
@@ -163,16 +179,18 @@ export class UserMaminaService {
   async _queueEmojiMotion(articleKey,motion) {
     if(!this.current) throw new Error('Aucune revue ouverte.')
     const rows=await this._listPendingMotions()
+    const id=`motion:${Date.now()}:${Math.random().toString(36).slice(2,8)}`
+    const normalizedMotion={...motion,clientId:String(motion?.clientId||id)}
     rows.push({
-      id:`motion:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,
+      id,
       createdAt:new Date().toISOString(),
       articleKey,
       magazineId:this.current.magazine.magazineId,
       topicId:this.current.magazine.topicId,
-      motion,
+      motion:normalizedMotion,
     })
     await this._savePendingMotions(rows)
-    info('motion.outbox','Animation mise en attente',{articleKey})
+    info('motion.outbox','Animation mise en attente',{articleKey,clientId:normalizedMotion.clientId})
   }
 
   async _sendMotionNow(item) {
@@ -233,10 +251,9 @@ export class UserMaminaService {
       if(!topicId){const topic=(await this.gateway.topics(this.dialog.peer)).find(t=>exactTopic(t,PARAMS_TOPIC));topicId=topic?topicIdOf(topic):0;if(topicId)await settings.set('paramsTopicId',topicId)}
       if(!topicId)return cached
       const raw=await this.gateway.topicMessages(this.dialog.peer,topicId,{limit:300})
-      const profiles=raw.map(TelegramGateway.messageModel).filter(r=>r.meta?.kind==='mamina-profile'&&r.senderId&&String(r.meta?.famileoName||'').trim())
-      profiles.sort((a,b)=>a.id-b.id)
+      const rows=raw.map(TelegramGateway.messageModel).filter(r=>r.meta?.kind==='mamina-profile'&&r.senderId&&String(r.meta?.famileoName||'').trim()).sort((a,b)=>a.id-b.id)
       const map={}
-      for(const row of profiles)map[String(row.senderId)]={telegramUserId:Number(row.senderId),famileoName:String(row.meta.famileoName).trim(),messageId:row.id,author:row.author||''}
+      for(const row of rows)map[String(row.senderId)]={telegramUserId:Number(row.senderId),famileoName:String(row.meta.famileoName).trim(),messageId:row.id,author:row.author||''}
       await settings.set(key,map)
       return map
     } catch(e) { warn('profile','Profils famille indisponibles',{message:e?.message||String(e)});return cached }
@@ -247,6 +264,35 @@ export class UserMaminaService {
     const profiles=await this.familyProfileAssignments({refresh:true})
     const own=userId?profiles[String(userId)]||null:null
     return {userId,own,assignedNames:[...new Set(Object.values(profiles).map(x=>String(x?.famileoName||'').trim()).filter(Boolean))],profiles}
+  }
+
+  async motionAuthorFamileoName(senderId,{isOutgoing=false}={}) {
+    const userId=Number(await settings.get('userId',0)||0)||null
+    const target=Number(senderId||0)||(isOutgoing?userId:null)
+    if(!target)return''
+    const profiles=await this.familyProfileAssignments({refresh:false})
+    return String(profiles?.[String(target)]?.famileoName||'')
+  }
+
+  async adminAvatarAssignments() {
+    if(!this.dialog)throw new Error('Aucun groupe sélectionné.')
+    const userId=Number(await settings.get('userId',0)||0)||null
+    const profiles=await this.familyProfileAssignments({refresh:true})
+    const canDeleteOthers=Boolean(this.gateway?.canDeleteOthers?.(this.dialog.peer))
+    return {userId,canDeleteOthers,profiles:Object.values(profiles).sort((a,b)=>String(a.famileoName||'').localeCompare(String(b.famileoName||''),'fr'))}
+  }
+
+  async adminRemoveAvatarAssociation(telegramUserId) {
+    if(!this.gateway||!this.dialog)throw new Error('Telegram non initialisé.')
+    const state=await this.adminAvatarAssignments(),target=Number(telegramUserId||0),profile=state.profiles.find(x=>Number(x.telegramUserId)===target)
+    if(!profile)throw new Error('Association introuvable.')
+    if(target!==Number(state.userId)&&!state.canDeleteOthers)throw new Error('Le droit Telegram « supprimer les messages » est requis pour retirer l’association d’un autre utilisateur.')
+    let topicId=Number(await settings.get('paramsTopicId',0)||0)
+    if(!topicId){const topic=(await this.gateway.topics(this.dialog.peer)).find(t=>exactTopic(t,PARAMS_TOPIC));topicId=topic?topicIdOf(topic):0}
+    if(!topicId)throw new Error('Sujet params introuvable.')
+    await this.gateway.deleteMessagesById(this.dialog.peer,[profile.messageId])
+    await this.familyProfileAssignments({refresh:true})
+    return this.adminAvatarAssignments()
   }
 
   async assignFamileoAvatar(famileoName) {
@@ -745,17 +791,23 @@ export class UserMaminaService {
     if(!this.current) return null
     const {magazine,pdf,articles,rows}=this.current
     const read=await this.readMap()
+    const pendingTopicOps=await this._listPendingTopicOps()
+    const pendingDeletedIds=new Set(pendingTopicOps.filter(x=>x.type==='delete-contribution'&&x.magazineId===magazine.magazineId).map(x=>Number(x.targetMessageId||0)).filter(x=>x>0))
     // Always resolve through the tombstone-aware path. Cached rows may still
     // contain the original contribution after Telegram deleted it, while a
-    // later silent deletion marker tells every client to hide it.
-    const resolved=resolveRowsToArticles(rows,articles)
+    // later silent deletion marker tells every client to hide it. Pending
+    // local deletions are treated as tombstones too, so sync cannot resurrect
+    // them before the queued operation is sent.
+    const resolved=resolveRowsToArticles(rows.filter(r=>!pendingDeletedIds.has(Number(r.id))),articles)
     const commentsBy=resolved.byArticle
     const motionsBy=resolved.motionsBy
     const outbox=await listOutbox()
     const pendingBy=new Map(outbox.map(x=>[x.articleKey,x]))
     const pendingMotionRows=await this._listPendingMotions()
     const pendingMotionBy=new Map(articles.map(a=>[a.articleKey,[]]))
+    const remoteClientIds=new Set([...motionsBy.values()].flat().map(r=>String(r.motion?.clientId||r.meta?.motion?.clientId||'')).filter(Boolean))
     for(const item of pendingMotionRows){
+      if(remoteClientIds.has(String(item.motion?.clientId||'')))continue
       if(pendingMotionBy.has(item.articleKey))pendingMotionBy.get(item.articleKey).push(this._pendingMotionRow(item,pendingMotionBy.get(item.articleKey).length))
     }
     const withState=articles.map(a=>{
@@ -808,6 +860,7 @@ export class UserMaminaService {
       size:Math.max(.035,Math.min(.16,Number(motion.size)||.075)),
       scale:['stable','grow','shrink','pulse','inverse-pulse','explosion','rain','cloud','random'].includes(motion.scale)?motion.scale:'stable',
       duration:Math.max(1200,Math.min(4500,Math.round(Number(motion.duration)||2200))),
+      clientId:String(motion?.clientId||`motion:${Date.now()}:${Math.random().toString(36).slice(2,8)}`),
     }
 
     const online = typeof navigator==='undefined' || navigator.onLine!==false
@@ -829,6 +882,31 @@ export class UserMaminaService {
     }
   }
 
+  async _applyLocalDeleteOp(op,{markerRow=null}={}) {
+    const id=Number(op.targetMessageId||0),magazineId=op.magazineId,ak=op.articleKey
+    if(id>0){try{await deleteMessageByKey(`${magazineId}:${id}`)}catch(e){warn('delete','Suppression cache local impossible',{messageId:id,message:e?.message||String(e)})}}
+    if(this.current?.magazine?.magazineId===magazineId){
+      this.current.rows=this.current.rows.filter(r=>Number(r.id)!==id)
+      if(markerRow){const payload={...markerRow,articleKey:ak,key:`${magazineId}:${markerRow.id}`,magazineId,topicKey:this.current.magazine.topicKey};this.current.rows.push(payload);await putMessages([payload])}
+      this.current.rows.sort((a,b)=>a.id-b.id)
+    }
+  }
+
+  async _executeDeleteTopicOp(op) {
+    if(!this.gateway||!this.dialog)throw new Error('Telegram non initialisé.')
+    const magazine=await getMagazine(op.magazineId);if(!magazine)throw new Error('Revue introuvable pour la suppression.')
+    const articles=await listArticles(op.magazineId),article=articles.find(a=>a.articleKey===op.articleKey)||this.current?.articles?.find(a=>a.articleKey===op.articleKey)
+    if(!article)throw new Error('Article introuvable pour la suppression.')
+    const full=await this.gateway.topicMessages(this.dialog.peer,Number(op.topicId),{limit:Infinity})
+    const {rootId}=await this.gateway.ensureRoot(this.dialog.peer,Number(op.topicId),magazine,article,full)
+    const marker=await this.gateway.postDeletionMarker(this.dialog.peer,Number(op.topicId),rootId,op.articleKey,Number(op.targetMessageId),op.targetKind)
+    // Once the tombstone exists, direct Telegram deletion is best-effort only.
+    try{await this.gateway.deleteMessagesById(this.dialog.peer,[Number(op.targetMessageId)])}catch(e){warn('delete','Suppression Telegram directe impossible, tombstone publié',{messageId:op.targetMessageId,message:e?.message||String(e)})}
+    const markerRow=TelegramGateway.messageModel(marker)
+    await this._applyLocalDeleteOp(op,{markerRow})
+    return markerRow
+  }
+
   async deleteOwnContribution({articleKey,kind,messageId=null,pendingId=null}={}) {
     if(!this.current)throw new Error('Aucune revue ouverte.')
     const ak=String(articleKey||'');if(!ak)throw new Error('Article inconnu.')
@@ -838,39 +916,18 @@ export class UserMaminaService {
       await this._savePendingMotions(after)
       return this.currentView()
     }
-    if(kind==='message'&&!messageId){
-      await deleteOutbox(ak)
-      return this.currentView()
-    }
-    const id=Number(messageId||0)
-    const row=this.current.rows.find(r=>Number(r.id)===id&&r.articleKey===ak)
+    if(kind==='message'&&!messageId){await deleteOutbox(ak);return this.currentView()}
+    const id=Number(messageId||0),row=this.current.rows.find(r=>Number(r.id)===id&&r.articleKey===ak)
     if(!row||!row.isOutgoing)throw new Error('Seules tes contributions peuvent être supprimées.')
-    if(!this.gateway||!this.dialog||this.gateway.connectionState!=='connected')throw new Error('Connexion Telegram requise pour supprimer cette contribution.')
-    const article=this.current.articles.find(a=>a.articleKey===ak)
-    if(!article)throw new Error('Article inconnu.')
-    const full=await this.gateway.topicMessages(this.dialog.peer,Number(this.current.magazine.topicId),{limit:Infinity})
-    const {rootId}=await this.gateway.ensureRoot(this.dialog.peer,Number(this.current.magazine.topicId),this.current.magazine,article,full)
-    let marker=null,deleted=false
-    try { marker=await this.gateway.postDeletionMarker(this.dialog.peer,Number(this.current.magazine.topicId),rootId,ak,id,kind) } catch(e) { warn('delete','Marqueur de suppression non publié',{messageId:id,message:e?.message||String(e)}) }
-    try { await this.gateway.deleteMessagesById(this.dialog.peer,[id]); deleted=true } catch(e) { warn('delete','Suppression Telegram directe impossible',{messageId:id,message:e?.message||String(e)}) }
-    if(!marker&&!deleted)throw new Error('Suppression Telegram impossible pour le moment.')
-    const markerRow=marker?TelegramGateway.messageModel(marker):null
-    const localKey=`${this.current.magazine.magazineId}:${id}`
-    // Remove the target locally even when publishing the tombstone failed;
-    // this prevents a successfully deleted Telegram message from reappearing
-    // from IndexedDB on the same device.
-    try { await deleteMessageByKey(localKey) } catch(e) { warn('delete','Suppression cache local impossible',{messageId:id,message:e?.message||String(e)}) }
-    this.current.rows=this.current.rows.filter(r=>Number(r.id)!==id)
-    if(markerRow)this.current.rows.push({...markerRow,articleKey:ak,key:`${this.current.magazine.magazineId}:${markerRow.id}`,magazineId:this.current.magazine.magazineId,topicKey:this.current.magazine.topicKey})
-    this.current.rows.sort((a,b)=>a.id-b.id)
-    if(markerRow)await putMessages([this.current.rows.find(r=>r.id===markerRow.id)])
-    // A published tombstone will adjust the persisted counters on the next
-    // incremental sync. Only adjust immediately when the marker itself could
-    // not be published, otherwise the same deletion would be counted twice.
-    if(!marker){
-      const magazine=await getMagazine(this.current.magazine.magazineId)
-      if(magazine){const field=kind==='motion'?'motionCount':'reactionCount',next={...magazine,[field]:Math.max(0,Number(magazine[field]||0)-1)};await putMagazine(next);this.current.magazine=next}
+    const op={type:'delete-contribution',magazineId:this.current.magazine.magazineId,topicId:this.current.magazine.topicId,articleKey:ak,targetMessageId:id,targetKind:kind}
+    // Hide immediately on this device. The pending op acts as a local tombstone
+    // and prevents a sync from resurrecting the row while offline.
+    await this._applyLocalDeleteOp(op)
+    const online=typeof navigator==='undefined'||navigator.onLine!==false
+    if(!this.gateway||!this.dialog||!online||this.gateway.connectionState!=='connected'){
+      await this._queueTopicOp(op);info('delete.outbox','Suppression mise en attente',{articleKey:ak,messageId:id});return this.currentView()
     }
+    try{await this._executeDeleteTopicOp(op)}catch(e){warn('delete.outbox','Suppression différée après échec réseau',{messageId:id,message:e?.message||String(e)});await this._queueTopicOp(op)}
     return this.currentView()
   }
 
@@ -979,7 +1036,8 @@ export class UserMaminaService {
     if(!connected && !force) return 0
     const rows=await listOutbox()
     const motions=await this._listPendingMotions()
-    const total=rows.length+motions.length
+    const topicOps=await this._listPendingTopicOps()
+    const total=rows.length+motions.length+topicOps.length
     if(total) this.activity(`Envoi différé · ${total} élément${total>1?'s':''}`)
     let sent=0
     for(const item of rows) {
@@ -1005,6 +1063,19 @@ export class UserMaminaService {
       } catch(e) {
         warn('motion.outbox','Animation différée toujours en attente',{articleKey:item.articleKey,message:e?.message||String(e)})
         if(this.gateway.connectionState!=='connected') break
+      }
+    }
+    const pendingOps=await this._listPendingTopicOps()
+    for(const item of pendingOps){
+      try{
+        if(item.type==='delete-contribution')await this._executeDeleteTopicOp(item)
+        else throw new Error(`Opération différée inconnue: ${item.type}`)
+        await this._savePendingTopicOps((await this._listPendingTopicOps()).filter(x=>x.id!==item.id))
+        sent++
+        info('topic.outbox','Opération différée envoyée',{type:item.type,articleKey:item.articleKey||null})
+      }catch(e){
+        warn('topic.outbox','Opération différée toujours en attente',{type:item.type,message:e?.message||String(e)})
+        if(this.gateway.connectionState!=='connected')break
       }
     }
     return sent
@@ -1043,7 +1114,7 @@ export class UserMaminaService {
     return {updated,missing,cleared}
   }
 
-  async pendingCount() { return (await countOutbox()) + (await this._listPendingMotions()).length }
+  async pendingCount() { return (await countOutbox()) + (await this._listPendingMotions()).length + (await this._listPendingTopicOps()).length }
   async storageStats() { return estimateLocalStorage() }
   async pendingForArticle(articleKey) { return {text:await getOutbox(articleKey),motions:(await this._listPendingMotions()).filter(x=>x.articleKey===articleKey)} }
 

@@ -1,5 +1,18 @@
 # CHANGELOG MamiNa
 
+## v1.1.13
+**Synthèse :** avatars Famileo pendant les animations, départ à 1 s, suppressions différées, déduplication offline, aperçu de courbe, version visible et gestion admin des associations.
+
+Les avatars affichés pendant la lecture des animations utilisent désormais en priorité l’avatar Famileo associé au compte Telegram ; l’avatar Telegram reste le fallback. La première animation démarre après 1 seconde de présence à zoom 1:1.
+
+Les suppressions de contributions fonctionnent maintenant hors ligne. Elles sont masquées immédiatement sur l’appareil puis placées dans un buffer générique d’opérations de sujet (`pendingTopicOps`) compté dans le compteur global d’envois différés. Au retour réseau, MamiNa publie le tombstone silencieux puis tente la suppression Telegram directe ; l’absence du message cible reste non bloquante.
+
+Les animations créées hors ligne portent un `clientId` stable. Lorsqu’une copie envoyée revient depuis Telegram, la version locale en attente correspondante est dédupliquée afin d’éviter le double affichage chez l’émetteur.
+
+La vue de suppression affiche maintenant un mini tracé normalisé de la courbe entre les emoji et le type d’animation. La version courante est visible sur le splash et sous MamiNa dans la vue Magazines.
+
+L’administration ajoute un écran à la demande listant les associations Telegram ↔ avatar Famileo. La suppression de sa propre association est permise ; la suppression d’une association d’un autre utilisateur est proposée uniquement lorsque les droits Telegram de suppression de messages sont détectés. Telegram reste l’autorité finale sur ces droits.
+
 ## v1.1.12
 **Synthèse :** suppression de ses contributions, association d’avatar Famileo et animation aléatoire radiale.
 

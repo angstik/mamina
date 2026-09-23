@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.12'
+const APP_VERSION='1.1.13'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -85,6 +85,8 @@ async function loadSettings(){
   $('storedMaminaPasswordState').textContent=c.storagePassword?(hasStored?'Mot de passe mémorisé sur cet appareil.':'Aucun mot de passe mémorisé.'):'Piloté par params : stockage désactivé.'
   $('clearStoredMaminaPassword').disabled=!hasStored
   $('appVersion').textContent=APP_VERSION
+  $('syncStatus').textContent=`v${APP_VERSION}`
+  if($('splashVersion'))$('splashVersion').textContent=`v${APP_VERSION}`
 }
 function elapsed(ms){const s=Math.floor(ms/1000);if(s<60)return`${s}s`;const m=Math.floor(s/60);if(m<60)return`${m}m`;return`${Math.floor(m/60)}h`}
 function refreshPills(){
@@ -118,6 +120,7 @@ async function localHome(){
 }
 async function showWelcomeSplash(force=false){
   try{
+    if($('splashVersion'))$('splashVersion').textContent=`v${APP_VERSION}`
     const profile=await service.localUserProfile()
     if(!profile?.name && !force)return
     const splash=$('splash')
@@ -359,6 +362,14 @@ async function refreshReaderAfterContributionChange(view,articleKey){
   const list=$('articleDeck').querySelector(`[data-index="${idx}"] .reaction-list`);if(list&&fresh)renderComments(fresh,list)
   updateReaderPageLabel();updateMotionReplayHeader();await refreshPending()
 }
+function motionMiniShape(curve){
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('contribution-motion-shape');svg.setAttribute('viewBox','0 0 40 20');svg.setAttribute('aria-hidden','true')
+  if(!curve?.p0||!curve?.p1||!curve?.p2||!curve?.p3)return svg
+  const pts=[curve.p0,curve.p1,curve.p2,curve.p3],xs=pts.map(p=>Number(p[0])||0),ys=pts.map(p=>Number(p[1])||0),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),w=Math.max(.001,maxX-minX),h=Math.max(.001,maxY-minY),scale=Math.min(34/w,14/h),ox=3+(34-w*scale)/2,oy=3+(14-h*scale)/2
+  const q=p=>[ox+(p[0]-minX)*scale,oy+(p[1]-minY)*scale]
+  const [p0,p1,p2,p3]=pts.map(q),path=document.createElementNS('http://www.w3.org/2000/svg','path')
+  path.setAttribute('d',`M ${p0[0].toFixed(1)} ${p0[1].toFixed(1)} C ${p1[0].toFixed(1)} ${p1[1].toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)} ${p3[0].toFixed(1)} ${p3[1].toFixed(1)}`);svg.appendChild(path);return svg
+}
 function renderContributionPopup(){
   const host=$('contributionPopupList'),items=ownContributions();host.innerHTML=''
   if(!items.length){host.innerHTML='<div class="empty">Aucune contribution à supprimer.</div>';return}
@@ -370,7 +381,9 @@ function renderContributionPopup(){
     if(item.kind==='motion'){
       body.className='contribution-motion'
       const motion=row.motion||row.meta?.motion||{},emojis=(motion.emoji||[]).map(codepointsToString).join(' ')
-      body.textContent=`${emojis||'✨'} · ${motionOptionLabel(motion.scale)}`
+      const em=document.createElement('span');em.className='contribution-motion-emoji';em.textContent=emojis||'✨'
+      const type=document.createElement('span');type.className='contribution-motion-type';type.textContent=motionOptionLabel(motion.scale)
+      body.append(em,motionMiniShape(motion.curve),type)
     }else{body.className='contribution-message';body.textContent=row.displayText||row.text||''}
     preview.append(kind,body)
     const del=document.createElement('button');del.type='button';del.className='contribution-delete';del.textContent='🗑️';del.title='Supprimer';del.setAttribute('aria-label','Supprimer cette contribution')
@@ -877,10 +890,22 @@ function playMotion(motion,index,{preview=false,delay=0}={}){
   const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(96,(Number(motion.size)||.075)*rect.width)),duration=motionPlaybackDuration(motion),mode=motion.scale||'stable';spanA.style.fontSize=`${size}px`;spanB.style.fontSize=`${size}px`
   return new Promise(resolve=>{const start=performance.now()+delay;const frame=now=>{if(now<start){requestAnimationFrame(frame);return}const t=Math.min(1,(now-start)/duration),pt=motionPointAt(motion.curve,t),x=rect.left+pt[0]*rect.width,y=rect.top+pt[1]*rect.height,blend=motionEmojiBlend(emojis,t),fade=t>.88?Math.max(0,(1-t)/.12):1,sc=motionScaleAt(mode,t),base=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`;if(spanA.textContent!==blend.a)spanA.textContent=blend.a;if(spanB.textContent!==blend.b)spanB.textContent=blend.b;spanA.style.opacity=String(fade*(1-blend.mix));spanB.style.opacity=String(fade*blend.mix);spanA.style.transform=base;spanB.style.transform=base;if(t<1&&document.body.contains(spanA))requestAnimationFrame(frame);else{spanA.remove();spanB.remove();resolve()}};requestAnimationFrame(frame)})
 }
+async function magazineAvatarForName(name){
+  if(!name||!currentModel)return null
+  const needle=String(name).trim().toLocaleLowerCase('fr'),idx=displayArticles.findIndex(a=>String(a.authorName||'').trim().toLocaleLowerCase('fr')===needle&&a.avatarBounds)
+  if(idx<0)return null
+  try{await loadVisual(idx);const img=await waitForImage(articleImg(idx));return img?cropImage(img,displayArticles[idx].avatarBounds):null}catch{return null}
+}
+async function magazineAvatarForMotion(row){
+  const name=await service.motionAuthorFamileoName(row.senderId,{isOutgoing:row.isOutgoing}).catch(()=> '')
+  return magazineAvatarForName(name)
+}
 async function showMotionAuthors(rows=[]){
   const host=$('motionAuthorsHeader');freeUrls(motionAuthorUrls);host.innerHTML=''
   const uniq=[];for(const row of rows){const id=row.senderId||`name:${row.author}`;if(!uniq.some(x=>x.id===id))uniq.push({id,row})}
   for(const {row} of uniq.slice(0,5)){
+    const magazineAvatar=await magazineAvatarForMotion(row)
+    if(magazineAvatar){const img=document.createElement('img');img.className='motion-author-avatar';img.alt=row.author||'Auteur';img.title=row.author||'';img.src=magazineAvatar;host.appendChild(img);continue}
     const avatar=await service.motionAuthorAvatar(row.senderId,{isOutgoing:row.isOutgoing})
     if(avatar){const img=document.createElement('img');img.className='motion-author-avatar';img.alt=row.author||'Auteur';img.title=row.author||'';img.src=objectUrl(avatar,motionAuthorUrls);host.appendChild(img)}
     else{const f=document.createElement('span');f.className='motion-author-avatar motion-author-fallback';f.textContent=String(row.author||'?').trim().slice(0,1).toUpperCase();f.title=row.author||'';host.appendChild(f)}
@@ -919,7 +944,7 @@ function scheduleArticleMotions(article,index){
     if(playedMotionVisits.has(key)||activeMotionArticles.has(article.articleKey))return
     playedMotionVisits.add(key)
     playArticleMotions(article,index)
-  },2000)
+  },1000)
 }
 $('motionEmojiInput').addEventListener('input',e=>{
   const values=emojiGraphemes(e.currentTarget.value)
@@ -1231,6 +1256,23 @@ $('copyAdminError').onclick=async()=>{
     status('adminStatus','Copie impossible : '+(e.message||e),false)
   }
 }
+function renderAdminAvatarAssignments(state){
+  const host=$('adminAvatarList');host.innerHTML=''
+  const rows=state?.profiles||[]
+  if(!rows.length){host.innerHTML='<div class="empty">Aucune association avatar.</div>';return}
+  for(const row of rows){
+    const e=document.createElement('div');e.className='admin-avatar-row'
+    const badge=document.createElement('span');badge.className='admin-avatar-badge';badge.textContent=String(row.famileoName||'?').slice(0,1).toUpperCase()
+    const info=document.createElement('div');info.className='admin-avatar-info';info.innerHTML=`<strong>${esc(row.famileoName||'—')}</strong><span>${esc(row.author||'Telegram')} · ${row.telegramUserId}</span>`
+    const del=document.createElement('button');del.type='button';del.textContent='🗑️';del.title='Supprimer cette association';const allowed=Number(row.telegramUserId)===Number(state.userId)||state.canDeleteOthers;del.disabled=!allowed
+    del.onclick=async()=>{del.disabled=true;status('adminAvatarStatus','Suppression…');try{const next=await service.adminRemoveAvatarAssociation(row.telegramUserId);renderAdminAvatarAssignments(next);status('adminAvatarStatus','Association supprimée.',true)}catch(err){debug(err);status('adminAvatarStatus','Erreur : '+(err.message||err),false);del.disabled=false}}
+    e.append(badge,info,del);host.appendChild(e)
+    magazineAvatarForName(row.famileoName).then(url=>{if(!url||!document.body.contains(e))return;const img=document.createElement('img');img.className='admin-avatar-badge';img.alt=row.famileoName||'Avatar';img.src=url;badge.replaceWith(img)}).catch(()=>{})
+  }
+  if(!state.canDeleteOthers)status('adminAvatarStatus','Sans droit Telegram « supprimer les messages », seules tes propres associations peuvent être retirées.')
+}
+$('adminShowAvatars').onclick=async()=>{const box=$('adminAvatarAdmin');if(!box.hidden){box.hidden=true;return}box.hidden=false;status('adminAvatarStatus','Chargement…');try{const state=await service.adminAvatarAssignments();renderAdminAvatarAssignments(state);if(state.canDeleteOthers)status('adminAvatarStatus','Droits de suppression Telegram détectés.',true)}catch(e){debug(e);status('adminAvatarStatus','Erreur : '+(e.message||e),false)}}
+
 $('adminSaveParams').onclick=async()=>{try{$('adminSaveParams').disabled=true;status('adminParamsStatus','Mise à jour params…');const r=await service.adminSaveParams({storagePassword:$('adminStoragePassword').checked});if(!$('adminStoragePassword').checked)localStorage.removeItem(STORED_PASSWORD_KEY);status('adminParamsStatus',`OK · message ${r.paramsMessageId}`,true);await loadSettings()}catch(e){rememberAdminError(e,'Mise à jour params');status('adminParamsStatus','Erreur : '+e.message,false)}finally{$('adminSaveParams').disabled=false}}
 $('adminInitSystem').onclick=async()=>{try{const sha=$('catalogShaFile').files?.[0],json=$('catalogJsonFile').files?.[0],bin=$('catalogBinFile').files?.[0];$('adminInitSystem').disabled=true;$('copyAdminError').hidden=true;lastAdminErrorText='';status('adminSystemStatus','Publication params/catalog…');const r=await service.adminInitializeSystem({shaFile:sha,catalogJsonFile:json,catalogBinFile:bin});status('adminSystemStatus',`OK · params ${r.paramsTopicId}, catalog ${r.catalogTopicId}`,true);await $('adminRefreshTopics').onclick?.()}catch(e){rememberAdminError(e,'Initialisation params/catalog');status('adminSystemStatus','Erreur : '+e.message,false)}finally{$('adminInitSystem').disabled=false}}
 $('adminRefreshGroups').onclick=async()=>{try{adminGroups=await service.adminListForumDialogs();const s=$('adminGroupSelect');s.innerHTML='';adminGroups.forEach((g,i)=>{const o=document.createElement('option');o.value=i;o.textContent=g.title;s.appendChild(o)});const recipe=adminGroups.findIndex(g=>String(g.title||'').trim().toLowerCase()==='famileo_recette');if(recipe>=0){s.value=String(recipe);await service.selectDialog(adminGroups[recipe])}status('adminStatus',`${adminGroups.length} groupes avec sujets.${recipe>=0?' famileo_recette sélectionné.':''}`,true)}catch(e){status('adminStatus','Erreur : '+e.message,false)}}

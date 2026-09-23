@@ -16,6 +16,7 @@
 <div id="splash" class="splash" hidden>
   <img class="splash-brand-image" src="./mamina-v08-512.png?v=101" alt="MamiNa">
   <div class="splash-title">MamiNa</div>
+  <div id="splashVersion" class="splash-version subtle"></div>
   <div class="splash-user-row">
     <img id="splashAvatar" class="splash-avatar" alt="">
     <div id="splashHello" class="splash-hello"></div>
@@ -184,6 +185,11 @@
         <label class="check-row"><input id="adminStoragePassword" type="checkbox" checked> Mémoriser le mot de passe MamiNa sur l’appareil</label>
         <button id="adminSaveParams" type="button">Publier / mettre à jour params</button>
         <div id="adminParamsStatus" class="status"></div>
+        <button id="adminShowAvatars" type="button" class="secondary">Gérer les avatars associés</button>
+        <div id="adminAvatarAdmin" class="admin-avatar-admin" hidden>
+          <div id="adminAvatarList" class="admin-avatar-list"></div>
+          <div id="adminAvatarStatus" class="status"></div>
+        </div>
         <label>Ressources catalogue</label>
         <input id="catalogShaFile" type="file" accept="application/json">
         <input id="catalogJsonFile" type="file" accept="application/json">

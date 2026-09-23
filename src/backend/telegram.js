@@ -167,6 +167,11 @@ export class TelegramGateway {
     }), { threadId:topicId, silent:true })
   }
 
+  canDeleteOthers(peer) {
+    const rights=peer?.adminRights||peer?.admin_rights||peer?.permissions||{}
+    return Boolean(peer?.isCreator||peer?.creator||rights?.deleteMessages||rights?.delete_messages)
+  }
+
   async editSystemText(peer, messageId, humanText, meta) {
     return this.tg.editMessage({ chatId: peer, messageId: Number(messageId), text: withMeta(humanText, meta), shouldDispatch: true })
   }
