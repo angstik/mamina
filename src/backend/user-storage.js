@@ -119,6 +119,7 @@ export async function putMessages(rows) {
 export async function listMessagesByMagazine(magazineId) { const db=await openDb(); try{const a=await requestResult(db.transaction('messages').objectStore('messages').index('magazineId').getAll(magazineId)); return (a||[]).sort((x,y)=>x.id-y.id)}finally{db.close()} }
 export async function listMessagesByArticle(articleKey) { const db=await openDb(); try{const a=await requestResult(db.transaction('messages').objectStore('messages').index('articleKey').getAll(articleKey)); return (a||[]).sort((x,y)=>x.id-y.id)}finally{db.close()} }
 export async function deleteMessagesByMagazine(magazineId) { const rows=await listMessagesByMagazine(magazineId); const db=await openDb(); try{await new Promise((resolve,reject)=>{const tx=db.transaction('messages','readwrite'),s=tx.objectStore('messages');for(const r of rows)s.delete(r.key);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)})}finally{db.close()} }
+export async function deleteMessageByKey(key) { if(!key)return; return transact('messages','readwrite',s=>s.delete(key)) }
 
 export async function getReadState(articleKey) { const db=await openDb(); try{return await requestResult(db.transaction('readState').objectStore('readState').get(articleKey))}finally{db.close()} }
 export async function putReadState(articleKey,lastReadMessageId) { return transact('readState','readwrite',s=>s.put({articleKey,lastReadMessageId:Number(lastReadMessageId)||0,updatedAt:new Date().toISOString()})) }

@@ -7,7 +7,7 @@ import { parseMeta, stripMeta } from './protocol.js'
 import {
   settings, putMagazine, getMagazine, getMagazineByTopic, listMagazines,
   putTopicState, getTopicState, replaceArticles, listArticles,
-  putMessages, listMessagesByMagazine, deleteMessagesByMagazine,
+  putMessages, listMessagesByMagazine, deleteMessagesByMagazine, deleteMessageByKey,
   getReadState, putReadState, listReadStates,
   putAsset, getAsset, deleteAsset, deleteAssetsByPrefix, pruneToMagazineIds,
   putOutbox, getOutbox, listOutbox, deleteOutbox, countOutbox, estimateLocalStorage, clearPublicationCache,
@@ -67,6 +67,10 @@ function canvasBlob(canvas, type='image/jpeg', quality=.82) {
 
 function resolveRowsToArticles(rows, articles) {
   const articleKeys = new Set(articles.map(a => a.articleKey))
+  // Deletion markers are tombstones. Missing targets are intentionally ignored:
+  // a newcomer may only receive the tombstone because Telegram already deleted
+  // the original message.
+  const deletedIds = new Set(rows.filter(r=>r.meta?.kind==='delete').map(r=>Number(r.meta?.targetMessageId||0)).filter(x=>x>0))
   const roots = new Map()
   for (const row of rows) {
     if (row.meta?.kind === 'root' && row.meta.articleKey) {
@@ -94,6 +98,7 @@ function resolveRowsToArticles(rows, articles) {
   }
 
   for (const row of rows) {
+    if(row.meta?.kind==='delete' || deletedIds.has(Number(row.id)))continue
     const ak=resolveArticle(row)
     if(!ak)continue
     if (row.meta?.kind === 'motion' && row.meta?.type === 'emoji' && motionsBy.has(ak)) {
@@ -145,11 +150,13 @@ export class UserMaminaService {
       senderId:null,
       isOutgoing:true,
       pending:true,
+      pendingId:item.id,
       date:item.createdAt,
       text:'',
       meta:{kind:'motion',type:'emoji'},
       motion:item.motion,
       topicId:Number(item.topicId||0)||null,
+      pendingId:item.id,
     }
   }
 
@@ -214,6 +221,49 @@ export class UserMaminaService {
   }
 
 
+  _profileCacheKey() { return `familyProfiles:${idOfPeer(this.dialog?.peer)}` }
+
+  async familyProfileAssignments({refresh=true}={}) {
+    const key=this._profileCacheKey()
+    let cached=await settings.get(key,{})
+    if(!cached||typeof cached!=='object'||Array.isArray(cached))cached={}
+    if(!refresh||!this.gateway||!this.dialog||!(this.gateway.connectionState==='connected'||this.gateway.connectionState==='updating'||this.gateway.isConnected()))return cached
+    try {
+      let topicId=Number(await settings.get('paramsTopicId',0)||0)
+      if(!topicId){const topic=(await this.gateway.topics(this.dialog.peer)).find(t=>exactTopic(t,PARAMS_TOPIC));topicId=topic?topicIdOf(topic):0;if(topicId)await settings.set('paramsTopicId',topicId)}
+      if(!topicId)return cached
+      const raw=await this.gateway.topicMessages(this.dialog.peer,topicId,{limit:300})
+      const profiles=raw.map(TelegramGateway.messageModel).filter(r=>r.meta?.kind==='mamina-profile'&&r.senderId&&String(r.meta?.famileoName||'').trim())
+      profiles.sort((a,b)=>a.id-b.id)
+      const map={}
+      for(const row of profiles)map[String(row.senderId)]={telegramUserId:Number(row.senderId),famileoName:String(row.meta.famileoName).trim(),messageId:row.id,author:row.author||''}
+      await settings.set(key,map)
+      return map
+    } catch(e) { warn('profile','Profils famille indisponibles',{message:e?.message||String(e)});return cached }
+  }
+
+  async avatarAssociationState() {
+    const userId=Number(await settings.get('userId',0)||0)||null
+    const profiles=await this.familyProfileAssignments({refresh:true})
+    const own=userId?profiles[String(userId)]||null:null
+    return {userId,own,assignedNames:[...new Set(Object.values(profiles).map(x=>String(x?.famileoName||'').trim()).filter(Boolean))],profiles}
+  }
+
+  async assignFamileoAvatar(famileoName) {
+    if(!this.gateway||!this.dialog||!(this.gateway.connectionState==='connected'||this.gateway.connectionState==='updating'||this.gateway.isConnected()))throw new Error('Connexion Telegram requise pour associer un avatar.')
+    const name=String(famileoName||'').trim();if(!name)throw new Error('Avatar invalide.')
+    const state=await this.avatarAssociationState(),needle=name.toLocaleLowerCase('fr')
+    const taken=Object.values(state.profiles||{}).find(x=>Number(x?.telegramUserId)!==Number(state.userId)&&String(x?.famileoName||'').trim().toLocaleLowerCase('fr')===needle)
+    if(taken)throw new Error('Cet avatar vient d’être attribué à un autre utilisateur.')
+    let topicId=Number(await settings.get('paramsTopicId',0)||0)
+    if(!topicId){const topic=(await this.gateway.topics(this.dialog.peer)).find(t=>exactTopic(t,PARAMS_TOPIC));topicId=topic?topicIdOf(topic):0}
+    if(!topicId)throw new Error('Sujet params introuvable.')
+    await this.gateway.postFamilyProfile(this.dialog.peer,topicId,name)
+    await settings.set('paramsTopicId',topicId)
+    await this.familyProfileAssignments({refresh:true})
+    return this.avatarAssociationState()
+  }
+
   async cacheMotionAvatars(rawMessages=[],models=null) {
     const rows=models||rawMessages.map(TelegramGateway.messageModel)
     const seen=new Set()
@@ -266,6 +316,7 @@ export class UserMaminaService {
     this.activity('Profil Telegram…')
     try {
       const profile=await this.gateway.selfProfile()
+      if(profile.id) await settings.set('userId',Number(profile.id))
       if(profile.name) await settings.set('userName',profile.name)
       if(profile.username) await settings.set('userUsername',profile.username)
       if(profile.avatar) await putAsset('user-avatar',new Uint8Array(profile.avatar))
@@ -279,11 +330,12 @@ export class UserMaminaService {
   }
 
   async localUserProfile() {
+    const id=Number(await settings.get('userId',0)||0)||null
     const name=await settings.get('userName','')
     const username=await settings.get('userUsername','')
     const bytes=await getAsset('user-avatar')
     const avatar=bytes ? new Blob([bytes],{type:'image/jpeg'}) : null
-    return {name,username,avatar}
+    return {id,name,username,avatar}
   }
 
   installUpdates() {
@@ -490,13 +542,15 @@ export class UserMaminaService {
     const rows=models.filter(r=>r.id>cursor)
     const messages=rows.filter(r=>r.meta?.kind==='message')
     const motionAdd=rows.filter(r=>r.meta?.kind==='motion'&&r.meta?.type==='emoji').length
+    const messageDelete=rows.filter(r=>r.meta?.kind==='delete'&&r.meta?.targetKind==='message').length
+    const motionDelete=rows.filter(r=>r.meta?.kind==='delete'&&r.meta?.targetKind==='motion').length
     let unreadAdd=0
     for(const m of messages) {
       if(m.isOutgoing) continue
       const rs=await getReadState(m.meta?.articleKey||'')
       if(m.id>Number(rs?.lastReadMessageId||0)) unreadAdd++
     }
-    const next={...magazine,reactionCount:Number(magazine.reactionCount||0)+messages.length,motionCount:Number(magazine.motionCount||0)+motionAdd,unreadCount:Number(magazine.unreadCount||0)+unreadAdd,lastMessageId:Math.max(cursor,...rows.map(r=>r.id)),updatedAt:new Date().toISOString()}
+    const next={...magazine,reactionCount:Math.max(0,Number(magazine.reactionCount||0)+messages.length-messageDelete),motionCount:Math.max(0,Number(magazine.motionCount||0)+motionAdd-motionDelete),unreadCount:Number(magazine.unreadCount||0)+unreadAdd,lastMessageId:Math.max(cursor,...rows.map(r=>r.id)),updatedAt:new Date().toISOString()}
     this.activity('Base locale · mise à jour des messages')
     await putMagazine(next)
     await putTopicState({topicKey:magazine.topicKey,topicId:magazine.topicId,cursor:next.lastMessageId,updatedAt:next.updatedAt})
@@ -582,9 +636,16 @@ export class UserMaminaService {
     const resolved=resolveRowsToArticles(all,articles)
     const comments=[...resolved.byArticle.values()].flat()
     const motions=[...resolved.motionsBy.values()].flat()
-    const payload=[...comments,...motions].map(c=>({
+    const tombstones=all.filter(r=>r.meta?.kind==='delete'&&Number(r.meta?.targetMessageId||0)>0).map(r=>({
+      ...r,
+      articleKey:r.meta?.articleKey||r.articleKey||null,
+      key:`${magazine.magazineId}:${r.id}`,
+      magazineId:magazine.magazineId,
+      topicKey:magazine.topicKey,
+    }))
+    const payload=[...comments,...motions,...tombstones].map(c=>({
       ...c,
-      key:`${magazine.magazineId}:${c.id}`,
+      key:c.key||`${magazine.magazineId}:${c.id}`,
       magazineId:magazine.magazineId,
       topicKey:magazine.topicKey,
       articleKey:c.articleKey,
@@ -684,13 +745,12 @@ export class UserMaminaService {
     if(!this.current) return null
     const {magazine,pdf,articles,rows}=this.current
     const read=await this.readMap()
-    const commentsBy=new Map(articles.map(a=>[a.articleKey,[]]))
-    const motionsBy=new Map(articles.map(a=>[a.articleKey,[]]))
-    for(const row of rows){
-      if(!row.articleKey)continue
-      if(row.meta?.kind==='motion'&&motionsBy.has(row.articleKey))motionsBy.get(row.articleKey).push(row)
-      else if(commentsBy.has(row.articleKey))commentsBy.get(row.articleKey).push(row)
-    }
+    // Always resolve through the tombstone-aware path. Cached rows may still
+    // contain the original contribution after Telegram deleted it, while a
+    // later silent deletion marker tells every client to hide it.
+    const resolved=resolveRowsToArticles(rows,articles)
+    const commentsBy=resolved.byArticle
+    const motionsBy=resolved.motionsBy
     const outbox=await listOutbox()
     const pendingBy=new Map(outbox.map(x=>[x.articleKey,x]))
     const pendingMotionRows=await this._listPendingMotions()
@@ -767,6 +827,51 @@ export class UserMaminaService {
       await this._queueEmojiMotion(articleKey,normalized)
       return this.currentView()
     }
+  }
+
+  async deleteOwnContribution({articleKey,kind,messageId=null,pendingId=null}={}) {
+    if(!this.current)throw new Error('Aucune revue ouverte.')
+    const ak=String(articleKey||'');if(!ak)throw new Error('Article inconnu.')
+    if(kind==='motion'&&pendingId){
+      const before=await this._listPendingMotions(),after=before.filter(x=>x.id!==pendingId)
+      if(after.length===before.length)throw new Error('Animation en attente introuvable.')
+      await this._savePendingMotions(after)
+      return this.currentView()
+    }
+    if(kind==='message'&&!messageId){
+      await deleteOutbox(ak)
+      return this.currentView()
+    }
+    const id=Number(messageId||0)
+    const row=this.current.rows.find(r=>Number(r.id)===id&&r.articleKey===ak)
+    if(!row||!row.isOutgoing)throw new Error('Seules tes contributions peuvent être supprimées.')
+    if(!this.gateway||!this.dialog||this.gateway.connectionState!=='connected')throw new Error('Connexion Telegram requise pour supprimer cette contribution.')
+    const article=this.current.articles.find(a=>a.articleKey===ak)
+    if(!article)throw new Error('Article inconnu.')
+    const full=await this.gateway.topicMessages(this.dialog.peer,Number(this.current.magazine.topicId),{limit:Infinity})
+    const {rootId}=await this.gateway.ensureRoot(this.dialog.peer,Number(this.current.magazine.topicId),this.current.magazine,article,full)
+    let marker=null,deleted=false
+    try { marker=await this.gateway.postDeletionMarker(this.dialog.peer,Number(this.current.magazine.topicId),rootId,ak,id,kind) } catch(e) { warn('delete','Marqueur de suppression non publié',{messageId:id,message:e?.message||String(e)}) }
+    try { await this.gateway.deleteMessagesById(this.dialog.peer,[id]); deleted=true } catch(e) { warn('delete','Suppression Telegram directe impossible',{messageId:id,message:e?.message||String(e)}) }
+    if(!marker&&!deleted)throw new Error('Suppression Telegram impossible pour le moment.')
+    const markerRow=marker?TelegramGateway.messageModel(marker):null
+    const localKey=`${this.current.magazine.magazineId}:${id}`
+    // Remove the target locally even when publishing the tombstone failed;
+    // this prevents a successfully deleted Telegram message from reappearing
+    // from IndexedDB on the same device.
+    try { await deleteMessageByKey(localKey) } catch(e) { warn('delete','Suppression cache local impossible',{messageId:id,message:e?.message||String(e)}) }
+    this.current.rows=this.current.rows.filter(r=>Number(r.id)!==id)
+    if(markerRow)this.current.rows.push({...markerRow,articleKey:ak,key:`${this.current.magazine.magazineId}:${markerRow.id}`,magazineId:this.current.magazine.magazineId,topicKey:this.current.magazine.topicKey})
+    this.current.rows.sort((a,b)=>a.id-b.id)
+    if(markerRow)await putMessages([this.current.rows.find(r=>r.id===markerRow.id)])
+    // A published tombstone will adjust the persisted counters on the next
+    // incremental sync. Only adjust immediately when the marker itself could
+    // not be published, otherwise the same deletion would be counted twice.
+    if(!marker){
+      const magazine=await getMagazine(this.current.magazine.magazineId)
+      if(magazine){const field=kind==='motion'?'motionCount':'reactionCount',next={...magazine,[field]:Math.max(0,Number(magazine[field]||0)-1)};await putMagazine(next);this.current.magazine=next}
+    }
+    return this.currentView()
   }
 
   async queueText(articleKey,text) {

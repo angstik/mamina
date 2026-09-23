@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.11'
+const APP_VERSION='1.1.12'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -25,6 +25,7 @@ const DEFAULT_MOTION_EMOJI=['❤️','😂','👍','😍','😢','🎉','😘','
 const EMOJI_RECENT_KEY='MAMINA_EMOJI_RECENT'
 const EMOJI_USAGE_KEY='MAMINA_EMOJI_USAGE'
 const motionAuthorUrls=[]
+const avatarChoiceUrls=[]
 const focusZoomStates=new Map()
 let focusArticleKey=null,focusPhotoUrl=null
 
@@ -208,6 +209,7 @@ function startNetwork(){
       const byKey=new Map(fresh.articles.map(a=>[a.articleKey,a]))
       displayArticles=displayArticles.map(a=>byKey.has(a.articleKey)?{...a,...byKey.get(a.articleKey)}:a)
       rerenderCommentOrderOnly()
+      updateReaderPageLabel()
       updateMotionReplayHeader()
       await refreshPending()
     }
@@ -241,6 +243,8 @@ async function refreshOpenMagazineLocal(){
   const idx=displayArticles.findIndex(a=>a.articleKey===keep)
   if(idx>=0)currentArticleIndex=idx
   rerenderCommentOrderOnly()
+  updateReaderPageLabel()
+  updateMotionReplayHeader()
 }
 async function backgroundSync(){
   if(!service.hasGateway()||!service.hasDialog())return
@@ -290,6 +294,7 @@ async function openMagazine(id,preferredArticleKey=null,restoring=false){
     $('home').hidden=true;$('reader').hidden=false
     saveReaderState(displayArticles[currentArticleIndex]?.articleKey)
     await renderReader()
+    setTimeout(()=>maybeOfferFamileoAvatar(),420)
     if(displayArticles.some(a=>!a.photoBounds||!a.authorName)){
       setTimeout(async()=>{
         try{
@@ -308,6 +313,8 @@ async function openMagazine(id,preferredArticleKey=null,restoring=false){
   }
 }
 $('back').onclick=async()=>{
+  if(!$('contributionPopup').hidden){closeContributionPopup();return}
+  if(!$('avatarPopup').hidden){closeAvatarPopup();return}
   if(!$('motionComposer').hidden){closeMotionComposer({restoreZoom:true});return}
   if(!$('composerModal').hidden)return
   clearReaderState();$('reader').hidden=true;$('home').hidden=false
@@ -328,6 +335,81 @@ function orderArticles(rows){
   })
 }
 const currentArticle=()=>displayArticles[currentArticleIndex]
+const slotLong=s=>s==='h'?'haut':s==='b'?'bas':''
+function ownContributions(article=currentArticle()){
+  if(!article)return[]
+  const rows=[]
+  for(const m of article.comments||[]){if(m.isOutgoing||m.pending)rows.push({kind:'message',date:m.date||'',id:Number(m.id||0),row:m})}
+  for(const m of article.motions||[]){if(m.isOutgoing||m.pending)rows.push({kind:'motion',date:m.date||'',id:Number(m.id||0),row:m})}
+  return rows.sort((a,b)=>{const da=Date.parse(a.date)||0,db=Date.parse(b.date)||0;return da-db||a.id-b.id})
+}
+function updateReaderPageLabel(){
+  const a=currentArticle(),host=$('readerPage');if(!a||!host)return
+  const suffix=slotLong(a.slot),label=`Article ${currentArticleIndex+1}/${displayArticles.length} - Page ${a.page}${suffix?' '+suffix:''}`
+  host.innerHTML=''
+  const span=document.createElement('span');span.className='reader-page-text';span.textContent=label;host.appendChild(span)
+  if(ownContributions(a).length){const b=document.createElement('button');b.type='button';b.className='reader-page-more';b.textContent='…';b.title='Mes contributions';b.setAttribute('aria-label','Mes contributions');b.onclick=e=>{e.stopPropagation();openContributionPopup()};host.appendChild(b)}
+}
+function motionOptionLabel(mode){return({stable:'Stable',grow:'Agrandit',shrink:'Rétrécit',pulse:'Petit-grand-petit','inverse-pulse':'Grand-petit-grand',explosion:'Explosion',rain:'Pluie',cloud:'Nuage',random:'Aléatoire'})[mode]||'Animation'}
+function closeContributionPopup(){$('contributionPopup').hidden=true;$('contributionPopupStatus').textContent=''}
+async function refreshReaderAfterContributionChange(view,articleKey){
+  currentModel=view
+  const fresh=view?.articles?.find(a=>a.articleKey===articleKey),idx=displayArticles.findIndex(a=>a.articleKey===articleKey)
+  if(fresh&&idx>=0)displayArticles[idx]=fresh
+  const list=$('articleDeck').querySelector(`[data-index="${idx}"] .reaction-list`);if(list&&fresh)renderComments(fresh,list)
+  updateReaderPageLabel();updateMotionReplayHeader();await refreshPending()
+}
+function renderContributionPopup(){
+  const host=$('contributionPopupList'),items=ownContributions();host.innerHTML=''
+  if(!items.length){host.innerHTML='<div class="empty">Aucune contribution à supprimer.</div>';return}
+  for(const item of items){
+    const row=item.row,e=document.createElement('div');e.className='contribution-row'
+    const preview=document.createElement('div');preview.className='contribution-preview'
+    const kind=document.createElement('div');kind.className='contribution-kind';kind.textContent=(item.kind==='motion'?'Animation':'Message')+(row.pending?' · hors ligne':'')
+    const body=document.createElement('div')
+    if(item.kind==='motion'){
+      body.className='contribution-motion'
+      const motion=row.motion||row.meta?.motion||{},emojis=(motion.emoji||[]).map(codepointsToString).join(' ')
+      body.textContent=`${emojis||'✨'} · ${motionOptionLabel(motion.scale)}`
+    }else{body.className='contribution-message';body.textContent=row.displayText||row.text||''}
+    preview.append(kind,body)
+    const del=document.createElement('button');del.type='button';del.className='contribution-delete';del.textContent='🗑️';del.title='Supprimer';del.setAttribute('aria-label','Supprimer cette contribution')
+    del.onclick=async()=>{del.disabled=true;status('contributionPopupStatus','Suppression…');try{const view=await service.deleteOwnContribution({articleKey:currentArticle().articleKey,kind:item.kind,messageId:row.pending?null:row.id,pendingId:row.pendingId||null});await refreshReaderAfterContributionChange(view,currentArticle().articleKey);renderContributionPopup();requestAnimationFrame(()=>{const h=$('contributionPopupList');h.scrollTop=h.scrollHeight});status('contributionPopupStatus','Supprimé.',true)}catch(err){debug(err);status('contributionPopupStatus','Erreur : '+(err.message||err),false);del.disabled=false}}
+    e.append(preview,del);host.appendChild(e)
+  }
+  requestAnimationFrame(()=>{host.scrollTop=host.scrollHeight})
+}
+function openContributionPopup(){if(!ownContributions().length)return;renderContributionPopup();$('contributionPopup').hidden=false}
+$('contributionPopupClose').onclick=closeContributionPopup
+$('contributionPopup').addEventListener('click',e=>{if(e.target===$('contributionPopup'))closeContributionPopup()})
+
+function closeAvatarPopup(){freeUrls(avatarChoiceUrls);$('avatarPopup').hidden=true;$('avatarPopupStatus').textContent=''}
+$('avatarPopupClose').onclick=closeAvatarPopup
+$('avatarPopup').addEventListener('click',e=>{if(e.target===$('avatarPopup'))closeAvatarPopup()})
+function waitForImage(img,timeout=3500){return new Promise(resolve=>{if(img?.complete&&img.naturalWidth)return resolve(img);let done=false;const end=()=>{if(done)return;done=true;clearTimeout(timer);resolve(img?.naturalWidth?img:null)};const timer=setTimeout(end,timeout);img?.addEventListener('load',end,{once:true});img?.addEventListener('error',end,{once:true})})}
+async function fillAvatarChoiceImage(button,article,index){
+  try{await loadVisual(index);const img=await waitForImage(articleImg(index));if(!img||$('avatarPopup').hidden)return;const url=cropImage(img,article.avatarBounds);if(!url)return;const placeholder=button.querySelector('.avatar-placeholder');if(placeholder){const pic=document.createElement('img');pic.alt=`Avatar ${article.authorName||''}`;pic.src=url;placeholder.replaceWith(pic);avatarChoiceUrls.push(url)}}catch(e){debug(e)}
+}
+async function maybeOfferFamileoAvatar(){
+  if(!currentModel||!['connected','updating'].includes(service.connectionState())||!$('avatarPopup').hidden)return
+  try{
+    const state=await service.avatarAssociationState();if(state.own)return
+    const assigned=new Set((state.assignedNames||[]).map(x=>String(x).trim().toLocaleLowerCase('fr'))),seen=new Set(),choices=[]
+    for(let i=0;i<displayArticles.length;i++){
+      const a=displayArticles[i],name=String(a.authorName||'').trim(),key=name.toLocaleLowerCase('fr')
+      if(!name||!a.avatarBounds||seen.has(key)||assigned.has(key))continue
+      seen.add(key);choices.push({name,article:a,index:i})
+    }
+    if(!choices.length)return
+    const host=$('avatarPopupGrid');host.innerHTML='';freeUrls(avatarChoiceUrls)
+    for(const choice of choices){
+      const b=document.createElement('button');b.type='button';b.className='avatar-choice';b.innerHTML=`<div class="avatar-placeholder">${esc(choice.name.slice(0,1).toUpperCase())}</div><span>${esc(choice.name)}</span>`
+      b.onclick=async()=>{for(const x of host.querySelectorAll('button'))x.disabled=true;status('avatarPopupStatus','Association…');try{await service.assignFamileoAvatar(choice.name);status('avatarPopupStatus','Avatar associé.',true);setTimeout(closeAvatarPopup,280)}catch(err){debug(err);status('avatarPopupStatus','Erreur : '+(err.message||err),false);for(const x of host.querySelectorAll('button'))x.disabled=false}}
+      host.appendChild(b);fillAvatarChoiceImage(b,choice.article,choice.index)
+    }
+    $('avatarPopup').hidden=false
+  }catch(e){debug(e)}
+}
 async function rebuild(key){
   displayArticles=orderArticles(currentModel.articles)
   const i=displayArticles.findIndex(a=>a.articleKey===key)
@@ -454,7 +536,7 @@ function activate(i){
   hideMotionAuthors()
   currentArticleIndex=i
   saveReaderState(currentArticle()?.articleKey)
-  $('readerPage').textContent=`Article ${i+1}/${displayArticles.length} · p${currentArticle().page}-${currentArticle().slot}`
+  updateReaderPageLabel()
   updateMotionReplayHeader()
   ;[i,i-1,i+1].forEach(loadVisual)
   setTimeout(()=>warmAround(i),0)
@@ -763,13 +845,26 @@ function playCloudMotion(motion,index,{delay=0}={}){
   const spans=specs.map((q,i)=>{const e=document.createElement('span');e.className='motion-play-emoji';e.textContent=motionParticleEmoji(emojis,i);e.style.fontSize=`${size}px`;layer.appendChild(e);return e})
   return new Promise(resolve=>{const start=performance.now()+delay;const frame=now=>{if(now<start){requestAnimationFrame(frame);return}const t=Math.min(1,(now-start)/duration),opacity=t>.84?Math.max(0,(1-t)/.16):1;for(let i=0;i<spans.length;i++){const q=specs[i],ct=clamp01Motion(q.start+q.end*t),pt=motionPointAt(motion.curve,ct),d=motionDerivatives(motion.curve,ct,rect),wave=Math.sin(Math.PI*t)*Math.sin(q.phase+t*Math.PI*2)*q.amp*q.side,x=rect.left+pt[0]*rect.width+d.nx*wave,y=rect.top+pt[1]*rect.height+d.ny*wave,sc=.52+1.18*Math.sin(Math.PI*Math.min(1,t/.72));spans[i].style.opacity=String(opacity);spans[i].style.transform=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`}if(t<1&&spans.some(e=>document.body.contains(e)))requestAnimationFrame(frame);else{spans.forEach(e=>e.remove());resolve()}};requestAnimationFrame(frame)})
 }
+function curveMotionMetrics(curve,rect){
+  const pts=[],n=28
+  for(let i=0;i<=n;i++){const t=i/n,p=motionPointAt(curve,t);pts.push({x:p[0]*rect.width,y:p[1]*rect.height})}
+  let length=0,turn=0
+  for(let i=1;i<pts.length;i++)length+=Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y)
+  for(let i=2;i<pts.length;i++){
+    const ax=pts[i-1].x-pts[i-2].x,ay=pts[i-1].y-pts[i-2].y,bx=pts[i].x-pts[i-1].x,by=pts[i].y-pts[i-1].y
+    turn+=Math.atan2(ax*by-ay*bx,ax*bx+ay*by)
+  }
+  const chord=Math.max(1,Math.hypot(pts.at(-1).x-pts[0].x,pts.at(-1).y-pts[0].y))
+  return {length,turn,roundish:Math.abs(turn)>1.15&&length/chord>1.25}
+}
 function playRandomMotion(motion,index,{delay=0}={}){
   const v=motionVisual(index),img=motionImage(index),layer=v?.querySelector('.motion-play-layer');if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
   const emojis=(motion.emoji||[]).map(codepointsToString).filter(Boolean);if(!emojis.length)return Promise.resolve()
-  const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(96,(Number(motion.size)||.075)*rect.width)),duration=motionPlaybackDuration(motion)
-  const specs=Array.from({length:7},(_,i)=>({dir:i%2?1:-1,reach:.20+.045*i,speed:.55+.12*(i%4),phase:(i+1)*1.77,amp:Math.min(rect.width,rect.height)*(.028+.01*(i%3)),side:i%3===0?-1:1}))
+  const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(96,(Number(motion.size)||.075)*rect.width)),duration=motionPlaybackDuration(motion),metrics=curveMotionMetrics(motion.curve,rect)
+  const center=motionPointAt(motion.curve,.5),cx=rect.left+center[0]*rect.width,cy=rect.top+center[1]*rect.height,base=Math.max(48,Math.min(metrics.length*.58,Math.hypot(rect.width,rect.height)*.72)),rotationSign=metrics.turn>=0?1:-1
+  const specs=Array.from({length:7},()=>({angle:Math.random()*Math.PI*2,distance:base*(.42+Math.random()*.72),accel:1.15+Math.random()*2.4,orth:(Math.random()*2-1)*base*(.08+Math.random()*.14),waves:1+Math.floor(Math.random()*3),phase:Math.random()*Math.PI*2,spin:metrics.roundish?rotationSign*(.45+Math.random()*1.25):0}))
   const spans=specs.map((q,i)=>{const e=document.createElement('span');e.className='motion-play-emoji';e.textContent=motionParticleEmoji(emojis,i);e.style.fontSize=`${size}px`;layer.appendChild(e);return e})
-  return new Promise(resolve=>{const start=performance.now()+delay;const frame=now=>{if(now<start){requestAnimationFrame(frame);return}const t=Math.min(1,(now-start)/duration),opacity=t>.86?Math.max(0,(1-t)/.14):1;for(let i=0;i<spans.length;i++){const q=specs[i],travel=1-Math.pow(1-t,q.speed),ct=clamp01Motion(.5+q.dir*q.reach*travel),pt=motionPointAt(motion.curve,ct),d=motionDerivatives(motion.curve,ct,rect),drift=Math.sin(q.phase+t*Math.PI*4)*q.amp*(.35+.65*travel),spread=Math.cos(q.phase*.7+t*Math.PI*3)*q.amp*.5*(.25+travel),x=rect.left+pt[0]*rect.width+d.nx*(drift*q.side)+d.tx*spread,y=rect.top+pt[1]*rect.height+d.ny*(drift*q.side)+d.ty*spread,sc=.48+1.28*Math.sin(Math.PI*Math.min(1,t/.8));spans[i].style.opacity=String(opacity);spans[i].style.transform=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`}if(t<1&&spans.some(e=>document.body.contains(e)))requestAnimationFrame(frame);else{spans.forEach(e=>e.remove());resolve()}};requestAnimationFrame(frame)})
+  return new Promise(resolve=>{const start=performance.now()+delay;const frame=now=>{if(now<start){requestAnimationFrame(frame);return}const t=Math.min(1,(now-start)/duration),opacity=t>.86?Math.max(0,(1-t)/.14):1;for(let i=0;i<spans.length;i++){const q=specs[i],radial=Math.pow(t,q.accel),angle=q.angle+q.spin*t,rx=Math.cos(angle),ry=Math.sin(angle),ox=-ry,oy=rx,side=Math.sin(q.phase+t*Math.PI*2*q.waves)*q.orth*Math.sin(Math.PI*t),dist=q.distance*radial,x=cx+rx*dist+ox*side,y=cy+ry*dist+oy*side,sc=.44+1.36*Math.sin(Math.PI*Math.min(1,t/.82));spans[i].style.opacity=String(opacity);spans[i].style.transform=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`}if(t<1&&spans.some(e=>document.body.contains(e)))requestAnimationFrame(frame);else{spans.forEach(e=>e.remove());resolve()}};requestAnimationFrame(frame)})
 }
 function playMotion(motion,index,{preview=false,delay=0}={}){
   if(motion?.scale==='explosion')return playExplosionMotion(motion,index,{delay})
@@ -801,9 +896,10 @@ function playArticleMotions(article,index,{force=false}={}){
   return Promise.all(jobs).finally(()=>{activeMotionArticles.delete(key);hideMotionAuthors();updateMotionReplayHeader()}).then(()=>true)
 }
 function updateMotionReplayHeader(){
-  const b=$('motionReplayHeader'),a=currentArticle(),has=Boolean(a?.motions?.length)
+  const b=$('motionReplayHeader'),a=currentArticle(),has=Boolean(a?.motions?.length),pending=Boolean(a?.motions?.some(m=>m.pending))
   b.hidden=!has||!$('composerModal').hidden||!$('motionComposer').hidden
   b.disabled=!has||activeMotionArticles.has(a?.articleKey)
+  b.classList.toggle('pending-outbox',pending)
 }
 function playMotionPreview(){
   if(!motionDraft?.curve)return
@@ -847,7 +943,8 @@ $('motionSend').onclick=async()=>{
     currentModel=await service.postEmojiMotion(motionDraft.articleKey,payload)
     const fresh=currentModel.articles.find(a=>a.articleKey===motionDraft.articleKey),idx=displayArticles.findIndex(a=>a.articleKey===motionDraft.articleKey)
     if(fresh&&idx>=0)displayArticles[idx]={...displayArticles[idx],...fresh}
-    closeMotionComposer({restoreZoom:false});setArticleBadge('Animation envoyée')
+    const queued=Boolean(fresh?.motions?.some(m=>m.pending))
+    closeMotionComposer({restoreZoom:false});updateReaderPageLabel();updateMotionReplayHeader();await refreshPending();setArticleBadge(queued?'Animation en attente':'Animation envoyée')
   }catch(e){debug(e);status('motionStatus','Erreur : '+(e.message||e),false)}finally{button.disabled=false}
 }
 
@@ -1531,6 +1628,7 @@ $('sendText').onclick=async()=>{
       const list=$('articleDeck').querySelector(`[data-index="${idx}"] .reaction-list`)
       if(list)renderComments(displayArticles[idx],list)
     }
+    updateReaderPageLabel()
     await refreshPending()
     closeComposer()
   }catch(e){debug(e)}

@@ -1,5 +1,16 @@
 # CHANGELOG MamiNa
 
+## v1.1.12
+**Synthèse :** suppression de ses contributions, association d’avatar Famileo et animation aléatoire radiale.
+
+La ligne du lecteur affiche désormais `Article n/N - Page p haut/bas`. Quand l’utilisateur possède au moins une contribution sur l’article, un bouton `…` ouvre une feuille listant uniquement ses messages et animations, du plus ancien au plus récent avec la contribution la plus récente visible en bas. Les messages sont limités visuellement à deux lignes ; les animations affichent leurs emoji et leur type. Les contributions locales en attente peuvent être supprimées directement.
+
+Pour une contribution déjà envoyée, MamiNa publie un marqueur technique silencieux de suppression puis tente de supprimer le message Telegram original. Le traitement des marqueurs est volontairement tolérant : un nouvel appareil peut recevoir seulement le marqueur si l’original a déjà disparu. Le cache local retire également la contribution supprimée pour éviter sa réapparition.
+
+Lors de l’ouverture d’une revue, si le compte Telegram n’est pas encore associé à un contributeur Famileo, MamiNa propose les avatars de la revue qui ne sont pas déjà attribués. Le choix est publié silencieusement dans `params` sous forme de profil MamiNa ; fermer la feuille laisse l’utilisateur non associé. Une vérification juste avant publication évite d’attribuer un avatar déjà pris entre-temps.
+
+Le mode `Aléatoire` repart du centre de la courbe : 7 emoji rayonnent selon des directions, accélérations et composantes orthogonales tirées aléatoirement. Leur distance/vitesse augmente avec la longueur du tracé. Pour une courbe suffisamment ronde, une rotation supplémentaire suit le sens du tracé.
+
 ## v1.1.11
 **Synthèse :** animations différées hors ligne, bouton d’envoi visible/vert, signalement ✨ en attente, `Nuage` + nouveau mode `Aléatoire`.
 

@@ -218,6 +218,31 @@
   </div>
 </section>
 
+<div id="contributionPopup" class="sheet-overlay" hidden>
+  <section class="compact-sheet contribution-sheet" role="dialog" aria-modal="true" aria-labelledby="contributionPopupTitle">
+    <div class="sheet-title-row">
+      <strong id="contributionPopupTitle">Mes contributions</strong>
+      <button id="contributionPopupClose" type="button" class="sheet-close" aria-label="Fermer">✕</button>
+    </div>
+    <div id="contributionPopupList" class="contribution-popup-list"></div>
+    <div id="contributionPopupStatus" class="status"></div>
+  </section>
+</div>
+
+<div id="avatarPopup" class="sheet-overlay" hidden>
+  <section class="compact-sheet avatar-sheet" role="dialog" aria-modal="true" aria-labelledby="avatarPopupTitle">
+    <div class="sheet-title-row">
+      <div>
+        <strong id="avatarPopupTitle">Ton avatar dans les magazines</strong>
+        <div class="subtle">Choisis ton profil Famileo, ou ferme si tu ne veux pas l’associer.</div>
+      </div>
+      <button id="avatarPopupClose" type="button" class="sheet-close" aria-label="Fermer">✕</button>
+    </div>
+    <div id="avatarPopupGrid" class="avatar-popup-grid"></div>
+    <div id="avatarPopupStatus" class="status"></div>
+  </section>
+</div>
+
 <div id="motionComposer" class="motion-composer" hidden>
   <div id="motionPanel" class="motion-panel">
     <div class="motion-head">

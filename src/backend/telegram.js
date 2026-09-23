@@ -56,6 +56,7 @@ export class TelegramGateway {
     }
     return {
       name:user?.displayName||user?.username||user?.firstName||'',
+      id:Number(user?.id||0)||null,
       username:user?.username||null,
       avatar,
     }
@@ -145,6 +146,25 @@ export class TelegramGateway {
 
   async postSystemText(peer, topicId, humanText, meta) {
     return this.tg.sendText(peer, withMeta(humanText, meta), { threadId: topicId, silent: true })
+  }
+
+  async deleteMessagesById(peer, ids=[]) {
+    const clean=[...new Set(ids.map(Number).filter(Number.isFinite).filter(x=>x>0))]
+    if(!clean.length)return
+    return this.tg.deleteMessagesById(peer,clean,{revoke:true})
+  }
+
+  async postDeletionMarker(peer, topicId, rootId, articleKey, targetMessageId, targetKind) {
+    return this.tg.sendText(peer, withMeta('🗑️ Suppression MamiNa', {
+      kind:'delete', type:'contribution', articleKey,
+      targetMessageId:Number(targetMessageId), targetKind:String(targetKind||''),
+    }), { threadId:topicId, replyTo:rootId||undefined, silent:true })
+  }
+
+  async postFamilyProfile(peer, topicId, famileoName) {
+    return this.tg.sendText(peer, withMeta('👤 Profil MamiNa', {
+      kind:'mamina-profile', version:1, famileoName:String(famileoName||'').trim(),
+    }), { threadId:topicId, silent:true })
   }
 
   async editSystemText(peer, messageId, humanText, meta) {
