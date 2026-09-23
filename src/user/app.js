@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.10'
+const APP_VERSION='1.1.11'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -563,7 +563,7 @@ function motionDerivatives(curve,t,rect){
   return {tx,ty,nx:nx*side,ny:ny*side}
 }
 function motionScaleAt(mode,t){
-  const small=.30,big=2.00,range=big-small
+  const small=.16,big=4.80,range=big-small
   if(mode==='grow')return small+range*t
   if(mode==='shrink')return big-range*t
   if(mode==='pulse')return small+range*Math.sin(Math.PI*t)
@@ -572,7 +572,7 @@ function motionScaleAt(mode,t){
 }
 function motionEmojiBlend(emojis,t){
   if(emojis.length<=1)return {a:emojis[0]||'',b:'',mix:0}
-  const boundaries=emojis.length===2?[.5]:[1/3,2/3],window=.085
+  const boundaries=emojis.length===2?[.5]:[1/3,2/3],window=.14
   for(let i=0;i<boundaries.length;i++){
     const b=boundaries[i],from=Math.max(0,b-window),to=Math.min(1,b+window)
     if(t>=from&&t<=to)return {a:emojis[i],b:emojis[i+1],mix:(t-from)/Math.max(.001,to-from)}
@@ -657,10 +657,13 @@ function populateMotionEmoji(force=false){
 }
 function updateMotionPanel(){
   const ready=Boolean(motionDraft?.curve),hasEmoji=Boolean(motionDraft?.emoji?.length)
+  const send=$('motionSend')
   $('motionControls').hidden=!ready
   $('motionReplay').hidden=!ready
   $('motionRedraw').hidden=!ready
-  $('motionSend').hidden=!ready
+  send.hidden=!ready
+  send.classList.toggle('ready',ready)
+  send.disabled=false
   $('motionNext').hidden=ready
   $('motionNext').disabled=!hasEmoji
   $('motionEmojiGrid').hidden=false
@@ -748,20 +751,30 @@ function playRainMotion(motion,index,{delay=0}={}){
   const v=motionVisual(index),img=motionImage(index),layer=v?.querySelector('.motion-play-layer');if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
   const emojis=(motion.emoji||[]).map(codepointsToString).filter(Boolean);if(!emojis.length)return Promise.resolve()
   const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(96,(Number(motion.size)||.075)*rect.width)),duration=motionPlaybackDuration(motion)
-  const spans=Array.from({length:9},(_,i)=>{const e=document.createElement('span');e.className='motion-play-emoji';e.textContent=motionParticleEmoji(emojis,i);e.style.fontSize=`${size}px`;layer.appendChild(e);return e})
-  return new Promise(resolve=>{const start=performance.now()+delay;const frame=now=>{if(now<start){requestAnimationFrame(frame);return}const t=Math.min(1,(now-start)/duration),ease=1-Math.pow(1-t,2),opacity=t>.82?Math.max(0,(1-t)/.18):1;for(let i=0;i<spans.length;i++){const seed=(i+.5)/9,pt=motionPointAt(motion.curve,seed),d=motionDerivatives(motion.curve,seed,rect),travel=Math.min(rect.width,rect.height)*(.10+.25*ease)*(0.88+(i%3)*.08),along=Math.sin(t*Math.PI)*Math.min(rect.width,rect.height)*.025,x=rect.left+pt[0]*rect.width+d.nx*travel+d.tx*along,y=rect.top+pt[1]*rect.height+d.ny*travel+d.ty*along,sc=.55+1.05*Math.sin(Math.min(1,t/.6)*Math.PI/2);spans[i].style.opacity=String(opacity);spans[i].style.transform=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`}if(t<1&&spans.some(e=>document.body.contains(e)))requestAnimationFrame(frame);else{spans.forEach(e=>e.remove());resolve()}};requestAnimationFrame(frame)})
+  const count=7
+  const spans=Array.from({length:count},(_,i)=>{const e=document.createElement('span');e.className='motion-play-emoji';e.textContent=motionParticleEmoji(emojis,i);e.style.fontSize=`${size}px`;layer.appendChild(e);return e})
+  return new Promise(resolve=>{const start=performance.now()+delay;const frame=now=>{if(now<start){requestAnimationFrame(frame);return}const t=Math.min(1,(now-start)/duration),ease=1-Math.pow(1-t,2),opacity=t>.82?Math.max(0,(1-t)/.18):1;for(let i=0;i<spans.length;i++){const seed=(i+.5)/count,pt=motionPointAt(motion.curve,seed),d=motionDerivatives(motion.curve,seed,rect),travel=Math.min(rect.width,rect.height)*(.10+.25*ease)*(0.88+(i%3)*.08),along=Math.sin(t*Math.PI)*Math.min(rect.width,rect.height)*.025,x=rect.left+pt[0]*rect.width+d.nx*travel+d.tx*along,y=rect.top+pt[1]*rect.height+d.ny*travel+d.ty*along,sc=.55+1.05*Math.sin(Math.min(1,t/.6)*Math.PI/2);spans[i].style.opacity=String(opacity);spans[i].style.transform=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`}if(t<1&&spans.some(e=>document.body.contains(e)))requestAnimationFrame(frame);else{spans.forEach(e=>e.remove());resolve()}};requestAnimationFrame(frame)})
+}
+function playCloudMotion(motion,index,{delay=0}={}){
+  const v=motionVisual(index),img=motionImage(index),layer=v?.querySelector('.motion-play-layer');if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
+  const emojis=(motion.emoji||[]).map(codepointsToString).filter(Boolean);if(!emojis.length)return Promise.resolve()
+  const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(96,(Number(motion.size)||.075)*rect.width)),duration=motionPlaybackDuration(motion)
+  const specs=Array.from({length:7},(_,i)=>({start:.08+i*.10,end:(i%2?1:-1)*(.16+.06*i),amp:Math.min(rect.width,rect.height)*(.05+.015*i),phase:(i+1)*1.3,side:i%2?1:-1}))
+  const spans=specs.map((q,i)=>{const e=document.createElement('span');e.className='motion-play-emoji';e.textContent=motionParticleEmoji(emojis,i);e.style.fontSize=`${size}px`;layer.appendChild(e);return e})
+  return new Promise(resolve=>{const start=performance.now()+delay;const frame=now=>{if(now<start){requestAnimationFrame(frame);return}const t=Math.min(1,(now-start)/duration),opacity=t>.84?Math.max(0,(1-t)/.16):1;for(let i=0;i<spans.length;i++){const q=specs[i],ct=clamp01Motion(q.start+q.end*t),pt=motionPointAt(motion.curve,ct),d=motionDerivatives(motion.curve,ct,rect),wave=Math.sin(Math.PI*t)*Math.sin(q.phase+t*Math.PI*2)*q.amp*q.side,x=rect.left+pt[0]*rect.width+d.nx*wave,y=rect.top+pt[1]*rect.height+d.ny*wave,sc=.52+1.18*Math.sin(Math.PI*Math.min(1,t/.72));spans[i].style.opacity=String(opacity);spans[i].style.transform=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`}if(t<1&&spans.some(e=>document.body.contains(e)))requestAnimationFrame(frame);else{spans.forEach(e=>e.remove());resolve()}};requestAnimationFrame(frame)})
 }
 function playRandomMotion(motion,index,{delay=0}={}){
   const v=motionVisual(index),img=motionImage(index),layer=v?.querySelector('.motion-play-layer');if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
   const emojis=(motion.emoji||[]).map(codepointsToString).filter(Boolean);if(!emojis.length)return Promise.resolve()
   const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(96,(Number(motion.size)||.075)*rect.width)),duration=motionPlaybackDuration(motion)
-  const specs=Array.from({length:7},(_,i)=>({start:Math.random()*.82,end:.18+Math.random()*.62,side:Math.random()<.5?-1:1,amp:(.07+Math.random()*.18)*Math.min(rect.width,rect.height),phase:Math.random()*Math.PI*2,i}))
+  const specs=Array.from({length:7},(_,i)=>({dir:i%2?1:-1,reach:.20+.045*i,speed:.55+.12*(i%4),phase:(i+1)*1.77,amp:Math.min(rect.width,rect.height)*(.028+.01*(i%3)),side:i%3===0?-1:1}))
   const spans=specs.map((q,i)=>{const e=document.createElement('span');e.className='motion-play-emoji';e.textContent=motionParticleEmoji(emojis,i);e.style.fontSize=`${size}px`;layer.appendChild(e);return e})
-  return new Promise(resolve=>{const start=performance.now()+delay;const frame=now=>{if(now<start){requestAnimationFrame(frame);return}const t=Math.min(1,(now-start)/duration),opacity=t>.84?Math.max(0,(1-t)/.16):1;for(let i=0;i<spans.length;i++){const q=specs[i],ct=clamp01Motion(q.start+q.end*t),pt=motionPointAt(motion.curve,ct),d=motionDerivatives(motion.curve,ct,rect),wave=Math.sin(Math.PI*t)*Math.sin(q.phase+t*Math.PI*2)*q.amp*q.side,x=rect.left+pt[0]*rect.width+d.nx*wave,y=rect.top+pt[1]*rect.height+d.ny*wave,sc=.50+1.15*Math.sin(Math.PI*Math.min(1,t/.72));spans[i].style.opacity=String(opacity);spans[i].style.transform=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`}if(t<1&&spans.some(e=>document.body.contains(e)))requestAnimationFrame(frame);else{spans.forEach(e=>e.remove());resolve()}};requestAnimationFrame(frame)})
+  return new Promise(resolve=>{const start=performance.now()+delay;const frame=now=>{if(now<start){requestAnimationFrame(frame);return}const t=Math.min(1,(now-start)/duration),opacity=t>.86?Math.max(0,(1-t)/.14):1;for(let i=0;i<spans.length;i++){const q=specs[i],travel=1-Math.pow(1-t,q.speed),ct=clamp01Motion(.5+q.dir*q.reach*travel),pt=motionPointAt(motion.curve,ct),d=motionDerivatives(motion.curve,ct,rect),drift=Math.sin(q.phase+t*Math.PI*4)*q.amp*(.35+.65*travel),spread=Math.cos(q.phase*.7+t*Math.PI*3)*q.amp*.5*(.25+travel),x=rect.left+pt[0]*rect.width+d.nx*(drift*q.side)+d.tx*spread,y=rect.top+pt[1]*rect.height+d.ny*(drift*q.side)+d.ty*spread,sc=.48+1.28*Math.sin(Math.PI*Math.min(1,t/.8));spans[i].style.opacity=String(opacity);spans[i].style.transform=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`}if(t<1&&spans.some(e=>document.body.contains(e)))requestAnimationFrame(frame);else{spans.forEach(e=>e.remove());resolve()}};requestAnimationFrame(frame)})
 }
 function playMotion(motion,index,{preview=false,delay=0}={}){
   if(motion?.scale==='explosion')return playExplosionMotion(motion,index,{delay})
   if(motion?.scale==='rain')return playRainMotion(motion,index,{delay})
+  if(motion?.scale==='cloud')return playCloudMotion(motion,index,{delay})
   if(motion?.scale==='random')return playRandomMotion(motion,index,{delay})
   const v=motionVisual(index),img=motionImage(index),layer=v?.querySelector('.motion-play-layer');if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
   const emojis=(motion.emoji||[]).map(codepointsToString).filter(Boolean);if(!emojis.length)return Promise.resolve()

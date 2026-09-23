@@ -128,6 +128,92 @@ export class UserMaminaService {
   setActivityListener(fn) { this.onActivity=typeof fn==='function'?fn:null }
   activity(text, detail=null) { try { this.onActivity?.({text,detail,at:new Date().toISOString()}) } catch {} }
 
+  async _listPendingMotions() {
+    const rows=await settings.get('pendingEmojiMotions',[])
+    return Array.isArray(rows)?rows.filter(Boolean):[]
+  }
+
+  async _savePendingMotions(rows=[]) {
+    await settings.set('pendingEmojiMotions',Array.isArray(rows)?rows.filter(Boolean):[])
+  }
+
+  _pendingMotionRow(item,ordinal=0) {
+    return {
+      id:Number.MAX_SAFE_INTEGER-1000+ordinal,
+      articleKey:item.articleKey,
+      author:'Moi',
+      senderId:null,
+      isOutgoing:true,
+      pending:true,
+      date:item.createdAt,
+      text:'',
+      meta:{kind:'motion',type:'emoji'},
+      motion:item.motion,
+      topicId:Number(item.topicId||0)||null,
+    }
+  }
+
+  async _queueEmojiMotion(articleKey,motion) {
+    if(!this.current) throw new Error('Aucune revue ouverte.')
+    const rows=await this._listPendingMotions()
+    rows.push({
+      id:`motion:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,
+      createdAt:new Date().toISOString(),
+      articleKey,
+      magazineId:this.current.magazine.magazineId,
+      topicId:this.current.magazine.topicId,
+      motion,
+    })
+    await this._savePendingMotions(rows)
+    info('motion.outbox','Animation mise en attente',{articleKey})
+  }
+
+  async _sendMotionNow(item) {
+    if(!this.gateway || !this.dialog) throw new Error('Telegram non initialisé.')
+    const magazine=await getMagazine(item.magazineId)
+    if(!magazine) throw new Error('Revue de l’animation en attente introuvable.')
+
+    let bytes=await getAsset(`pdf:${magazine.magazineId}`)
+    if(!bytes) bytes=await getAsset(`staging-pdf:${magazine.magazineId}`)
+    if(!bytes) throw new Error('PDF local requis pour résoudre l’animation en attente.')
+
+    const pdf=await FamileoPdf.load(bytes)
+    try {
+      const article=pdf.articles().find(a=>a.articleKey===item.articleKey)
+      if(!article) throw new Error('Article de l’animation en attente introuvable.')
+      const full=await this.gateway.topicMessages(this.dialog.peer,Number(item.topicId),{limit:Infinity})
+      const {rootId}=await this.gateway.ensureRoot(this.dialog.peer,Number(item.topicId),pdf.magazine,article,full)
+      const sentMessage=await this.gateway.postEmojiMotion(this.dialog.peer,Number(item.topicId),rootId,item.articleKey,item.motion)
+      return {sentMessage,magazine,article}
+    } finally {
+      try { await pdf.doc?.cleanup?.(); await pdf.doc?.destroy?.() } catch {}
+    }
+  }
+
+  async _persistSentMotionResult(item,result) {
+    const message=result?.sentMessage
+    const magazine=result?.magazine
+    if(!message || !magazine) return
+
+    const row=TelegramGateway.messageModel(message)
+    await this.cacheMotionAvatars([message],[row])
+    const payload={...row,articleKey:item.articleKey,motion:item.motion,key:`${magazine.magazineId}:${row.id}`,magazineId:magazine.magazineId,topicKey:magazine.topicKey}
+    await putMessages([payload])
+
+    if(this.current?.magazine?.magazineId===magazine.magazineId){
+      const withoutSame=this.current.rows.filter(r=>r.id!==payload.id)
+      this.current.rows=[...withoutSame,payload].sort((a,b)=>a.id-b.id)
+    }
+
+    const stored=await getMagazine(magazine.magazineId)
+    if(stored){
+      const next={...stored,motionCount:Number(stored.motionCount||0)+1}
+      await putMagazine(next)
+      if(this.current?.magazine?.magazineId===magazine.magazineId)this.current.magazine=next
+    }
+  }
+
+
   async cacheMotionAvatars(rawMessages=[],models=null) {
     const rows=models||rawMessages.map(TelegramGateway.messageModel)
     const seen=new Set()
@@ -607,6 +693,11 @@ export class UserMaminaService {
     }
     const outbox=await listOutbox()
     const pendingBy=new Map(outbox.map(x=>[x.articleKey,x]))
+    const pendingMotionRows=await this._listPendingMotions()
+    const pendingMotionBy=new Map(articles.map(a=>[a.articleKey,[]]))
+    for(const item of pendingMotionRows){
+      if(pendingMotionBy.has(item.articleKey))pendingMotionBy.get(item.articleKey).push(this._pendingMotionRow(item,pendingMotionBy.get(item.articleKey).length))
+    }
     const withState=articles.map(a=>{
       const comments=(commentsBy.get(a.articleKey)||[]).sort((x,y)=>x.id-y.id)
       const pending=pendingBy.get(a.articleKey)
@@ -620,7 +711,7 @@ export class UserMaminaService {
         displayText:pending.text,
         text:pending.text,
       })
-      const motions=(motionsBy.get(a.articleKey)||[]).sort((x,y)=>x.id-y.id)
+      const motions=[...(motionsBy.get(a.articleKey)||[]).sort((x,y)=>x.id-y.id),...(pendingMotionBy.get(a.articleKey)||[])]
       const lastRead=read.get(a.articleKey)||0
       return {...a,comments,motions,lastReadMessageId:lastRead,unreadCount:comments.filter(c=>!c.isOutgoing&&c.id>lastRead).length}
     })
@@ -646,7 +737,6 @@ export class UserMaminaService {
     if(!this.current) throw new Error('Aucune revue ouverte.')
     const article=this.current.articles.find(a=>a.articleKey===articleKey)
     if(!article) throw new Error('Article inconnu.')
-    if(!this.gateway||!this.dialog||this.gateway.connectionState!=='connected') throw new Error('Connexion Telegram requise pour envoyer l’animation.')
     const emoji=Array.isArray(motion?.emoji)?motion.emoji.slice(0,3):[]
     if(emoji.length<1) throw new Error('Choisis au moins un emoji.')
     const points=['p0','p1','p2','p3'].map(k=>motion?.curve?.[k])
@@ -656,20 +746,27 @@ export class UserMaminaService {
       emoji,
       curve:Object.fromEntries(['p0','p1','p2','p3'].map((k,i)=>[k,points[i].map(n=>Math.max(0,Math.min(1,Number(n))))])),
       size:Math.max(.035,Math.min(.16,Number(motion.size)||.075)),
-      scale:['stable','grow','shrink','pulse','inverse-pulse','explosion','rain','random'].includes(motion.scale)?motion.scale:'stable',
+      scale:['stable','grow','shrink','pulse','inverse-pulse','explosion','rain','cloud','random'].includes(motion.scale)?motion.scale:'stable',
       duration:Math.max(1200,Math.min(4500,Math.round(Number(motion.duration)||2200))),
     }
-    const full=await this.gateway.topicMessages(this.dialog.peer,Number(this.current.magazine.topicId),{limit:Infinity})
-    const {rootId}=await this.gateway.ensureRoot(this.dialog.peer,Number(this.current.magazine.topicId),this.current.magazine,article,full)
-    const sent=await this.gateway.postEmojiMotion(this.dialog.peer,Number(this.current.magazine.topicId),rootId,articleKey,normalized)
-    const row=TelegramGateway.messageModel(sent)
-    await this.cacheMotionAvatars([sent],[row])
-    const payload={...row,articleKey,motion:normalized,key:`${this.current.magazine.magazineId}:${row.id}`,magazineId:this.current.magazine.magazineId,topicKey:this.current.magazine.topicKey}
-    await putMessages([payload])
-    this.current.rows=[...this.current.rows.filter(r=>r.id!==payload.id),payload].sort((a,b)=>a.id-b.id)
-    const magazine=await getMagazine(this.current.magazine.magazineId)
-    if(magazine){const next={...magazine,motionCount:Number(magazine.motionCount||0)+1};await putMagazine(next);this.current.magazine=next}
-    return this.currentView()
+
+    const online = typeof navigator==='undefined' || navigator.onLine!==false
+    if(!this.gateway || !this.dialog || !online || this.gateway.connectionState!=='connected') {
+      await this._queueEmojiMotion(articleKey,normalized)
+      return this.currentView()
+    }
+
+    try {
+      const full=await this.gateway.topicMessages(this.dialog.peer,Number(this.current.magazine.topicId),{limit:Infinity})
+      const {rootId}=await this.gateway.ensureRoot(this.dialog.peer,Number(this.current.magazine.topicId),this.current.magazine,article,full)
+      const sent=await this.gateway.postEmojiMotion(this.dialog.peer,Number(this.current.magazine.topicId),rootId,articleKey,normalized)
+      await this._persistSentMotionResult({articleKey,magazineId:this.current.magazine.magazineId,motion:normalized}, {sentMessage:sent,magazine:this.current.magazine,article})
+      return this.currentView()
+    } catch(e) {
+      warn('motion.outbox','Envoi direct impossible, animation conservée localement',{articleKey,message:e?.message||String(e)})
+      await this._queueEmojiMotion(articleKey,normalized)
+      return this.currentView()
+    }
   }
 
   async queueText(articleKey,text) {
@@ -776,22 +873,32 @@ export class UserMaminaService {
     const connected=this.gateway.connectionState==='connected' || this.gateway.connectionState==='updating' || this.gateway.isConnected()
     if(!connected && !force) return 0
     const rows=await listOutbox()
-    if(rows.length) this.activity(`Envoi différé · ${rows.length} message${rows.length>1?'s':''}`)
+    const motions=await this._listPendingMotions()
+    const total=rows.length+motions.length
+    if(total) this.activity(`Envoi différé · ${total} élément${total>1?'s':''}`)
     let sent=0
     for(const item of rows) {
       try {
         const result=await this._sendTextNow(item)
         await deleteOutbox(item.articleKey)
-
         await this._persistSentResult(item,result)
-
         sent++
-        info('outbox','Message différé envoyé et normalisé localement',{articleKey:item.articleKey,messageId:Number(message?.id||0)||null})
+        info('outbox','Message différé envoyé et normalisé localement',{articleKey:item.articleKey,messageId:Number(result?.sentMessage?.id||0)||null})
       } catch(e) {
-        warn('outbox','Message différé toujours en attente',{
-          articleKey:item.articleKey,message:e?.message||String(e),
-        })
-        // Keep remaining messages; a permission/network failure may affect all.
+        warn('outbox','Message différé toujours en attente',{articleKey:item.articleKey,message:e?.message||String(e)})
+        if(this.gateway.connectionState!=='connected') break
+      }
+    }
+    let pendingMotions=await this._listPendingMotions()
+    for(const item of pendingMotions) {
+      try {
+        const result=await this._sendMotionNow(item)
+        await this._savePendingMotions((await this._listPendingMotions()).filter(x=>x.id!==item.id))
+        await this._persistSentMotionResult(item,result)
+        sent++
+        info('motion.outbox','Animation différée envoyée et normalisée localement',{articleKey:item.articleKey,messageId:Number(result?.sentMessage?.id||0)||null})
+      } catch(e) {
+        warn('motion.outbox','Animation différée toujours en attente',{articleKey:item.articleKey,message:e?.message||String(e)})
         if(this.gateway.connectionState!=='connected') break
       }
     }
@@ -831,9 +938,9 @@ export class UserMaminaService {
     return {updated,missing,cleared}
   }
 
-  async pendingCount() { return countOutbox() }
+  async pendingCount() { return (await countOutbox()) + (await this._listPendingMotions()).length }
   async storageStats() { return estimateLocalStorage() }
-  async pendingForArticle(articleKey) { return getOutbox(articleKey) }
+  async pendingForArticle(articleKey) { return {text:await getOutbox(articleKey),motions:(await this._listPendingMotions()).filter(x=>x.articleKey===articleKey)} }
 
   async ensureCurrentPdf() {
     if(!this.current) throw new Error('Aucune revue ouverte.')

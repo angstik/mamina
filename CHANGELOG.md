@@ -1,5 +1,14 @@
 # CHANGELOG MamiNa
 
+## v1.1.11
+**Synthèse :** animations différées hors ligne, bouton d’envoi visible/vert, signalement ✨ en attente, `Nuage` + nouveau mode `Aléatoire`.
+
+Le bouton `✓` devient vert dès qu’une animation est prête à être envoyée. Si Telegram ou le réseau sont indisponibles, l’animation est conservée localement, fonctionne tout de suite dans l’article, et rejoint la file globale d’envoi différé. Chaque animation est comptée dans le compteur de flux en attente et plusieurs animations peuvent désormais rester en attente sur un même article.
+
+Lorsqu’un article courant contient au moins une animation en attente, le bouton `✨` de l’en-tête vibre en rotation jusqu’à synchronisation. La reprise réseau envoie maintenant messages texte et animations différées dans la même passe.
+
+Les amplitudes de taille petit/grand sont encore renforcées. `Pluie` passe de 9 à 7 emoji. L’ancien mode `Aléatoire` est renommé `Nuage`. Un nouveau mode `Aléatoire` est ajouté : 7 emoji partent du centre du tracé puis s’éloignent le long de la courbe avec des vitesses et dérives variées.
+
 ## v1.1.10
 **Synthèse :** clavier emoji natif, récents/fréquents, pluie/aléatoire, auteurs pendant lecture et compteur ✨ par revue.
 
