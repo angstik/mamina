@@ -85,6 +85,7 @@ function resolveRowsToArticles(rows, articles) {
   const rowById = new Map(rows.map(r=>[r.id,r]))
   const byArticle = new Map(articles.map(a=>[a.articleKey,[]]))
   const motionsBy = new Map(articles.map(a=>[a.articleKey,[]]))
+  const soundsBy = new Map(articles.map(a=>[a.articleKey,null]))
 
   const resolveArticle = row => {
     if (row.meta?.articleKey && articleKeys.has(row.meta.articleKey)) return row.meta.articleKey
@@ -105,12 +106,17 @@ function resolveRowsToArticles(rows, articles) {
       motionsBy.get(ak).push({ ...row, articleKey:ak, motion:row.meta.motion||null })
       continue
     }
+    if (row.meta?.kind === 'sound' && row.meta?.type === 'article' && soundsBy.has(ak)) {
+      const previous=soundsBy.get(ak)
+      if(!previous || Number(row.id)>Number(previous.id))soundsBy.set(ak,{...row,articleKey:ak,sound:row.meta.sound||null})
+      continue
+    }
     if (row.meta?.kind === 'message' || (!row.meta && row.replyToId)) {
       if (!byArticle.has(ak)) continue
       byArticle.get(ak).push({ ...row, articleKey:ak, displayText:stripMeta(row.text) })
     }
   }
-  return { roots, byArticle, motionsBy }
+  return { roots, byArticle, motionsBy, soundsBy }
 }
 
 export class UserMaminaService {
@@ -682,6 +688,7 @@ export class UserMaminaService {
     const resolved=resolveRowsToArticles(all,articles)
     const comments=[...resolved.byArticle.values()].flat()
     const motions=[...resolved.motionsBy.values()].flat()
+    const sounds=[...resolved.soundsBy.values()].filter(Boolean)
     const tombstones=all.filter(r=>r.meta?.kind==='delete'&&Number(r.meta?.targetMessageId||0)>0).map(r=>({
       ...r,
       articleKey:r.meta?.articleKey||r.articleKey||null,
@@ -689,7 +696,7 @@ export class UserMaminaService {
       magazineId:magazine.magazineId,
       topicKey:magazine.topicKey,
     }))
-    const payload=[...comments,...motions,...tombstones].map(c=>({
+    const payload=[...comments,...motions,...sounds,...tombstones].map(c=>({
       ...c,
       key:c.key||`${magazine.magazineId}:${c.id}`,
       magazineId:magazine.magazineId,
@@ -781,7 +788,7 @@ export class UserMaminaService {
       const pdf=await FamileoPdf.load(bytes,{trace:(scope,message,detail)=>info(scope,message,detail)})
       if(!articles.length)articles=pdf.articles()
       const resolved=resolveRowsToArticles(models,articles)
-      rows=[...resolved.byArticle.values(),...resolved.motionsBy.values()].flat()
+      rows=[...resolved.byArticle.values(),...resolved.motionsBy.values(),...[...resolved.soundsBy.values()].filter(Boolean)].flat()
       this.current={magazine,pdf,articles,rows}
     }
     return this.currentView()
@@ -801,6 +808,11 @@ export class UserMaminaService {
     const resolved=resolveRowsToArticles(rows.filter(r=>!pendingDeletedIds.has(Number(r.id))),articles)
     const commentsBy=resolved.byArticle
     const motionsBy=resolved.motionsBy
+    const soundsBy=resolved.soundsBy
+    const pendingSoundBy=new Map()
+    for(const op of pendingTopicOps){
+      if(op.type==='set-sound'&&op.magazineId===magazine.magazineId)pendingSoundBy.set(op.articleKey,op.sound)
+    }
     const outbox=await listOutbox()
     const pendingBy=new Map(outbox.map(x=>[x.articleKey,x]))
     const pendingMotionRows=await this._listPendingMotions()
@@ -824,8 +836,11 @@ export class UserMaminaService {
         text:pending.text,
       })
       const motions=[...(motionsBy.get(a.articleKey)||[]).sort((x,y)=>x.id-y.id),...(pendingMotionBy.get(a.articleKey)||[])]
+      const remoteSound=soundsBy.get(a.articleKey)?.sound||null
+      const pendingSound=pendingSoundBy.get(a.articleKey)
+      const sound=pendingSound?{...pendingSound,pending:true}:remoteSound
       const lastRead=read.get(a.articleKey)||0
-      return {...a,comments,motions,lastReadMessageId:lastRead,unreadCount:comments.filter(c=>!c.isOutgoing&&c.id>lastRead).length}
+      return {...a,comments,motions,sound,lastReadMessageId:lastRead,unreadCount:comments.filter(c=>!c.isOutgoing&&c.id>lastRead).length}
     })
     return {magazine,articles:withState,pdf}
   }
@@ -880,6 +895,47 @@ export class UserMaminaService {
       await this._queueEmojiMotion(articleKey,normalized)
       return this.currentView()
     }
+  }
+
+
+  async _queueArticleSound(op) {
+    const rows=(await this._listPendingTopicOps()).filter(x=>!(x.type==='set-sound'&&x.magazineId===op.magazineId&&x.articleKey===op.articleKey))
+    rows.push({id:`op:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,createdAt:new Date().toISOString(),...op})
+    await this._savePendingTopicOps(rows)
+  }
+
+  async _executeSetSoundTopicOp(op) {
+    if(!this.gateway||!this.dialog)throw new Error('Telegram non initialisé.')
+    const magazine=await getMagazine(op.magazineId);if(!magazine)throw new Error('Revue introuvable pour le son.')
+    const articles=await listArticles(op.magazineId),article=articles.find(a=>a.articleKey===op.articleKey)||this.current?.articles?.find(a=>a.articleKey===op.articleKey)
+    if(!article)throw new Error('Article introuvable pour le son.')
+    const full=await this.gateway.topicMessages(this.dialog.peer,Number(op.topicId),{limit:Infinity})
+    const {rootId}=await this.gateway.ensureRoot(this.dialog.peer,Number(op.topicId),magazine,article,full)
+    const sent=await this.gateway.postArticleSound(this.dialog.peer,Number(op.topicId),rootId,op.articleKey,op.sound)
+    const row=TelegramGateway.messageModel(sent)
+    const payload={...row,articleKey:op.articleKey,key:`${magazine.magazineId}:${row.id}`,magazineId:magazine.magazineId,topicKey:magazine.topicKey}
+    await putMessages([payload])
+    if(this.current?.magazine?.magazineId===magazine.magazineId){
+      this.current.rows=[...this.current.rows.filter(r=>Number(r.id)!==Number(row.id)),payload].sort((a,b)=>a.id-b.id)
+    }
+    return row
+  }
+
+  async postArticleSound(articleKey,sound) {
+    if(!this.current)throw new Error('Aucune revue ouverte.')
+    const article=this.current.articles.find(a=>a.articleKey===articleKey);if(!article)throw new Error('Article inconnu.')
+    const soundId=String(sound?.soundId||'').trim();if(!soundId)throw new Error('Son invalide.')
+    const duration=['source','5','15','continuous'].includes(String(sound?.duration))?String(sound.duration):'source'
+    const normalized={version:1,soundId,duration,clientId:String(sound?.clientId||`sound:${Date.now()}:${Math.random().toString(36).slice(2,8)}`)}
+    const op={type:'set-sound',magazineId:this.current.magazine.magazineId,topicId:this.current.magazine.topicId,articleKey,sound:normalized}
+    const online=typeof navigator==='undefined'||navigator.onLine!==false
+    if(!this.gateway||!this.dialog||!online||this.gateway.connectionState!=='connected'){
+      await this._queueArticleSound(op)
+      return this.currentView()
+    }
+    try{await this._executeSetSoundTopicOp(op)}
+    catch(e){warn('sound.outbox','Envoi direct impossible, son conservé localement',{articleKey,message:e?.message||String(e)});await this._queueArticleSound(op)}
+    return this.currentView()
   }
 
   async _applyLocalDeleteOp(op,{markerRow=null}={}) {
@@ -1069,6 +1125,7 @@ export class UserMaminaService {
     for(const item of pendingOps){
       try{
         if(item.type==='delete-contribution')await this._executeDeleteTopicOp(item)
+        else if(item.type==='set-sound')await this._executeSetSoundTopicOp(item)
         else throw new Error(`Opération différée inconnue: ${item.type}`)
         await this._savePendingTopicOps((await this._listPendingTopicOps()).filter(x=>x.id!==item.id))
         sent++
@@ -1245,7 +1302,7 @@ export class UserMaminaService {
     const [shaB,jsonB,binB]=await Promise.all([load('sha256'),load('json'),load('bin')]);return new EmojiResolver({shaJson:JSON.parse(new TextDecoder().decode(shaB)),catalogJson:JSON.parse(new TextDecoder().decode(jsonB)),catalogBin:binB,set:params.parser?.emojiSet||'apple',threshold:Number(params.parser?.emojiThreshold||.999)})
   }
 
-  async adminSaveParams({storagePassword=true}={}) {
+  async adminSaveParams({storagePassword=true,sounds=null,freesoundApiKey=null}={}) {
     if(!this.dialog)throw new Error('Aucun groupe sélectionné.')
     const peer=this.dialog.peer
     let topics=await this.gateway.topics(peer)
@@ -1261,7 +1318,14 @@ export class UserMaminaService {
     const existing=[...rows].reverse().find(m=>TelegramGateway.messageModel(m).meta?.kind==='mamina-params')||null
     const previous=existing?TelegramGateway.messageModel(existing).meta:(await settings.get('remoteParams',null)||{})
     const enabled=Boolean(storagePassword)
-    const paramsMeta={...previous,kind:'mamina-params',version:Number(previous?.version||1),storagePassword:enabled,auth:{...(previous?.auth||{}),storePassword:enabled}}
+    const normalizedSounds=(Array.isArray(sounds)?sounds:(Array.isArray(previous?.sounds)?previous.sounds:[])).slice(0,15).map((x,i)=>({
+      id:String(x?.id||`sound-${i+1}`).trim().slice(0,80),
+      emoji:String(x?.emoji||'🎶').trim().slice(0,16)||'🎶',
+      label:String(x?.label||'Son').trim().slice(0,80)||'Son',
+      url:String(x?.url||'').trim().slice(0,2048),
+    })).filter(x=>/^https?:\/\//i.test(x.url))
+    const apiKey=freesoundApiKey==null?String(previous?.freesoundApiKey||''):String(freesoundApiKey||'').trim()
+    const paramsMeta={...previous,kind:'mamina-params',version:Number(previous?.version||1),storagePassword:enabled,auth:{...(previous?.auth||{}),storePassword:enabled},sounds:normalizedSounds,freesoundApiKey:apiKey}
     const paramsMsg=existing
       ? await this.gateway.editSystemText(peer,existing.id,'Paramètres MamiNa',paramsMeta)
       : await this.gateway.postSystemText(peer,paramsTopicId,'Paramètres MamiNa',paramsMeta)
@@ -1280,7 +1344,7 @@ export class UserMaminaService {
     const post=async(file,role)=>this.gateway.postDocument(peer,catalogTopicId,file,{kind:'catalog-file',role,name:file.name})
     const [shaMsg,jsonMsg,binMsg]=await Promise.all([post(shaFile,'sha256'),post(catalogJsonFile,'json'),post(catalogBinFile,'bin')])
     const manifest=await this.gateway.postSystemText(peer,catalogTopicId,'Catalogue MamiNa',{kind:'mamina-catalog-manifest',version:1,files:{sha256:Number(shaMsg.id),json:Number(jsonMsg.id),bin:Number(binMsg.id)}})
-    const paramsMeta={kind:'mamina-params',version:1,parser:{spec:'SPEC_v1_CG',emojiSet:'apple',emojiThreshold:.999},catalog:{topicId:catalogTopicId,manifestMessageId:Number(manifest.id)},storagePassword:true,auth:{storePassword:true}}
+    const paramsMeta={kind:'mamina-params',version:1,parser:{spec:'SPEC_v1_CG',emojiSet:'apple',emojiThreshold:.999},catalog:{topicId:catalogTopicId,manifestMessageId:Number(manifest.id)},storagePassword:true,auth:{storePassword:true},sounds:[],freesoundApiKey:''}
     const oldParams=await this.gateway.topicMessages(peer,paramsTopicId,{limit:50})
     const existing=[...oldParams].reverse().find(m=>TelegramGateway.messageModel(m).meta?.kind==='mamina-params')
     const paramsMsg=existing?await this.gateway.editSystemText(peer,existing.id,'Paramètres MamiNa',paramsMeta):await this.gateway.postSystemText(peer,paramsTopicId,'Paramètres MamiNa',paramsMeta)
@@ -1354,6 +1418,7 @@ export class UserMaminaService {
 
   async getSettings() {
     const storagePassword=await this.maminaPasswordStorageEnabled()
+    const remote=await settings.get('remoteParams',null)
     return {
       reactionOrder:await settings.get('reactionOrder','asc'),
       articleOrderMode:await settings.get('articleOrderMode','magazine'),
@@ -1361,6 +1426,8 @@ export class UserMaminaService {
       appTitle:await settings.get('appTitle','MamiNa'),
       theme:await settings.get('theme','system'),
       storagePassword,
+      sounds:Array.isArray(remote?.sounds)?remote.sounds.slice(0,15):[],
+      freesoundApiKey:String(remote?.freesoundApiKey||''),
     }
   }
   async setReactionOrder(order) {

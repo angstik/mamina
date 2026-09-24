@@ -309,6 +309,19 @@ export class TelegramGateway {
     })
   }
 
+  async postArticleSound(peer, topicId, rootId, articleKey, sound) {
+    return this.tg.sendText(peer, withMeta('🎶 Son article', {
+      kind:'sound',
+      type:'article',
+      articleKey,
+      sound,
+    }), {
+      threadId: topicId,
+      replyTo: rootId,
+      silent: true,
+    })
+  }
+
   async postImageComment(peer, topicId, rootId, articleKey, file, text='', progressCallback) {
     return this.tg.sendMedia(peer, InputMedia.photo(file), {
       threadId: topicId,

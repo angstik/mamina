@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.13'
+const APP_VERSION='1.1.14'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -28,6 +28,14 @@ const motionAuthorUrls=[]
 const avatarChoiceUrls=[]
 const focusZoomStates=new Map()
 let focusArticleKey=null,focusPhotoUrl=null
+const SOUND_ENABLED_KEY='MAMINA_SOUND_ENABLED'
+const SOUND_CACHE_NAME='mamina-sounds-v1'
+const SOUND_CACHE_META_KEY='MAMINA_SOUND_CACHE_META'
+const SOUND_CACHE_TTL=7*24*60*60*1000
+let soundCatalog=[],freesoundApiKey='',soundDraft=null
+let soundGlobalEnabled=localStorage.getItem(SOUND_ENABLED_KEY)!=='0'
+let audioContext=null,articleSoundSource=null,articleSoundStopTimer=null,soundStartTimer=null,soundPlaybackToken=0
+let soundLoadingKey=null,soundUnavailableKey=null,soundManuallyStoppedKey=null,previewSoundSource=null
 
 const status=(id,text,ok=null)=>{const e=$(id);if(!e)return;e.textContent=text;e.className='status'+(ok===true?' ok':ok===false?' error':'')}
 const debug=e=>logError('ui',e?.stack||e?.message||String(e),e)
@@ -79,6 +87,11 @@ async function loadSettings(){
   $('themeSelect').value=c.theme
   $('adminAppTitle').value=c.appTitle
   $('adminStoragePassword').checked=Boolean(c.storagePassword)
+  soundCatalog=Array.isArray(c.sounds)?c.sounds.slice(0,15):[]
+  freesoundApiKey=String(c.freesoundApiKey||'')
+  $('adminFreesoundApiKey').value=freesoundApiKey
+  renderAdminSoundRows(soundCatalog)
+  refreshSoundGlobalIcon()
   if(!c.storagePassword)localStorage.removeItem(STORED_PASSWORD_KEY)
   const hasStored=Boolean(localStorage.getItem(STORED_PASSWORD_KEY))
   $('rememberMaminaPassword').textContent=c.storagePassword?'Activé':'Désactivé'
@@ -142,6 +155,7 @@ async function init(){
   await showWelcomeSplash()
   try{await service.migrateDerivedArticleGeometry()}catch(e){debug(e)}
   await localHome()
+  purgeExpiredSoundCache().catch(()=>{})
   renderLogs()
   connectionClock=setInterval(refreshPills,1000)
   const saved=readReaderState()
@@ -214,6 +228,7 @@ function startNetwork(){
       rerenderCommentOrderOnly()
       updateReaderPageLabel()
       updateMotionReplayHeader()
+      updateSoundHeader()
       await refreshPending()
     }
   }
@@ -248,6 +263,7 @@ async function refreshOpenMagazineLocal(){
   rerenderCommentOrderOnly()
   updateReaderPageLabel()
   updateMotionReplayHeader()
+  updateSoundHeader()
 }
 async function backgroundSync(){
   if(!service.hasGateway()||!service.hasDialog())return
@@ -318,8 +334,10 @@ async function openMagazine(id,preferredArticleKey=null,restoring=false){
 $('back').onclick=async()=>{
   if(!$('contributionPopup').hidden){closeContributionPopup();return}
   if(!$('avatarPopup').hidden){closeAvatarPopup();return}
+  if(!$('soundComposer').hidden){closeSoundComposer();return}
   if(!$('motionComposer').hidden){closeMotionComposer({restoreZoom:true});return}
   if(!$('composerModal').hidden)return
+  stopArticleSound()
   clearReaderState();$('reader').hidden=true;$('home').hidden=false
   freeUrls(readerUrls);zoomStates.clear();await service.closeMagazine();currentModel=null;await localHome()
 }
@@ -460,6 +478,162 @@ $('motionReplayHeader').onclick=()=>{
   playArticleMotions(a,currentArticleIndex,{force:true})
 }
 
+function refreshSoundGlobalIcon(){
+  const b=$('soundGlobalToggle');if(!b)return
+  b.textContent=soundGlobalEnabled?'🔊':'🔇'
+  b.setAttribute('aria-pressed',soundGlobalEnabled?'true':'false')
+}
+function ensureAudioContext(){
+  if(!audioContext){
+    const C=window.AudioContext||window.webkitAudioContext
+    if(C)audioContext=new C()
+  }
+  if(audioContext?.state==='suspended')audioContext.resume().catch(()=>{})
+  return audioContext
+}
+document.addEventListener('pointerdown',()=>ensureAudioContext(),{capture:true,passive:true})
+function soundEntry(soundId){return soundCatalog.find(x=>String(x.id)===String(soundId))||null}
+function soundUrl(entry){
+  const key=encodeURIComponent(freesoundApiKey||'')
+  return String(entry?.url||'').replaceAll('{API_KEY}',key).replaceAll('{apiKey}',key).replaceAll('%APIKEY%',key)
+}
+function soundCacheMeta(){return safeJson(SOUND_CACHE_META_KEY,{})}
+function saveSoundCacheMeta(meta){try{localStorage.setItem(SOUND_CACHE_META_KEY,JSON.stringify(meta))}catch{}}
+async function purgeExpiredSoundCache(){
+  if(!('caches'in window))return
+  const meta=soundCacheMeta(),now=Date.now(),cache=await caches.open(SOUND_CACHE_NAME);let changed=false
+  for(const [url,at] of Object.entries(meta)){if(now-Number(at||0)>SOUND_CACHE_TTL){await cache.delete(url).catch(()=>{});delete meta[url];changed=true}}
+  if(changed)saveSoundCacheMeta(meta)
+}
+const soundDelay=ms=>new Promise(r=>setTimeout(r,ms))
+async function fetchSoundBlob(entry){
+  const url=soundUrl(entry);if(!/^https?:\/\//i.test(url))throw new Error('URL son invalide')
+  const meta=soundCacheMeta(),now=Date.now()
+  if('caches'in window){
+    const cache=await caches.open(SOUND_CACHE_NAME),cached=await cache.match(url)
+    if(cached&&now-Number(meta[url]||0)<=SOUND_CACHE_TTL)return cached.blob()
+    if(cached){await cache.delete(url).catch(()=>{});delete meta[url];saveSoundCacheMeta(meta)}
+  }
+  if(!navigator.onLine)throw new Error('offline')
+  for(let attempt=0;attempt<=3;attempt++){
+    let response
+    try{response=await fetch(url,{cache:'no-store',mode:'cors'})}catch(e){throw e}
+    if(response.ok){
+      const blob=await response.blob()
+      if('caches'in window){const cache=await caches.open(SOUND_CACHE_NAME);await cache.put(url,new Response(blob,{headers:{'Content-Type':blob.type||'audio/mpeg'}})).catch(()=>{});meta[url]=Date.now();saveSoundCacheMeta(meta)}
+      return blob
+    }
+    if(response.status>=500&&response.status<=599&&attempt<3){await soundDelay([650,1200,2200][attempt]||2200);continue}
+    throw new Error(`HTTP ${response.status}`)
+  }
+  throw new Error('Son indisponible')
+}
+function stopNode(node){try{node?.stop?.()}catch{}try{node?.disconnect?.()}catch{}}
+function stopPreviewSound(){stopNode(previewSoundSource);previewSoundSource=null}
+function stopArticleSound({manual=false}={}){
+  clearTimeout(soundStartTimer);clearTimeout(articleSoundStopTimer);soundStartTimer=articleSoundStopTimer=null
+  stopNode(articleSoundSource);articleSoundSource=null;soundPlaybackToken++
+  if(manual&&currentArticle()?.articleKey)soundManuallyStoppedKey=currentArticle().articleKey
+  soundLoadingKey=null
+  updateSoundHeader()
+}
+async function decodeSound(entry){
+  const ctx=ensureAudioContext();if(!ctx)throw new Error('Audio indisponible')
+  const blob=await fetchSoundBlob(entry),bytes=await blob.arrayBuffer()
+  return ctx.decodeAudioData(bytes.slice(0))
+}
+async function playSoundDefinition(sound,{articleKey=null,preview=false}={}){
+  const entry=soundEntry(sound?.soundId);if(!entry)return false
+  if(!preview&&!soundGlobalEnabled)return false
+  const ctx=ensureAudioContext();if(!ctx)return false
+  if(preview)stopPreviewSound();else stopArticleSound()
+  const token=++soundPlaybackToken
+  if(!preview){soundLoadingKey=articleKey;soundUnavailableKey=null;updateSoundHeader()}
+  try{
+    const buffer=await decodeSound(entry)
+    if(token!==soundPlaybackToken)return false
+    if(ctx.state==='suspended'){await ctx.resume().catch(()=>{});if(ctx.state==='suspended')return false}
+    const source=ctx.createBufferSource();source.buffer=buffer
+    const mode=String(sound?.duration||'source'),seconds=mode==='5'?5:mode==='15'?15:null
+    source.loop=mode==='continuous'||Boolean(seconds&&buffer.duration<seconds-.05)
+    source.connect(ctx.destination);source.start()
+    if(preview)previewSoundSource=source
+    else{
+      articleSoundSource=source;soundLoadingKey=null;soundUnavailableKey=null;updateSoundHeader()
+      if(seconds){articleSoundStopTimer=setTimeout(()=>{if(articleSoundSource===source){stopNode(source);articleSoundSource=null;updateSoundHeader()}},seconds*1000)}
+      source.onended=()=>{if(articleSoundSource===source){articleSoundSource=null;clearTimeout(articleSoundStopTimer);articleSoundStopTimer=null;updateSoundHeader()}}
+    }
+    return true
+  }catch(e){
+    debug(e)
+    if(!preview){soundLoadingKey=null;soundUnavailableKey=articleKey;updateSoundHeader()}
+    return false
+  }
+}
+function updateSoundHeader(){
+  const b=$('soundReplayHeader'),a=currentArticle(),has=Boolean(a?.sound)
+  if(!b)return
+  b.hidden=!has||!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden||!$('soundComposer').hidden
+  b.classList.toggle('loading',Boolean(a&&soundLoadingKey===a.articleKey))
+  b.classList.toggle('unavailable',Boolean(a&&soundUnavailableKey===a.articleKey))
+  b.classList.toggle('playing',Boolean(a&&articleSoundSource&&soundManuallyStoppedKey!==a.articleKey))
+}
+function scheduleArticleSound(article,index,delay=1000){
+  clearTimeout(soundStartTimer);soundStartTimer=null
+  if(!article?.sound||!soundGlobalEnabled||soundManuallyStoppedKey===article.articleKey){updateSoundHeader();return}
+  soundStartTimer=setTimeout(()=>{
+    if(currentArticleIndex!==index||currentArticle()?.articleKey!==article.articleKey||!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden||!$('focusOverlay').hidden)return
+    playSoundDefinition(article.sound,{articleKey:article.articleKey})
+  },delay)
+  updateSoundHeader()
+}
+$('soundReplayHeader').onclick=()=>{
+  const a=currentArticle();if(!a?.sound)return
+  if(articleSoundSource||soundLoadingKey===a.articleKey){stopArticleSound({manual:true});return}
+  soundManuallyStoppedKey=null;soundUnavailableKey=null;playSoundDefinition(a.sound,{articleKey:a.articleKey})
+}
+$('soundGlobalToggle').onclick=()=>{
+  soundGlobalEnabled=!soundGlobalEnabled;localStorage.setItem(SOUND_ENABLED_KEY,soundGlobalEnabled?'1':'0');refreshSoundGlobalIcon()
+  if(!soundGlobalEnabled)stopArticleSound()
+  else{soundManuallyStoppedKey=null;const a=currentArticle();if(a?.sound)playSoundDefinition(a.sound,{articleKey:a.articleKey})}
+}
+function closeSoundComposer({resume=true}={}){
+  stopPreviewSound();soundDraft=null;$('soundComposer').hidden=true;$('soundStatus').textContent=''
+  updateSoundHeader()
+  if(resume){const a=currentArticle();if(a?.sound&&soundGlobalEnabled)scheduleArticleSound(a,currentArticleIndex,350)}
+}
+function renderSoundPicker(){
+  const host=$('soundEmojiGrid');host.innerHTML=''
+  for(const entry of soundCatalog){
+    if(!entry?.url)continue
+    const b=document.createElement('button');b.type='button';b.textContent=entry.emoji||'🎶';b.title=entry.label||'Son';b.dataset.soundId=entry.id
+    b.onclick=async()=>{if(!soundDraft)return;soundDraft.soundId=entry.id;for(const x of host.querySelectorAll('button'))x.classList.toggle('selected',x===b);$('soundSend').disabled=false;await playSoundDefinition({soundId:entry.id,duration:'source'},{preview:true})}
+    host.appendChild(b)
+  }
+  if(!host.children.length)host.innerHTML='<div class="empty">Aucun son configuré.</div>'
+}
+function openSoundComposer(index){
+  if(!$('composerModal').hidden||!$('motionComposer').hidden||!$('focusOverlay').hidden)return
+  const a=displayArticles[index];if(!a)return
+  stopArticleSound();soundDraft={articleKey:a.articleKey,index,soundId:null,duration:'source'}
+  renderSoundPicker();for(const b of document.querySelectorAll('[data-sound-duration]'))b.classList.toggle('selected',b.dataset.soundDuration==='source')
+  $('soundSend').disabled=true;$('soundStatus').textContent='';$('soundComposer').hidden=false;updateSoundHeader()
+}
+$('soundCancel').onclick=()=>closeSoundComposer()
+$('soundComposer').addEventListener('click',e=>{if(e.target===$('soundComposer'))closeSoundComposer()})
+for(const b of document.querySelectorAll('[data-sound-duration]'))b.onclick=()=>{if(!soundDraft)return;soundDraft.duration=b.dataset.soundDuration;for(const x of document.querySelectorAll('[data-sound-duration]'))x.classList.toggle('selected',x===b)}
+$('soundSend').onclick=async()=>{
+  if(!soundDraft?.soundId)return
+  const button=$('soundSend');button.disabled=true
+  try{
+    currentModel=await service.postArticleSound(soundDraft.articleKey,{soundId:soundDraft.soundId,duration:soundDraft.duration})
+    const fresh=currentModel.articles.find(a=>a.articleKey===soundDraft.articleKey),idx=displayArticles.findIndex(a=>a.articleKey===soundDraft.articleKey)
+    if(fresh&&idx>=0)displayArticles[idx]={...displayArticles[idx],...fresh}
+    closeSoundComposer({resume:false});updateSoundHeader();await refreshPending();soundManuallyStoppedKey=null;scheduleArticleSound(currentArticle(),currentArticleIndex,1000)
+    setArticleBadge(fresh?.sound?.pending?'Son en attente':'Son envoyé')
+  }catch(e){debug(e);$('soundStatus').textContent='Envoi impossible.';button.disabled=false}
+}
+
 function renderMarkup(t=''){
   let s=esc(t)
   s=s.replace(/\[mark\]([\s\S]*?)\[\/mark\]/g,'<mark style="background:#dff1ff">$1</mark>')
@@ -479,12 +653,13 @@ async function renderReader(){
   displayArticles.forEach((a,i)=>{
     const p=document.createElement('section');p.className='article-page';p.dataset.index=i
     const v=document.createElement('div');v.className='article-visual'
-    v.innerHTML=`<div class="subtle">Chargement…</div><span class="article-source-badge" hidden></span><div class="article-actions"><button class="article-float add-motion" title="Réaction animée">♥</button><button class="article-float add-message" title="Ajouter">＋</button></div><svg class="motion-draw-layer" hidden aria-hidden="true"><path class="motion-draw-path"></path></svg><div class="motion-play-layer" aria-hidden="true"></div>`
+    v.innerHTML=`<div class="subtle">Chargement…</div><span class="article-source-badge" hidden></span><div class="article-actions"><button class="article-float add-sound" title="Son">🎶</button><button class="article-float add-motion" title="Réaction animée">♥</button><button class="article-float add-message" title="Ajouter">＋</button></div><svg class="motion-draw-layer" hidden aria-hidden="true"><path class="motion-draw-path"></path></svg><div class="motion-play-layer" aria-hidden="true"></div>`
     p.appendChild(v)
     const list=document.createElement('div');list.className='reaction-list';renderComments(a,list);p.appendChild(list)
     d.appendChild(p)
     v.querySelector('.add-message').onclick=()=>openComposer(a.articleKey)
     v.querySelector('.add-motion').onclick=()=>openMotionComposer(i)
+    v.querySelector('.add-sound').onclick=()=>openSoundComposer(i)
     installArticleGestures(v,i)
   })
   d.classList.add('aligning')
@@ -547,10 +722,13 @@ function warmAround(i){
 }
 function activate(i){
   hideMotionAuthors()
+  stopArticleSound()
+  soundManuallyStoppedKey=null
   currentArticleIndex=i
   saveReaderState(currentArticle()?.articleKey)
   updateReaderPageLabel()
   updateMotionReplayHeader()
+  updateSoundHeader()
   ;[i,i-1,i+1].forEach(loadVisual)
   setTimeout(()=>warmAround(i),0)
   const a=currentArticle(),list=$('articleDeck').querySelector(`[data-index="${i}"] .reaction-list`)
@@ -558,10 +736,11 @@ function activate(i){
   requestAnimationFrame(()=>{if(unread.length)list.querySelector(`[data-message-id="${unread[0].id}"]`)?.scrollIntoView({block:'start'});else list.scrollTop=reactionOrder==='asc'?list.scrollHeight:0})
   clearTimeout(readTimer);readTimer=setTimeout(()=>service.markArticleRead(a.articleKey),1400)
   scheduleArticleMotions(a,i)
+  scheduleArticleSound(a,i,1000)
 }
 let scrollTimer
-$('articleDeck').onscroll=()=>{if(!$('composerModal').hidden||!$('motionComposer').hidden)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{const d=$('articleDeck'),i=Math.max(0,Math.min(displayArticles.length-1,Math.round(d.scrollLeft/d.clientWidth))),left=i*d.clientWidth;if(Math.abs(d.scrollLeft-left)>1)d.scrollTo({left,behavior:'auto'});if(i!==currentArticleIndex)activate(i)},90)}
-function goArticle(delta){if(!$('composerModal').hidden||!$('motionComposer').hidden)return;const next=Math.max(0,Math.min(displayArticles.length-1,currentArticleIndex+delta));if(next===currentArticleIndex)return;const d=$('articleDeck');d.scrollTo({left:next*d.clientWidth,behavior:'smooth'});setTimeout(()=>activate(next),190)}
+$('articleDeck').onscroll=()=>{if(!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{const d=$('articleDeck'),i=Math.max(0,Math.min(displayArticles.length-1,Math.round(d.scrollLeft/d.clientWidth))),left=i*d.clientWidth;if(Math.abs(d.scrollLeft-left)>1)d.scrollTo({left,behavior:'auto'});if(i!==currentArticleIndex)activate(i)},90)}
+function goArticle(delta){if(!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return;const next=Math.max(0,Math.min(displayArticles.length-1,currentArticleIndex+delta));if(next===currentArticleIndex)return;const d=$('articleDeck');d.scrollTo({left:next*d.clientWidth,behavior:'smooth'});setTimeout(()=>activate(next),190)}
 
 function clampPan(container,img,scale,tx,ty){
   if(!img||scale<=1)return {tx:0,ty:0}
@@ -616,7 +795,7 @@ function installArticleGestures(container,index){
     if(motionDraw?.v===container){start=null;pinch=null;return}
     if(start&&e.changedTouches?.length){
       const t=e.changedTouches[0],dx=t.clientX-start.x,dy=t.clientY-start.y,dur=performance.now()-start.time
-      if($('composerModal').hidden&&$('motionComposer').hidden&&st.scale===1&&Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.15){goArticle(dx<0?1:-1);start=null;pinch=null;return}
+      if($('composerModal').hidden&&$('motionComposer').hidden&&$('soundComposer').hidden&&st.scale===1&&Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.15){goArticle(dx<0?1:-1);start=null;pinch=null;return}
       if(st.scale>1&&lastMove){
         let vx=lastMove.vx*18,vy=lastMove.vy*18
         const inertia=()=>{
@@ -1271,9 +1450,36 @@ function renderAdminAvatarAssignments(state){
   }
   if(!state.canDeleteOthers)status('adminAvatarStatus','Sans droit Telegram « supprimer les messages », seules tes propres associations peuvent être retirées.')
 }
+
+function soundRowId(){return `sound-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`}
+function renderAdminSoundRows(rows=[]){
+  const host=$('adminSoundList');if(!host)return;host.innerHTML=''
+  for(const s of rows.slice(0,15))appendAdminSoundRow(s)
+  $('adminAddSound').disabled=host.children.length>=15
+}
+function appendAdminSoundRow(sound={}){
+  const host=$('adminSoundList');if(host.children.length>=15)return
+  const row=document.createElement('div');row.className='admin-sound-row';row.dataset.soundId=String(sound.id||soundRowId())
+  row.innerHTML='<input class="admin-sound-emoji" maxlength="8" aria-label="Emoji"><input class="admin-sound-label" maxlength="80" aria-label="Libellé"><input class="admin-sound-url" type="url" aria-label="URL du son"><button class="admin-sound-delete" type="button" title="Retirer">🗑️</button>'
+  row.querySelector('.admin-sound-emoji').value=sound.emoji||'🎶'
+  row.querySelector('.admin-sound-label').value=sound.label||''
+  row.querySelector('.admin-sound-url').value=sound.url||''
+  row.querySelector('.admin-sound-delete').onclick=()=>{row.remove();$('adminAddSound').disabled=host.children.length>=15}
+  host.appendChild(row);$('adminAddSound').disabled=host.children.length>=15
+}
+function collectAdminSounds(){
+  return [...$('adminSoundList').querySelectorAll('.admin-sound-row')].slice(0,15).map((row,i)=>({
+    id:row.dataset.soundId||`sound-${i+1}`,
+    emoji:row.querySelector('.admin-sound-emoji').value.trim()||'🎶',
+    label:row.querySelector('.admin-sound-label').value.trim()||'Son',
+    url:row.querySelector('.admin-sound-url').value.trim(),
+  })).filter(x=>x.url)
+}
+$('adminAddSound').onclick=()=>appendAdminSoundRow({emoji:'🎶',label:'',url:''})
+
 $('adminShowAvatars').onclick=async()=>{const box=$('adminAvatarAdmin');if(!box.hidden){box.hidden=true;return}box.hidden=false;status('adminAvatarStatus','Chargement…');try{const state=await service.adminAvatarAssignments();renderAdminAvatarAssignments(state);if(state.canDeleteOthers)status('adminAvatarStatus','Droits de suppression Telegram détectés.',true)}catch(e){debug(e);status('adminAvatarStatus','Erreur : '+(e.message||e),false)}}
 
-$('adminSaveParams').onclick=async()=>{try{$('adminSaveParams').disabled=true;status('adminParamsStatus','Mise à jour params…');const r=await service.adminSaveParams({storagePassword:$('adminStoragePassword').checked});if(!$('adminStoragePassword').checked)localStorage.removeItem(STORED_PASSWORD_KEY);status('adminParamsStatus',`OK · message ${r.paramsMessageId}`,true);await loadSettings()}catch(e){rememberAdminError(e,'Mise à jour params');status('adminParamsStatus','Erreur : '+e.message,false)}finally{$('adminSaveParams').disabled=false}}
+$('adminSaveParams').onclick=async()=>{try{$('adminSaveParams').disabled=true;status('adminParamsStatus','Mise à jour params…');const r=await service.adminSaveParams({storagePassword:$('adminStoragePassword').checked,sounds:collectAdminSounds(),freesoundApiKey:$('adminFreesoundApiKey').value});if(!$('adminStoragePassword').checked)localStorage.removeItem(STORED_PASSWORD_KEY);status('adminParamsStatus',`OK · message ${r.paramsMessageId}`,true);await loadSettings()}catch(e){rememberAdminError(e,'Mise à jour params');status('adminParamsStatus','Erreur : '+e.message,false)}finally{$('adminSaveParams').disabled=false}}
 $('adminInitSystem').onclick=async()=>{try{const sha=$('catalogShaFile').files?.[0],json=$('catalogJsonFile').files?.[0],bin=$('catalogBinFile').files?.[0];$('adminInitSystem').disabled=true;$('copyAdminError').hidden=true;lastAdminErrorText='';status('adminSystemStatus','Publication params/catalog…');const r=await service.adminInitializeSystem({shaFile:sha,catalogJsonFile:json,catalogBinFile:bin});status('adminSystemStatus',`OK · params ${r.paramsTopicId}, catalog ${r.catalogTopicId}`,true);await $('adminRefreshTopics').onclick?.()}catch(e){rememberAdminError(e,'Initialisation params/catalog');status('adminSystemStatus','Erreur : '+e.message,false)}finally{$('adminInitSystem').disabled=false}}
 $('adminRefreshGroups').onclick=async()=>{try{adminGroups=await service.adminListForumDialogs();const s=$('adminGroupSelect');s.innerHTML='';adminGroups.forEach((g,i)=>{const o=document.createElement('option');o.value=i;o.textContent=g.title;s.appendChild(o)});const recipe=adminGroups.findIndex(g=>String(g.title||'').trim().toLowerCase()==='famileo_recette');if(recipe>=0){s.value=String(recipe);await service.selectDialog(adminGroups[recipe])}status('adminStatus',`${adminGroups.length} groupes avec sujets.${recipe>=0?' famileo_recette sélectionné.':''}`,true)}catch(e){status('adminStatus','Erreur : '+e.message,false)}}
 $('adminGroupSelect').onchange=async()=>{const g=adminGroups[+$('adminGroupSelect').value];if(g){await service.selectDialog(g);await refreshPending()}}

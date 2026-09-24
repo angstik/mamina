@@ -1,5 +1,14 @@
 # CHANGELOG MamiNa
 
+## v1.1.14
+**Synthèse :** ajoute un son unique par article, choisi dans une liste administrée, avec lecture différée et cache hors ligne.
+
+L’administration de `params` contient maintenant jusqu’à 15 sons définis par identifiant, emoji, libellé et URL, ainsi que la clé API Freesound. Le lecteur n’effectue aucune recherche Freesound : il ne résout que les URLs approuvées par l’administrateur.
+
+Dans la vue Article, le bouton `🎶` ouvre un sélecteur avec aperçu et quatre durées : durée du fichier, 5 secondes, 15 secondes ou lecture continue tant que l’article reste affiché. Un seul son est actif par article : une nouvelle contribution sonore remplace logiquement la précédente. Les remplacements hors ligne passent par le buffer générique d’opérations Telegram et sont synchronisés au retour réseau.
+
+Le son démarre une seconde après l’affichage de l’article. Le bouton `🎶` de l’en-tête permet de l’arrêter ou de le relancer, et le haut-parleur global `🔊/🔇` coupe ou réactive tous les sons. Les fichiers sont conservés dans Cache Storage pendant 7 jours afin de fonctionner hors réseau après une première lecture. Les erreurs audio restent silencieuses ; l’icône tourne si la ressource est indisponible. Les réponses HTTP 5xx sont retentées trois fois, tandis que les autres erreurs ne le sont pas.
+
 ## v1.1.13
 **Synthèse :** avatars Famileo pendant les animations, départ à 1 s, suppressions différées, déduplication offline, aperçu de courbe, version visible et gestion admin des associations.
 

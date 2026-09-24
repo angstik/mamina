@@ -65,11 +65,13 @@
     </div>
     <button id="articleOrderButton" class="reader-order-button" type="button" title="Ordre des articles">Revue</button>
     <button id="messageOrderHeader" class="reader-order-button message-order-header" type="button" title="Ordre des messages">↑</button>
+    <button id="soundGlobalToggle" class="sound-global-toggle" type="button" title="Son global" aria-label="Activer ou couper le son">🔊</button>
     <span id="pendingReader" class="pending-count zero">0</span>
     <button id="connectionPillReader" class="connection-pill unknown" type="button" title="Connexion Telegram">—</button>
     <div id="readerPage" class="reader-page subtle"></div>
     <div id="motionAuthorsHeader" class="motion-authors-header" aria-label="Auteurs des animations" hidden></div>
     <button id="motionReplayHeader" class="motion-replay-header" type="button" title="Rejouer les animations" aria-label="Rejouer les animations" hidden>✨</button>
+    <button id="soundReplayHeader" class="sound-replay-header" type="button" title="Arrêter ou rejouer le son" aria-label="Arrêter ou rejouer le son" hidden>🎶</button>
   </header>
   <div id="activityReader" class="activity-strip" hidden></div>
   <div id="articleDeck" class="article-deck"></div>
@@ -183,6 +185,14 @@
         <h3>Configuration du groupe</h3>
         <p class="subtle">Crée/alimente les topics réservés <code>params</code> et <code>catalog</code>. Les lecteurs ne téléchargent jamais le catalogue lourd.</p>
         <label class="check-row"><input id="adminStoragePassword" type="checkbox" checked> Mémoriser le mot de passe MamiNa sur l’appareil</label>
+        <div class="admin-sound-config">
+          <h4>Sons des articles</h4>
+          <label for="adminFreesoundApiKey">Clé API Freesound</label>
+          <input id="adminFreesoundApiKey" type="password" autocomplete="off" placeholder="Clé API">
+          <div id="adminSoundList" class="admin-sound-list"></div>
+          <button id="adminAddSound" type="button" class="secondary">＋ Ajouter un son</button>
+          <p class="subtle">Maximum 15 sons. Chaque entrée associe un emoji, un libellé et une URL audio.</p>
+        </div>
         <button id="adminSaveParams" type="button">Publier / mettre à jour params</button>
         <div id="adminParamsStatus" class="status"></div>
         <button id="adminShowAvatars" type="button" class="secondary">Gérer les avatars associés</button>
@@ -246,6 +256,29 @@
     </div>
     <div id="avatarPopupGrid" class="avatar-popup-grid"></div>
     <div id="avatarPopupStatus" class="status"></div>
+  </section>
+</div>
+
+<div id="soundComposer" class="sheet-overlay" hidden>
+  <section class="compact-sheet sound-sheet" role="dialog" aria-modal="true" aria-labelledby="soundComposerTitle">
+    <div class="sheet-title-row">
+      <div>
+        <strong id="soundComposerTitle">Son de l’article</strong>
+        <div class="subtle">Choisis un son puis sa durée.</div>
+      </div>
+      <button id="soundCancel" type="button" class="sheet-close" aria-label="Annuler">✕</button>
+    </div>
+    <div id="soundEmojiGrid" class="sound-emoji-grid"></div>
+    <div class="sound-duration-row" role="group" aria-label="Durée du son">
+      <button type="button" data-sound-duration="source" class="selected" title="Durée du son">⌚</button>
+      <button type="button" data-sound-duration="5">5 s</button>
+      <button type="button" data-sound-duration="15">15 s</button>
+      <button type="button" data-sound-duration="continuous" title="Tant que l’article est affiché">🎞️</button>
+    </div>
+    <div id="soundStatus" class="status"></div>
+    <div class="sound-sheet-actions">
+      <button id="soundSend" type="button" class="sound-send" aria-label="Envoyer" disabled>✓</button>
+    </div>
   </section>
 </div>
 
