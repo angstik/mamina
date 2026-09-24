@@ -1318,11 +1318,15 @@ export class UserMaminaService {
     const existing=[...rows].reverse().find(m=>TelegramGateway.messageModel(m).meta?.kind==='mamina-params')||null
     const previous=existing?TelegramGateway.messageModel(existing).meta:(await settings.get('remoteParams',null)||{})
     const enabled=Boolean(storagePassword)
-    const normalizedSounds=(Array.isArray(sounds)?sounds:(Array.isArray(previous?.sounds)?previous.sounds:[])).slice(0,15).map((x,i)=>({
+    const normalizedSounds=(Array.isArray(sounds)?sounds:(Array.isArray(previous?.sounds)?previous.sounds:[])).map((x,i)=>({
       id:String(x?.id||`sound-${i+1}`).trim().slice(0,80),
       emoji:String(x?.emoji||'🎶').trim().slice(0,16)||'🎶',
-      label:String(x?.label||'Son').trim().slice(0,80)||'Son',
+      label:String(x?.label||'Son').trim().slice(0,120)||'Son',
       url:String(x?.url||'').trim().slice(0,2048),
+      provider:String(x?.provider||'').trim().slice(0,40),
+      providerId:String(x?.providerId||'').trim().slice(0,80),
+      license:String(x?.license||'').trim().slice(0,80),
+      keywords:String(x?.keywords||'').trim().slice(0,240),
     })).filter(x=>/^https?:\/\//i.test(x.url))
     const apiKey=freesoundApiKey==null?String(previous?.freesoundApiKey||''):String(freesoundApiKey||'').trim()
     const paramsMeta={...previous,kind:'mamina-params',version:Number(previous?.version||1),storagePassword:enabled,auth:{...(previous?.auth||{}),storePassword:enabled},sounds:normalizedSounds,freesoundApiKey:apiKey}
@@ -1426,7 +1430,7 @@ export class UserMaminaService {
       appTitle:await settings.get('appTitle','MamiNa'),
       theme:await settings.get('theme','system'),
       storagePassword,
-      sounds:Array.isArray(remote?.sounds)?remote.sounds.slice(0,15):[],
+      sounds:Array.isArray(remote?.sounds)?remote.sounds:[],
       freesoundApiKey:String(remote?.freesoundApiKey||''),
     }
   }

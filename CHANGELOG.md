@@ -1,5 +1,16 @@
 # CHANGELOG MamiNa
 
+## v1.1.15
+**Synthèse :** transforme les sons en bibliothèque CC0 administrée et stabilise l’alignement des contrôles média.
+
+Les boutons ✨ et 🎶 partagent désormais un groupe fixe à droite de la seconde ligne de l’en-tête, afin que l’ajout du son ne décale plus l’icône d’animation.
+
+L’administration affiche tous les sons configurés avec emoji, nom, licence/source, réécoute, remplacement/réparation et suppression. La liste n’a plus de limite dure : le compteur reste normal jusqu’à 10 sons, devient orange de 11 à 15 puis rouge à partir de 16, à titre d’avertissement uniquement.
+
+L’ajout et le remplacement utilisent un parcours guidé : mots-clés, recherche Freesound via l’API v2, filtre strict `license:"Creative Commons 0"`, écoute des previews, choix du résultat, puis choix de l’emoji avec le clavier natif et validation. Les sons Freesound conservent leur identifiant fournisseur, la licence CC0 et les mots-clés ayant servi à la recherche.
+
+Le bouton « Vérifier les sons » signale les URLs devenues inaccessibles. Le bouton 🔄 relance alors le même parcours de recherche en conservant l’identifiant MamiNa du son et son emoji ; les anciens articles qui le référencent utilisent donc automatiquement la nouvelle URL après publication des `params`.
+
 ## v1.1.14
 **Synthèse :** ajoute un son unique par article, choisi dans une liste administrée, avec lecture différée et cache hors ligne.
 

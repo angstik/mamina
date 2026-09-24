@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.14'
+const APP_VERSION='1.1.15'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -33,6 +33,7 @@ const SOUND_CACHE_NAME='mamina-sounds-v1'
 const SOUND_CACHE_META_KEY='MAMINA_SOUND_CACHE_META'
 const SOUND_CACHE_TTL=7*24*60*60*1000
 let soundCatalog=[],freesoundApiKey='',soundDraft=null
+let adminSoundDrafts=[],adminSoundWizard=null,adminSoundPreviewSource=null
 let soundGlobalEnabled=localStorage.getItem(SOUND_ENABLED_KEY)!=='0'
 let audioContext=null,articleSoundSource=null,articleSoundStopTimer=null,soundStartTimer=null,soundPlaybackToken=0
 let soundLoadingKey=null,soundUnavailableKey=null,soundManuallyStoppedKey=null,previewSoundSource=null
@@ -87,10 +88,11 @@ async function loadSettings(){
   $('themeSelect').value=c.theme
   $('adminAppTitle').value=c.appTitle
   $('adminStoragePassword').checked=Boolean(c.storagePassword)
-  soundCatalog=Array.isArray(c.sounds)?c.sounds.slice(0,15):[]
+  soundCatalog=Array.isArray(c.sounds)?c.sounds:[]
   freesoundApiKey=String(c.freesoundApiKey||'')
   $('adminFreesoundApiKey').value=freesoundApiKey
-  renderAdminSoundRows(soundCatalog)
+  adminSoundDrafts=soundCatalog.map(x=>({...x}))
+  renderAdminSoundRows(adminSoundDrafts)
   refreshSoundGlobalIcon()
   if(!c.storagePassword)localStorage.removeItem(STORED_PASSWORD_KEY)
   const hasStored=Boolean(localStorage.getItem(STORED_PASSWORD_KEY))
@@ -1452,34 +1454,135 @@ function renderAdminAvatarAssignments(state){
 }
 
 function soundRowId(){return `sound-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`}
-function renderAdminSoundRows(rows=[]){
+function soundCountTone(n){return n>15?'red':n>10?'orange':'normal'}
+function updateAdminSoundCount(){
+  const n=adminSoundDrafts.length,e=$('adminSoundCount');if(!e)return
+  e.textContent=String(n);e.dataset.tone=soundCountTone(n)
+}
+function stopAdminSoundPreview(){stopNode(adminSoundPreviewSource);adminSoundPreviewSource=null}
+async function playAdminSound(sound,button=null){
+  stopAdminSoundPreview()
+  if(button){button.disabled=true;button.textContent='…'}
+  try{
+    const ctx=ensureAudioContext();if(!ctx)throw new Error('Audio indisponible')
+    const entry={url:sound.url},blob=await fetchSoundBlob(entry),buffer=await ctx.decodeAudioData((await blob.arrayBuffer()).slice(0))
+    const source=ctx.createBufferSource();source.buffer=buffer;source.connect(ctx.destination);source.start();adminSoundPreviewSource=source
+    source.onended=()=>{if(adminSoundPreviewSource===source)adminSoundPreviewSource=null;if(button){button.disabled=false;button.textContent='▶️'}}
+  }catch(e){if(button){button.classList.add('broken');button.title='Son indisponible';button.disabled=false;button.textContent='⚠️'};throw e}
+}
+function renderAdminSoundRows(rows=adminSoundDrafts){
   const host=$('adminSoundList');if(!host)return;host.innerHTML=''
-  for(const s of rows.slice(0,15))appendAdminSoundRow(s)
-  $('adminAddSound').disabled=host.children.length>=15
+  for(const sound of rows){
+    const row=document.createElement('div');row.className='admin-sound-row';row.dataset.soundId=sound.id
+    const emoji=document.createElement('span');emoji.className='admin-sound-row-emoji';emoji.textContent=sound.emoji||'🎶'
+    const info=document.createElement('div');info.className='admin-sound-row-info'
+    const label=document.createElement('strong');label.textContent=sound.label||'Son'
+    const meta=document.createElement('span');meta.textContent=[sound.license||'',sound.provider==='freesound'&&sound.providerId?`Freesound #${sound.providerId}`:''].filter(Boolean).join(' · ')||'URL configurée'
+    info.append(label,meta)
+    const listen=document.createElement('button');listen.type='button';listen.className='admin-sound-listen';listen.textContent='▶️';listen.title='Écouter';listen.onclick=()=>playAdminSound(sound,listen).catch(()=>{})
+    const replace=document.createElement('button');replace.type='button';replace.className='admin-sound-replace';replace.textContent='🔄';replace.title='Remplacer / réparer';replace.onclick=()=>openAdminSoundWizard({replaceId:sound.id})
+    const del=document.createElement('button');del.type='button';del.className='admin-sound-delete';del.textContent='🗑️';del.title='Supprimer';del.onclick=()=>{stopAdminSoundPreview();adminSoundDrafts=adminSoundDrafts.filter(x=>x.id!==sound.id);renderAdminSoundRows()}
+    row.append(emoji,info,listen,replace,del);host.appendChild(row)
+  }
+  if(!rows.length)host.innerHTML='<div class="empty">Aucun son configuré.</div>'
+  updateAdminSoundCount()
 }
-function appendAdminSoundRow(sound={}){
-  const host=$('adminSoundList');if(host.children.length>=15)return
-  const row=document.createElement('div');row.className='admin-sound-row';row.dataset.soundId=String(sound.id||soundRowId())
-  row.innerHTML='<input class="admin-sound-emoji" maxlength="8" aria-label="Emoji"><input class="admin-sound-label" maxlength="80" aria-label="Libellé"><input class="admin-sound-url" type="url" aria-label="URL du son"><button class="admin-sound-delete" type="button" title="Retirer">🗑️</button>'
-  row.querySelector('.admin-sound-emoji').value=sound.emoji||'🎶'
-  row.querySelector('.admin-sound-label').value=sound.label||''
-  row.querySelector('.admin-sound-url').value=sound.url||''
-  row.querySelector('.admin-sound-delete').onclick=()=>{row.remove();$('adminAddSound').disabled=host.children.length>=15}
-  host.appendChild(row);$('adminAddSound').disabled=host.children.length>=15
+function collectAdminSounds(){return adminSoundDrafts.map(x=>({...x})).filter(x=>x.url)}
+function closeAdminSoundWizard(){
+  stopAdminSoundPreview();adminSoundWizard=null;$('adminSoundWizard').hidden=true;$('adminSoundResults').innerHTML='';$('adminSoundSearchStatus').textContent='';$('adminSoundEmojiStep').hidden=true;$('adminSoundSearchStep').hidden=false;$('adminSoundEmojiInput').value=''
 }
-function collectAdminSounds(){
-  return [...$('adminSoundList').querySelectorAll('.admin-sound-row')].slice(0,15).map((row,i)=>({
-    id:row.dataset.soundId||`sound-${i+1}`,
-    emoji:row.querySelector('.admin-sound-emoji').value.trim()||'🎶',
-    label:row.querySelector('.admin-sound-label').value.trim()||'Son',
-    url:row.querySelector('.admin-sound-url').value.trim(),
-  })).filter(x=>x.url)
+function openAdminSoundWizard({replaceId=null}={}){
+  const current=replaceId?adminSoundDrafts.find(x=>x.id===replaceId):null
+  adminSoundWizard={replaceId,selected:null,emoji:current?.emoji||'',keywords:current?.keywords||current?.label||''}
+  $('adminSoundWizardTitle').textContent=current?'Remplacer / réparer le son':'Ajouter un son CC0'
+  $('adminSoundKeywords').value=adminSoundWizard.keywords
+  $('adminSoundResults').innerHTML=''
+  $('adminSoundSearchStatus').textContent=''
+  $('adminSoundEmojiStep').hidden=true;$('adminSoundSearchStep').hidden=false;$('adminSoundWizard').hidden=false
+  requestAnimationFrame(()=>$('adminSoundKeywords').focus())
 }
-$('adminAddSound').onclick=()=>appendAdminSoundRow({emoji:'🎶',label:'',url:''})
+function freesoundSearchUrl(query){
+  const u=new URL('https://freesound.org/apiv2/search/')
+  u.searchParams.set('query',query)
+  u.searchParams.set('filter','license:"Creative Commons 0"')
+  u.searchParams.set('fields','id,name,username,license,duration,previews,url,tags')
+  u.searchParams.set('page_size','12')
+  u.searchParams.set('sort','rating_desc')
+  u.searchParams.set('token',$('adminFreesoundApiKey').value.trim())
+  return u
+}
+async function searchAdminSounds(){
+  const q=$('adminSoundKeywords').value.trim(),token=$('adminFreesoundApiKey').value.trim()
+  if(!q){status('adminSoundSearchStatus','Saisis quelques mots-clés.',false);return}
+  if(!token){status('adminSoundSearchStatus','Clé API Freesound manquante.',false);return}
+  const button=$('adminSoundSearch');button.disabled=true;status('adminSoundSearchStatus','Recherche CC0…');$('adminSoundResults').innerHTML=''
+  try{
+    const response=await fetch(freesoundSearchUrl(q),{headers:{Accept:'application/json'}})
+    if(!response.ok)throw new Error(`HTTP ${response.status}`)
+    const data=await response.json(),rows=(data.results||[]).filter(x=>String(x.license)==='Creative Commons 0')
+    if(!rows.length){status('adminSoundSearchStatus','Aucun résultat CC0.',null);return}
+    status('adminSoundSearchStatus',`${rows.length} résultat${rows.length>1?'s':''} CC0.`,true)
+    for(const result of rows){
+      const preview=result.previews?.['preview-hq-mp3']||result.previews?.['preview-lq-mp3']||result.previews?.['preview-hq-ogg']||result.previews?.['preview-lq-ogg']
+      if(!preview)continue
+      const card=document.createElement('div');card.className='admin-sound-result'
+      const info=document.createElement('div');info.className='admin-sound-result-info'
+      const title=document.createElement('strong');title.textContent=result.name||`Son ${result.id}`
+      const meta=document.createElement('span');meta.textContent=`${result.username||'—'} · ${Number(result.duration||0).toFixed(1)} s · CC0`
+      info.append(title,meta)
+      const play=document.createElement('button');play.type='button';play.textContent='▶️';play.title='Écouter';play.onclick=()=>playAdminSound({url:preview},play).catch(()=>{})
+      const choose=document.createElement('button');choose.type='button';choose.textContent='Choisir';choose.onclick=()=>chooseAdminSoundResult(result,preview,q)
+      card.append(info,play,choose);$('adminSoundResults').appendChild(card)
+    }
+  }catch(e){debug(e);status('adminSoundSearchStatus','Recherche Freesound impossible : '+(e.message||e),false)}
+  finally{button.disabled=false}
+}
+function chooseAdminSoundResult(result,preview,keywords){
+  stopAdminSoundPreview()
+  adminSoundWizard.selected={provider:'freesound',providerId:String(result.id),license:'CC0',label:String(result.name||'Son'),url:String(preview),keywords:String(keywords||'')}
+  $('adminSoundSearchStep').hidden=true;$('adminSoundEmojiStep').hidden=false
+  $('adminSoundChosen').innerHTML=`<strong>${esc(adminSoundWizard.selected.label)}</strong><span>Freesound #${esc(result.id)} · CC0 · ${Number(result.duration||0).toFixed(1)} s</span>`
+  const current=adminSoundWizard.replaceId?adminSoundDrafts.find(x=>x.id===adminSoundWizard.replaceId):null
+  const initial=current?.emoji||adminSoundWizard.emoji||''
+  $('adminSoundEmojiInput').value=initial;$('adminSoundEmojiPreview').textContent=initial||'🎶';$('adminSoundWizardValidate').disabled=!initial
+  setTimeout(()=>$('adminSoundEmojiInput').focus(),40)
+}
+function adminEmojiFromInput(value){
+  const rows=emojiGraphemes(value);return rows[0]||''
+}
+$('adminAddSound').onclick=()=>openAdminSoundWizard()
+$('adminSoundWizardClose').onclick=closeAdminSoundWizard
+$('adminSoundWizardCancel').onclick=closeAdminSoundWizard
+$('adminSoundSearch').onclick=searchAdminSounds
+$('adminSoundKeywords').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchAdminSounds()}})
+$('adminSoundEmojiInput').addEventListener('input',e=>{const emoji=adminEmojiFromInput(e.currentTarget.value);adminSoundWizard.emoji=emoji;$('adminSoundEmojiPreview').textContent=emoji||'🎶';$('adminSoundWizardValidate').disabled=!emoji})
+$('adminSoundWizardValidate').onclick=()=>{
+  const selected=adminSoundWizard?.selected,emoji=adminSoundWizard?.emoji;if(!selected||!emoji)return
+  if(adminSoundWizard.replaceId){
+    const i=adminSoundDrafts.findIndex(x=>x.id===adminSoundWizard.replaceId)
+    if(i>=0)adminSoundDrafts[i]={...adminSoundDrafts[i],...selected,emoji,id:adminSoundDrafts[i].id}
+  }else adminSoundDrafts.push({id:soundRowId(),emoji,...selected})
+  renderAdminSoundRows();closeAdminSoundWizard()
+}
+$('adminCheckSounds').onclick=async()=>{
+  const button=$('adminCheckSounds');button.disabled=true;stopAdminSoundPreview()
+  const rows=[...$('adminSoundList').querySelectorAll('.admin-sound-row')]
+  for(let i=0;i<adminSoundDrafts.length;i++){
+    const sound=adminSoundDrafts[i],row=rows[i],listen=row?.querySelector('.admin-sound-listen')
+    if(!listen)continue
+    listen.classList.remove('broken');listen.textContent='…'
+    try{
+      const url=soundUrl(sound),response=await fetch(url,{method:'GET',headers:{Range:'bytes=0-1023'},cache:'no-store'})
+      if(!response.ok)throw new Error(`HTTP ${response.status}`)
+      listen.textContent='▶️';listen.title='Écouter'
+    }catch{listen.textContent='⚠️';listen.classList.add('broken');listen.title='Chemin cassé · utiliser 🔄 pour remplacer'}
+  }
+  button.disabled=false
+}
 
 $('adminShowAvatars').onclick=async()=>{const box=$('adminAvatarAdmin');if(!box.hidden){box.hidden=true;return}box.hidden=false;status('adminAvatarStatus','Chargement…');try{const state=await service.adminAvatarAssignments();renderAdminAvatarAssignments(state);if(state.canDeleteOthers)status('adminAvatarStatus','Droits de suppression Telegram détectés.',true)}catch(e){debug(e);status('adminAvatarStatus','Erreur : '+(e.message||e),false)}}
 
-$('adminSaveParams').onclick=async()=>{try{$('adminSaveParams').disabled=true;status('adminParamsStatus','Mise à jour params…');const r=await service.adminSaveParams({storagePassword:$('adminStoragePassword').checked,sounds:collectAdminSounds(),freesoundApiKey:$('adminFreesoundApiKey').value});if(!$('adminStoragePassword').checked)localStorage.removeItem(STORED_PASSWORD_KEY);status('adminParamsStatus',`OK · message ${r.paramsMessageId}`,true);await loadSettings()}catch(e){rememberAdminError(e,'Mise à jour params');status('adminParamsStatus','Erreur : '+e.message,false)}finally{$('adminSaveParams').disabled=false}}
+$('adminSaveParams').onclick=async()=>{try{$('adminSaveParams').disabled=true;status('adminParamsStatus','Mise à jour params…');const r=await service.adminSaveParams({storagePassword:$('adminStoragePassword').checked,sounds:collectAdminSounds(),freesoundApiKey:$('adminFreesoundApiKey').value});if(!$('adminStoragePassword').checked)localStorage.removeItem(STORED_PASSWORD_KEY);status('adminParamsStatus',`OK · ${r.params.sounds?.length||0} sons · message ${r.paramsMessageId}`,true);await loadSettings()}catch(e){rememberAdminError(e,'Mise à jour params');status('adminParamsStatus','Erreur : '+e.message,false)}finally{$('adminSaveParams').disabled=false}}
 $('adminInitSystem').onclick=async()=>{try{const sha=$('catalogShaFile').files?.[0],json=$('catalogJsonFile').files?.[0],bin=$('catalogBinFile').files?.[0];$('adminInitSystem').disabled=true;$('copyAdminError').hidden=true;lastAdminErrorText='';status('adminSystemStatus','Publication params/catalog…');const r=await service.adminInitializeSystem({shaFile:sha,catalogJsonFile:json,catalogBinFile:bin});status('adminSystemStatus',`OK · params ${r.paramsTopicId}, catalog ${r.catalogTopicId}`,true);await $('adminRefreshTopics').onclick?.()}catch(e){rememberAdminError(e,'Initialisation params/catalog');status('adminSystemStatus','Erreur : '+e.message,false)}finally{$('adminInitSystem').disabled=false}}
 $('adminRefreshGroups').onclick=async()=>{try{adminGroups=await service.adminListForumDialogs();const s=$('adminGroupSelect');s.innerHTML='';adminGroups.forEach((g,i)=>{const o=document.createElement('option');o.value=i;o.textContent=g.title;s.appendChild(o)});const recipe=adminGroups.findIndex(g=>String(g.title||'').trim().toLowerCase()==='famileo_recette');if(recipe>=0){s.value=String(recipe);await service.selectDialog(adminGroups[recipe])}status('adminStatus',`${adminGroups.length} groupes avec sujets.${recipe>=0?' famileo_recette sélectionné.':''}`,true)}catch(e){status('adminStatus','Erreur : '+e.message,false)}}
 $('adminGroupSelect').onchange=async()=>{const g=adminGroups[+$('adminGroupSelect').value];if(g){await service.selectDialog(g);await refreshPending()}}

@@ -105,3 +105,49 @@ button,input,select{font:inherit}button{cursor:pointer}
   .admin-sound-row{grid-template-columns:46px minmax(0,1fr) 38px}
   .admin-sound-row .admin-sound-url{grid-column:1/4}
 }
+
+
+/* Sound library admin + stable media header v1.1.15 */
+.media-replay-header{grid-column:6/8;grid-row:2;display:flex;justify-content:flex-end;align-items:center;gap:2px;min-width:58px}
+.media-replay-header .motion-replay-header,.media-replay-header .sound-replay-header{grid-column:auto;grid-row:auto;justify-self:auto;flex:0 0 28px}
+.motion-authors-header{grid-column:5;grid-row:2}
+.reader.composer-open .media-replay-header{display:none}
+
+.admin-sound-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.admin-sound-heading h4{margin:0}
+.admin-sound-count{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:26px;padding:0 8px;border-radius:999px;background:#45c16f;color:#fff;font-weight:800;font-size:.78rem}
+.admin-sound-count[data-tone="orange"]{background:#e89b22;color:#221500}
+.admin-sound-count[data-tone="red"]{background:#c83b35;color:#fff}
+.admin-sound-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+.admin-sound-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.admin-sound-row{display:grid;grid-template-columns:42px minmax(0,1fr) 38px 38px 38px;gap:6px;align-items:center;border:1px solid var(--line);border-radius:11px;padding:6px;background:#8881}
+.admin-sound-row-emoji{font-size:1.5rem;text-align:center}
+.admin-sound-row-info{min-width:0;display:flex;flex-direction:column}
+.admin-sound-row-info strong,.admin-sound-row-info span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.admin-sound-row-info span{font-size:.72rem;opacity:.67}
+.admin-sound-row button{width:36px!important;height:36px!important;padding:0!important;margin:0!important;border-radius:9px}
+.admin-sound-listen.broken{background:#d98d2422!important;border-color:#d98d24!important}
+.admin-sound-wizard{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#8881}
+.admin-sound-wizard[hidden]{display:none}
+.admin-sound-wizard-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.admin-sound-wizard-head button{width:36px!important;height:36px;padding:0!important;margin:0!important;border-radius:50%}
+.admin-cc0-note{display:inline-block;margin-top:7px;padding:4px 8px;border-radius:999px;background:#45c16f22;color:#21833f;font-size:.74rem;font-weight:800}
+.admin-sound-results{display:flex;flex-direction:column;gap:6px;max-height:310px;overflow:auto;margin-top:8px}
+.admin-sound-result{display:grid;grid-template-columns:minmax(0,1fr) 40px auto;gap:6px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:6px;background:var(--panel)}
+.admin-sound-result-info{display:flex;flex-direction:column;min-width:0}
+.admin-sound-result-info strong,.admin-sound-result-info span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-sound-result-info span{font-size:.72rem;opacity:.68}
+.admin-sound-result button{width:auto!important;height:36px;padding:0 9px!important;margin:0!important}
+.admin-sound-chosen{display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:9px;background:#8881;margin-bottom:8px}
+.admin-sound-chosen span{font-size:.74rem;opacity:.68}
+.admin-sound-emoji-picker{font-size:1.25rem;text-align:center}
+.admin-sound-emoji-preview{text-align:center;font-size:2.4rem;padding:8px}
+.admin-sound-wizard-actions{display:flex;justify-content:flex-end;gap:7px}
+.admin-sound-wizard-actions button{width:44px!important;height:40px;padding:0!important;margin:0!important}
+.admin-sound-validate{background:#28a745!important;color:#fff!important;border-color:#28a745!important}
+@media(max-width:560px){
+  .admin-sound-actions{grid-template-columns:1fr}
+  .admin-sound-row{grid-template-columns:38px minmax(0,1fr) 34px 34px 34px}
+  .admin-sound-result{grid-template-columns:minmax(0,1fr) 38px}
+  .admin-sound-result button:last-child{grid-column:1/3}
+}
