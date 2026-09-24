@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Test MamiNa · Freesound CC0</title>
+<style>
+:root{color-scheme:light dark;--bg:#f6f4ef;--panel:#fff;--text:#1e1e1e;--muted:#6f6b65;--line:#ded9d0;--accent:#a8843d;--accent2:#e9dfc8;--ok:#27864a;--danger:#b84242}
+@media(prefers-color-scheme:dark){:root{--bg:#161513;--panel:#211f1c;--text:#f6f3ec;--muted:#aaa49b;--line:#393630;--accent:#d8b76c;--accent2:#3a3223;--ok:#57b977;--danger:#ef7f7f}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}main{max-width:840px;margin:auto;padding:18px 14px 36px}h1{font-size:1.45rem;margin:.2rem 0 .35rem}h2{font-size:1.05rem;margin:1.2rem 0 .65rem}p{margin:.4rem 0;color:var(--muted)}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:14px;margin-top:14px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.grow{flex:1 1 260px;min-width:0}input,button,select{font:inherit}input[type=text],input[type=password],input[type=search]{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:transparent;color:inherit;min-height:44px}button,.linkbtn{border:1px solid var(--line);background:transparent;color:inherit;border-radius:12px;padding:10px 12px;min-height:44px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer}button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}button.selected{background:var(--accent2);border-color:var(--accent)}button:disabled{opacity:.45;cursor:not-allowed}small,.small{font-size:.82rem;color:var(--muted)}.badge{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 8px;background:var(--accent2);font-size:.76rem;font-weight:700}.categories{display:flex;gap:7px;overflow:auto;padding:2px 0 4px;scrollbar-width:none}.categories::-webkit-scrollbar{display:none}.categories button{white-space:nowrap;min-height:38px;padding:7px 10px}.results{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px}.card{border:1px solid var(--line);border-radius:15px;padding:11px;min-width:0}.card-head{display:flex;gap:9px;align-items:flex-start}.card-title{font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.meta{font-size:.78rem;color:var(--muted);margin-top:2px}.wave{width:100%;height:56px;object-fit:cover;display:block;margin:9px 0;border-radius:8px;opacity:.88;background:#8882}.card-actions{display:flex;gap:7px}.card-actions button{flex:1}.choice{display:flex;gap:12px;align-items:center}.choice .icon{font-size:2rem}.choice strong{display:block}.status{min-height:22px;margin-top:8px;font-size:.88rem;color:var(--muted)}.status.error{color:var(--danger)}.status.ok{color:var(--ok)}.api{font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;background:#0001;padding:9px;border-radius:10px;overflow:auto;white-space:pre-wrap;word-break:break-all}.range{display:grid;grid-template-columns:auto 1fr 42px;gap:9px;align-items:center;margin-top:10px}footer{margin-top:18px;color:var(--muted);font-size:.78rem}
+</style>
+</head>
+<body>
+<main>
+  <h1>🔊 Test MamiNa · Freesound CC0</h1>
+  <p>Page autonome de recherche et d’écoute. Aucun son n’est stocké par cette page.</p>
+  <div id="runtimeState" class="panel" style="padding:10px 12px;border-style:dashed">
+    ⚠️ JavaScript non exécuté. Si ce message reste affiché, ouvre ce fichier depuis une vraie page HTTP/HTTPS (par ex. GitHub Pages), et non dans l’aperçu Fichiers/ChatGPT.
+  </div>
+  <section class="panel">
+    <div class="row"><span class="badge">CC0 uniquement</span><span class="small">Préviews MP3 Freesound · durée courte</span></div>
+    <h2>1. Clé API Freesound</h2>
+    <div class="row"><div class="grow"><input id="token" type="password" autocomplete="off" placeholder="Colle ici ta clé API Freesound"></div><a class="linkbtn" href="https://freesound.org/apiv2/apply/" target="_blank" rel="noopener">Obtenir une clé ↗</a></div>
+    <p class="small">La clé reste uniquement dans ce champ : elle n’est ni enregistrée ni envoyée ailleurs qu’à Freesound.</p>
+
+    <details style="margin-top:10px">
+      <summary class="small">Test direct sans JavaScript</summary>
+      <p class="small">Ce bouton ouvre la réponse JSON de Freesound dans un nouvel onglet. Il permet de vérifier ta clé même si l’aperçu actuel bloque JavaScript.</p>
+      <form action="https://freesound.org/apiv2/search/" method="get" target="_blank" class="row">
+        <input name="query" type="hidden" value="rain">
+        <input name="filter" type="hidden" value='license:"Creative Commons 0" duration:[0.2 TO 12]'>
+        <input name="fields" type="hidden" value="id,name,username,license,duration,previews,url">
+        <input name="page_size" type="hidden" value="5">
+        <div class="grow"><input name="token" type="password" autocomplete="off" placeholder="Clé API Freesound pour le test direct"></div>
+        <button type="submit">Tester directement ↗</button>
+      </form>
+    </details>
+  </section>
+  <section class="panel">
+    <h2>2. Chercher un son</h2>
+    <div id="categories" class="categories"></div>
+    <div class="row" style="margin-top:8px"><div class="grow"><input id="query" type="search" value="rain" placeholder="Ex. rain, forest, train, factory…"></div><button id="search" class="primary" type="button">Rechercher</button></div>
+    <label class="range"><span>Durée max.</span><input id="duration" type="range" min="2" max="30" step="1" value="12"><strong id="durationValue">12 s</strong></label>
+    <div id="status" class="status"></div>
+    <details><summary class="small">Voir l’appel API</summary><div id="apiPreview" class="api"></div></details>
+  </section>
+  <section class="panel"><div class="row"><h2 style="margin:0">3. Résultats</h2><span id="count" class="small"></span></div><div id="results" class="results"></div></section>
+  <section class="panel"><h2>4. Son sélectionné pour l’animation</h2><div id="choice" class="choice"><div class="icon">🔇</div><div><strong>Aucun son</strong><span class="small">Choisis un résultat ci-dessus.</span></div></div></section>
+  <footer>Prototype uniquement : MamiNa pourrait ensuite ne conserver que <code>provider + soundId</code> dans son message technique. Si l’appel est bloqué en ouvrant directement le fichier, sers cette page via HTTPS ou un petit serveur HTTP local.</footer>
+</main>
+<script>
+(() => {
+  const $=id=>document.getElementById(id);
+  const categories=[['🌧️','Pluie','rain'],['🌲','Forêt','forest ambience'],['🐦','Oiseaux','birds'],['🌊','Mer','sea waves'],['💨','Vent','wind'],['🔥','Feu','fire crackle'],['🚂','Train','train'],['🚗','Route','traffic'],['🏭','Industrie','factory machine'],['⚙️','Machine','industrial machine'],['👥','Foule','crowd'],['✨','Effet','magic sparkle whoosh']];
+  let playing=null;
+  const cats=$('categories');
+  categories.forEach(([icon,label,q])=>{const b=document.createElement('button');b.type='button';b.textContent=`${icon} ${label}`;b.addEventListener('click',()=>{$('query').value=q;[...cats.children].forEach(x=>x.classList.toggle('selected',x===b));doSearch()});cats.appendChild(b)});
+  $('duration').addEventListener('input',()=>{$('durationValue').textContent=$('duration').value+' s';updateApiPreview()});$('query').addEventListener('input',updateApiPreview);$('token').addEventListener('input',updateApiPreview);$('search').addEventListener('click',doSearch);$('query').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch()});
+  function buildUrl(){const q=$('query').value.trim(),token=$('token').value.trim(),max=Number($('duration').value)||12,u=new URL('https://freesound.org/apiv2/search/');u.searchParams.set('query',q);u.searchParams.set('filter',`license:"Creative Commons 0" duration:[0.2 TO ${max}]`);u.searchParams.set('fields','id,name,username,license,duration,previews,images,url,tags,num_downloads,avg_rating');u.searchParams.set('page_size','12');if(token)u.searchParams.set('token',token);return u}
+  function updateApiPreview(){const u=buildUrl();if(u.searchParams.has('token'))u.searchParams.set('token','VOTRE_CLE_API');$('apiPreview').textContent=u.toString()}
+  function setStatus(text,kind=''){$('status').textContent=text;$('status').className='status'+(kind?' '+kind:'')}
+  async function doSearch(){const token=$('token').value.trim(),q=$('query').value.trim();if(!token){setStatus('Ajoute d’abord une clé API Freesound.','error');return}if(!q){setStatus('Saisis une recherche.','error');return}$('search').disabled=true;$('results').innerHTML='';$('count').textContent='';setStatus('Recherche…');updateApiPreview();try{const r=await fetch(buildUrl(),{headers:{Accept:'application/json'}});if(!r.ok)throw new Error(`HTTP ${r.status}`);const data=await r.json(),rows=Array.isArray(data.results)?data.results:[];$('count').textContent=`${rows.length} affichés`;setStatus(rows.length?`${data.count??rows.length} sons CC0 trouvés.`:'Aucun résultat.',rows.length?'ok':'');for(const sound of rows)$('results').appendChild(soundCard(sound))}catch(e){setStatus(`Impossible d’appeler Freesound (${e.message}). Si JavaScript est indiqué actif, vérifie la clé. Si le fichier est ouvert depuis Fichiers/Quick Look/ChatGPT, publie-le sur une URL HTTP/HTTPS.`,'error')}finally{$('search').disabled=false}}
+  function soundCard(s){const card=document.createElement('article');card.className='card';const head=document.createElement('div');head.className='card-head';const text=document.createElement('div');text.style.minWidth='0';text.innerHTML='<div class="card-title"></div><div class="meta"></div>';text.querySelector('.card-title').textContent=s.name||`Son ${s.id}`;text.querySelector('.meta').textContent=`${s.username||'—'} · ${Number(s.duration||0).toFixed(1)} s · CC0`;head.appendChild(text);card.appendChild(head);const waveUrl=s.images&&(s.images.waveform_m||s.images.waveform_l);if(waveUrl){const img=document.createElement('img');img.className='wave';img.src=waveUrl;img.alt='Forme d’onde';card.appendChild(img)}const actions=document.createElement('div');actions.className='card-actions';const play=document.createElement('button');play.type='button';play.textContent='▶️ Écouter';play.addEventListener('click',()=>{if(playing){playing.pause();playing=null;[...document.querySelectorAll('[data-play]')].forEach(b=>b.textContent='▶️ Écouter')}const src=s.previews&&(s.previews['preview-lq-mp3']||s.previews['preview-hq-mp3']||s.previews['preview-lq-ogg']);if(!src)return;const audio=new Audio(src);playing=audio;play.dataset.play='1';play.textContent='⏹️ Stop';audio.addEventListener('ended',()=>{play.textContent='▶️ Écouter';playing=null});audio.play().catch(()=>{play.textContent='▶️ Écouter';playing=null})});const choose=document.createElement('button');choose.type='button';choose.textContent='✓ Choisir';choose.addEventListener('click',()=>selectSound(s));actions.append(play,choose);card.appendChild(actions);return card}
+  function selectSound(s){const ch=$('choice');ch.innerHTML='';const icon=document.createElement('div');icon.className='icon';icon.textContent='🔊';const info=document.createElement('div'),strong=document.createElement('strong'),meta=document.createElement('div');strong.textContent=s.name||`Son ${s.id}`;meta.className='small';meta.textContent=`Freesound #${s.id} · ${s.username||'—'} · CC0 · ${Number(s.duration||0).toFixed(1)} s`;info.append(strong,meta);ch.append(icon,info)}
+  updateApiPreview();
+})();
+</script>
+</body>
+</html>
