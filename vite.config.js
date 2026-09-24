@@ -10,6 +10,7 @@ export default defineConfig({
         user: resolve(process.cwd(), 'index.html'),
         master: resolve(process.cwd(), 'master.html'),
         secrets: resolve(process.cwd(), 'secret-tool.html'),
+        freesoundTest: resolve(process.cwd(), 'test-v2.html'),
       },
     },
   },
