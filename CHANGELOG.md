@@ -1,5 +1,12 @@
 # CHANGELOG MamiNa
 
+## v1.1.16
+**Synthèse :** configuration Freesound locale et recherche textuelle corrigée.
+
+La configuration Freesound saisie dans l’administration est désormais mémorisée uniquement sur l’appareil courant. Les prochaines publications de `params` n’embarquent plus cette valeur.
+
+La recherche utilise maintenant `/apiv2/search/text/` avec le filtre CC0 existant. Les URLs de preview enregistrées pour les lecteurs restent indépendantes de cette configuration locale.
+
 ## v1.1.15
 **Synthèse :** transforme les sons en bibliothèque CC0 administrée et stabilise l’alignement des contrôles média.
 

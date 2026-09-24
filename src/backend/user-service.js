@@ -1302,7 +1302,7 @@ export class UserMaminaService {
     const [shaB,jsonB,binB]=await Promise.all([load('sha256'),load('json'),load('bin')]);return new EmojiResolver({shaJson:JSON.parse(new TextDecoder().decode(shaB)),catalogJson:JSON.parse(new TextDecoder().decode(jsonB)),catalogBin:binB,set:params.parser?.emojiSet||'apple',threshold:Number(params.parser?.emojiThreshold||.999)})
   }
 
-  async adminSaveParams({storagePassword=true,sounds=null,freesoundApiKey=null}={}) {
+  async adminSaveParams({storagePassword=true,sounds=null}={}) {
     if(!this.dialog)throw new Error('Aucun groupe sélectionné.')
     const peer=this.dialog.peer
     let topics=await this.gateway.topics(peer)
@@ -1328,8 +1328,8 @@ export class UserMaminaService {
       license:String(x?.license||'').trim().slice(0,80),
       keywords:String(x?.keywords||'').trim().slice(0,240),
     })).filter(x=>/^https?:\/\//i.test(x.url))
-    const apiKey=freesoundApiKey==null?String(previous?.freesoundApiKey||''):String(freesoundApiKey||'').trim()
-    const paramsMeta={...previous,kind:'mamina-params',version:Number(previous?.version||1),storagePassword:enabled,auth:{...(previous?.auth||{}),storePassword:enabled},sounds:normalizedSounds,freesoundApiKey:apiKey}
+    const paramsMeta={...previous,kind:'mamina-params',version:Number(previous?.version||1),storagePassword:enabled,auth:{...(previous?.auth||{}),storePassword:enabled},sounds:normalizedSounds}
+    delete paramsMeta.freesoundApiKey
     const paramsMsg=existing
       ? await this.gateway.editSystemText(peer,existing.id,'Paramètres MamiNa',paramsMeta)
       : await this.gateway.postSystemText(peer,paramsTopicId,'Paramètres MamiNa',paramsMeta)
@@ -1348,7 +1348,7 @@ export class UserMaminaService {
     const post=async(file,role)=>this.gateway.postDocument(peer,catalogTopicId,file,{kind:'catalog-file',role,name:file.name})
     const [shaMsg,jsonMsg,binMsg]=await Promise.all([post(shaFile,'sha256'),post(catalogJsonFile,'json'),post(catalogBinFile,'bin')])
     const manifest=await this.gateway.postSystemText(peer,catalogTopicId,'Catalogue MamiNa',{kind:'mamina-catalog-manifest',version:1,files:{sha256:Number(shaMsg.id),json:Number(jsonMsg.id),bin:Number(binMsg.id)}})
-    const paramsMeta={kind:'mamina-params',version:1,parser:{spec:'SPEC_v1_CG',emojiSet:'apple',emojiThreshold:.999},catalog:{topicId:catalogTopicId,manifestMessageId:Number(manifest.id)},storagePassword:true,auth:{storePassword:true},sounds:[],freesoundApiKey:''}
+    const paramsMeta={kind:'mamina-params',version:1,parser:{spec:'SPEC_v1_CG',emojiSet:'apple',emojiThreshold:.999},catalog:{topicId:catalogTopicId,manifestMessageId:Number(manifest.id)},storagePassword:true,auth:{storePassword:true},sounds:[]}
     const oldParams=await this.gateway.topicMessages(peer,paramsTopicId,{limit:50})
     const existing=[...oldParams].reverse().find(m=>TelegramGateway.messageModel(m).meta?.kind==='mamina-params')
     const paramsMsg=existing?await this.gateway.editSystemText(peer,existing.id,'Paramètres MamiNa',paramsMeta):await this.gateway.postSystemText(peer,paramsTopicId,'Paramètres MamiNa',paramsMeta)
@@ -1431,7 +1431,7 @@ export class UserMaminaService {
       theme:await settings.get('theme','system'),
       storagePassword,
       sounds:Array.isArray(remote?.sounds)?remote.sounds:[],
-      freesoundApiKey:String(remote?.freesoundApiKey||''),
+      freesoundApiKey:String(remote?.freesoundApiKey||''), // legacy migration only
     }
   }
   async setReactionOrder(order) {

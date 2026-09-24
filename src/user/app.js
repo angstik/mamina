@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.15'
+const APP_VERSION='1.1.16'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -32,6 +32,7 @@ const SOUND_ENABLED_KEY='MAMINA_SOUND_ENABLED'
 const SOUND_CACHE_NAME='mamina-sounds-v1'
 const SOUND_CACHE_META_KEY='MAMINA_SOUND_CACHE_META'
 const SOUND_CACHE_TTL=7*24*60*60*1000
+const FREESOUND_API_KEY_LOCAL='MAMINA_FREESOUND_API_KEY'
 let soundCatalog=[],freesoundApiKey='',soundDraft=null
 let adminSoundDrafts=[],adminSoundWizard=null,adminSoundPreviewSource=null
 let soundGlobalEnabled=localStorage.getItem(SOUND_ENABLED_KEY)!=='0'
@@ -89,7 +90,9 @@ async function loadSettings(){
   $('adminAppTitle').value=c.appTitle
   $('adminStoragePassword').checked=Boolean(c.storagePassword)
   soundCatalog=Array.isArray(c.sounds)?c.sounds:[]
-  freesoundApiKey=String(c.freesoundApiKey||'')
+  const localFreesoundKey=localStorage.getItem(FREESOUND_API_KEY_LOCAL)||''
+  freesoundApiKey=localFreesoundKey||String(c.freesoundApiKey||'')
+  if(!localFreesoundKey&&freesoundApiKey)localStorage.setItem(FREESOUND_API_KEY_LOCAL,freesoundApiKey)
   $('adminFreesoundApiKey').value=freesoundApiKey
   adminSoundDrafts=soundCatalog.map(x=>({...x}))
   renderAdminSoundRows(adminSoundDrafts)
@@ -1502,7 +1505,7 @@ function openAdminSoundWizard({replaceId=null}={}){
   requestAnimationFrame(()=>$('adminSoundKeywords').focus())
 }
 function freesoundSearchUrl(query){
-  const u=new URL('https://freesound.org/apiv2/search/')
+  const u=new URL('https://freesound.org/apiv2/search/text/')
   u.searchParams.set('query',query)
   u.searchParams.set('filter','license:"Creative Commons 0"')
   u.searchParams.set('fields','id,name,username,license,duration,previews,url,tags')
@@ -1511,6 +1514,11 @@ function freesoundSearchUrl(query){
   u.searchParams.set('token',$('adminFreesoundApiKey').value.trim())
   return u
 }
+$('adminFreesoundApiKey').addEventListener('input',e=>{
+  freesoundApiKey=e.currentTarget.value.trim()
+  if(freesoundApiKey)localStorage.setItem(FREESOUND_API_KEY_LOCAL,freesoundApiKey)
+  else localStorage.removeItem(FREESOUND_API_KEY_LOCAL)
+})
 async function searchAdminSounds(){
   const q=$('adminSoundKeywords').value.trim(),token=$('adminFreesoundApiKey').value.trim()
   if(!q){status('adminSoundSearchStatus','Saisis quelques mots-clés.',false);return}
@@ -1582,7 +1590,7 @@ $('adminCheckSounds').onclick=async()=>{
 
 $('adminShowAvatars').onclick=async()=>{const box=$('adminAvatarAdmin');if(!box.hidden){box.hidden=true;return}box.hidden=false;status('adminAvatarStatus','Chargement…');try{const state=await service.adminAvatarAssignments();renderAdminAvatarAssignments(state);if(state.canDeleteOthers)status('adminAvatarStatus','Droits de suppression Telegram détectés.',true)}catch(e){debug(e);status('adminAvatarStatus','Erreur : '+(e.message||e),false)}}
 
-$('adminSaveParams').onclick=async()=>{try{$('adminSaveParams').disabled=true;status('adminParamsStatus','Mise à jour params…');const r=await service.adminSaveParams({storagePassword:$('adminStoragePassword').checked,sounds:collectAdminSounds(),freesoundApiKey:$('adminFreesoundApiKey').value});if(!$('adminStoragePassword').checked)localStorage.removeItem(STORED_PASSWORD_KEY);status('adminParamsStatus',`OK · ${r.params.sounds?.length||0} sons · message ${r.paramsMessageId}`,true);await loadSettings()}catch(e){rememberAdminError(e,'Mise à jour params');status('adminParamsStatus','Erreur : '+e.message,false)}finally{$('adminSaveParams').disabled=false}}
+$('adminSaveParams').onclick=async()=>{try{$('adminSaveParams').disabled=true;status('adminParamsStatus','Mise à jour params…');const r=await service.adminSaveParams({storagePassword:$('adminStoragePassword').checked,sounds:collectAdminSounds()});if(!$('adminStoragePassword').checked)localStorage.removeItem(STORED_PASSWORD_KEY);status('adminParamsStatus',`OK · ${r.params.sounds?.length||0} sons · message ${r.paramsMessageId}`,true);await loadSettings()}catch(e){rememberAdminError(e,'Mise à jour params');status('adminParamsStatus','Erreur : '+e.message,false)}finally{$('adminSaveParams').disabled=false}}
 $('adminInitSystem').onclick=async()=>{try{const sha=$('catalogShaFile').files?.[0],json=$('catalogJsonFile').files?.[0],bin=$('catalogBinFile').files?.[0];$('adminInitSystem').disabled=true;$('copyAdminError').hidden=true;lastAdminErrorText='';status('adminSystemStatus','Publication params/catalog…');const r=await service.adminInitializeSystem({shaFile:sha,catalogJsonFile:json,catalogBinFile:bin});status('adminSystemStatus',`OK · params ${r.paramsTopicId}, catalog ${r.catalogTopicId}`,true);await $('adminRefreshTopics').onclick?.()}catch(e){rememberAdminError(e,'Initialisation params/catalog');status('adminSystemStatus','Erreur : '+e.message,false)}finally{$('adminInitSystem').disabled=false}}
 $('adminRefreshGroups').onclick=async()=>{try{adminGroups=await service.adminListForumDialogs();const s=$('adminGroupSelect');s.innerHTML='';adminGroups.forEach((g,i)=>{const o=document.createElement('option');o.value=i;o.textContent=g.title;s.appendChild(o)});const recipe=adminGroups.findIndex(g=>String(g.title||'').trim().toLowerCase()==='famileo_recette');if(recipe>=0){s.value=String(recipe);await service.selectDialog(adminGroups[recipe])}status('adminStatus',`${adminGroups.length} groupes avec sujets.${recipe>=0?' famileo_recette sélectionné.':''}`,true)}catch(e){status('adminStatus','Erreur : '+e.message,false)}}
 $('adminGroupSelect').onchange=async()=>{const g=adminGroups[+$('adminGroupSelect').value];if(g){await service.selectDialog(g);await refreshPending()}}
