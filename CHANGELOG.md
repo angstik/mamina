@@ -1,5 +1,14 @@
 # CHANGELOG MamiNa
 
+## v1.1.18
+**Synthèse :** rend la bibliothèque de sons persistante avant publication et ajoute une publication dédiée.
+
+Les ajouts, remplacements et suppressions de sons sont maintenant conservés dans un brouillon local propre au groupe Telegram sélectionné. Une synchronisation de fond ou un rechargement de l’application ne peut plus remplacer ce brouillon par la dernière version publiée dans `params`.
+
+Le bloc Sons affiche « Modifications non publiées » dès qu’un changement est effectué. Le bouton « Publier les sons » publie explicitement toute la bibliothèque dans `params`, puis supprime le brouillon local uniquement après succès. « Annuler les modifications » restaure la dernière bibliothèque publiée.
+
+Le brouillon est isolé par identifiant de groupe Telegram afin qu’une liste en préparation ne puisse pas être publiée par erreur dans une autre famille. Le bouton général « Publier / mettre à jour params » continue à publier également la bibliothèque courante et nettoie le brouillon après succès.
+
 ## v1.1.17
 **Synthèse :** fiabilise la recherche Freesound CC0 et son diagnostic.
 

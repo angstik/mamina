@@ -1430,6 +1430,7 @@ export class UserMaminaService {
       appTitle:await settings.get('appTitle','MamiNa'),
       theme:await settings.get('theme','system'),
       storagePassword,
+      groupId:String(await settings.get('groupId','')||''),
       sounds:Array.isArray(remote?.sounds)?remote.sounds:[],
       freesoundApiKey:String(remote?.freesoundApiKey||''), // legacy migration only
     }
