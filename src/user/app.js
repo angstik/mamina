@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.16'
+const APP_VERSION='1.1.17'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -1505,7 +1505,7 @@ function openAdminSoundWizard({replaceId=null}={}){
   requestAnimationFrame(()=>$('adminSoundKeywords').focus())
 }
 function freesoundSearchUrl(query){
-  const u=new URL('https://freesound.org/apiv2/search/text/')
+  const u=new URL('https://freesound.org/apiv2/search/')
   u.searchParams.set('query',query)
   u.searchParams.set('filter','license:"Creative Commons 0"')
   u.searchParams.set('fields','id,name,username,license,duration,previews,url,tags')
@@ -1525,18 +1525,38 @@ async function searchAdminSounds(){
   if(!token){status('adminSoundSearchStatus','Clé API Freesound manquante.',false);return}
   const button=$('adminSoundSearch');button.disabled=true;status('adminSoundSearchStatus','Recherche CC0…');$('adminSoundResults').innerHTML=''
   try{
-    const response=await fetch(freesoundSearchUrl(q),{headers:{Accept:'application/json'}})
+    const url=freesoundSearchUrl(q)
+    const response=await fetch(url,{headers:{Accept:'application/json'}})
     if(!response.ok)throw new Error(`HTTP ${response.status}`)
-    const data=await response.json(),rows=(data.results||[]).filter(x=>String(x.license)==='Creative Commons 0')
-    if(!rows.length){status('adminSoundSearchStatus','Aucun résultat CC0.',null);return}
-    status('adminSoundSearchStatus',`${rows.length} résultat${rows.length>1?'s':''} CC0.`,true)
-    for(const result of rows){
-      const preview=result.previews?.['preview-hq-mp3']||result.previews?.['preview-lq-mp3']||result.previews?.['preview-hq-ogg']||result.previews?.['preview-lq-ogg']
-      if(!preview)continue
+    const data=await response.json(),rows=Array.isArray(data.results)?data.results:[]
+    const total=Number(data.count||0)
+    const licenses=[...new Set(rows.map(x=>String(x?.license||'').trim()).filter(Boolean))]
+    const playable=rows.map(result=>({
+      result,
+      preview:result.previews?.['preview-hq-mp3']||result.previews?.['preview-lq-mp3']||result.previews?.['preview-hq-ogg']||result.previews?.['preview-lq-ogg']||''
+    })).filter(x=>x.preview)
+    info('freesound.search','Recherche CC0 Freesound',{
+      endpoint:url.origin+url.pathname,
+      httpStatus:response.status,
+      total,
+      pageResults:rows.length,
+      playable:playable.length,
+      licenses,
+    })
+    if(!rows.length){
+      status('adminSoundSearchStatus',total>0?`${total} résultat${total>1?'s':''} annoncé${total>1?'s':''}, mais cette page est vide.`:'Aucun résultat CC0.',null)
+      return
+    }
+    if(!playable.length){
+      status('adminSoundSearchStatus',`${total||rows.length} résultat${(total||rows.length)>1?'s':''} CC0 trouvé${(total||rows.length)>1?'s':''}, mais aucune preview audio exploitable sur cette page.`,null)
+      return
+    }
+    status('adminSoundSearchStatus',`${total||rows.length} résultat${(total||rows.length)>1?'s':''} CC0 · ${playable.length} proposé${playable.length>1?'s':''} ici.`,true)
+    for(const {result,preview} of playable){
       const card=document.createElement('div');card.className='admin-sound-result'
       const info=document.createElement('div');info.className='admin-sound-result-info'
       const title=document.createElement('strong');title.textContent=result.name||`Son ${result.id}`
-      const meta=document.createElement('span');meta.textContent=`${result.username||'—'} · ${Number(result.duration||0).toFixed(1)} s · CC0`
+      const meta=document.createElement('span');meta.textContent=`${result.username||'—'} · ${Number(result.duration||0).toFixed(1)} s · ${result.license||'CC0'}`
       info.append(title,meta)
       const play=document.createElement('button');play.type='button';play.textContent='▶️';play.title='Écouter';play.onclick=()=>playAdminSound({url:preview},play).catch(()=>{})
       const choose=document.createElement('button');choose.type='button';choose.textContent='Choisir';choose.onclick=()=>chooseAdminSoundResult(result,preview,q)

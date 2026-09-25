@@ -1,5 +1,14 @@
 # CHANGELOG MamiNa
 
+## v1.1.17
+**Synthèse :** fiabilise la recherche Freesound CC0 et son diagnostic.
+
+La recherche utilise l’endpoint canonique actuel `/apiv2/search/` avec le filtre serveur `license:"Creative Commons 0"`. MamiNa ne refiltre plus ensuite les résultats par comparaison stricte du texte de licence, ce qui évite d’écarter localement une réponse déjà filtrée par Freesound.
+
+L’écran admin distingue maintenant trois cas : aucun résultat CC0, résultats trouvés mais sans preview exploitable, ou résultats jouables. Il affiche le nombre total annoncé par Freesound et le nombre de previews proposées sur la page courante.
+
+Le journal technique enregistre uniquement l’endpoint, le statut HTTP, le compteur, le nombre de résultats/previews et les libellés de licences retournés. La clé API locale n’est jamais journalisée.
+
 ## v1.1.16
 **Synthèse :** configuration Freesound locale et recherche textuelle corrigée.
 
