@@ -173,7 +173,7 @@ export class TelegramGateway {
   }
 
   async editSystemText(peer, messageId, humanText, meta) {
-    return this.tg.editMessage({ chatId: peer, messageId: Number(messageId), text: withMeta(humanText, meta), shouldDispatch: true })
+    return this.tg.editMessage({ chatId: peer, message: Number(messageId), text: withMeta(humanText, meta), shouldDispatch: true })
   }
 
   async postDocument(peer, topicId, file, meta, { progressCallback }={}) {

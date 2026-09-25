@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.18'
+const APP_VERSION='1.1.19'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -35,7 +35,7 @@ const SOUND_CACHE_TTL=7*24*60*60*1000
 const FREESOUND_API_KEY_LOCAL='MAMINA_FREESOUND_API_KEY'
 const SOUND_ADMIN_DRAFT_PREFIX='MAMINA_SOUND_ADMIN_DRAFT'
 let soundCatalog=[],freesoundApiKey='',soundDraft=null
-let adminSoundDrafts=[],adminSoundWizard=null,adminSoundPreviewSource=null,adminSoundGroupId=''
+let adminSoundDrafts=[],adminSoundWizard=null,adminSoundPreviewSource=null,adminSoundPreviewButton=null,adminSoundGroupId=''
 let soundGlobalEnabled=localStorage.getItem(SOUND_ENABLED_KEY)!=='0'
 let audioContext=null,articleSoundSource=null,articleSoundStopTimer=null,soundStartTimer=null,soundPlaybackToken=0
 let soundLoadingKey=null,soundUnavailableKey=null,soundManuallyStoppedKey=null,previewSoundSource=null
@@ -1496,16 +1496,41 @@ function updateAdminSoundCount(){
   const n=adminSoundDrafts.length,e=$('adminSoundCount');if(!e)return
   e.textContent=String(n);e.dataset.tone=soundCountTone(n)
 }
-function stopAdminSoundPreview(){stopNode(adminSoundPreviewSource);adminSoundPreviewSource=null}
-async function playAdminSound(sound,button=null){
+function stopAdminSoundPreview(){
+  const audio=adminSoundPreviewSource,button=adminSoundPreviewButton
+  adminSoundPreviewSource=null;adminSoundPreviewButton=null
+  if(audio){try{audio.pause()}catch{}try{audio.removeAttribute('src');audio.load()}catch{}}
+  if(button&&document.body.contains(button)){button.disabled=false;button.textContent='▶️';button.classList.remove('playing')}
+}
+function playAdminSound(sound,button=null){
   stopAdminSoundPreview()
-  if(button){button.disabled=true;button.textContent='…'}
-  try{
-    const ctx=ensureAudioContext();if(!ctx)throw new Error('Audio indisponible')
-    const entry={url:sound.url},blob=await fetchSoundBlob(entry),buffer=await ctx.decodeAudioData((await blob.arrayBuffer()).slice(0))
-    const source=ctx.createBufferSource();source.buffer=buffer;source.connect(ctx.destination);source.start();adminSoundPreviewSource=source
-    source.onended=()=>{if(adminSoundPreviewSource===source)adminSoundPreviewSource=null;if(button){button.disabled=false;button.textContent='▶️'}}
-  }catch(e){if(button){button.classList.add('broken');button.title='Son indisponible';button.disabled=false;button.textContent='⚠️'};throw e}
+  const url=soundUrl(sound)
+  if(!/^https?:\/\//i.test(url)){
+    if(button){button.classList.add('broken');button.title='Son indisponible';button.textContent='⚠️'}
+    return Promise.reject(new Error('URL son invalide'))
+  }
+  const audio=new Audio()
+  audio.preload='auto'
+  audio.src=url
+  adminSoundPreviewSource=audio
+  adminSoundPreviewButton=button
+  if(button){button.disabled=false;button.textContent='⏸️';button.classList.remove('broken');button.classList.add('playing');button.title='Lecture en cours'}
+  const reset=()=>{
+    if(adminSoundPreviewSource===audio){adminSoundPreviewSource=null;adminSoundPreviewButton=null}
+    if(button&&document.body.contains(button)){button.disabled=false;button.textContent='▶️';button.classList.remove('playing');button.title='Écouter'}
+  }
+  audio.addEventListener('ended',reset,{once:true})
+  audio.addEventListener('error',()=>{
+    if(adminSoundPreviewSource===audio){adminSoundPreviewSource=null;adminSoundPreviewButton=null}
+    if(button&&document.body.contains(button)){button.disabled=false;button.textContent='⚠️';button.classList.remove('playing');button.classList.add('broken');button.title='Son indisponible'}
+  },{once:true})
+  const started=audio.play()
+  return Promise.resolve(started).catch(e=>{
+    if(adminSoundPreviewSource===audio){adminSoundPreviewSource=null;adminSoundPreviewButton=null}
+    try{audio.pause()}catch{}
+    if(button&&document.body.contains(button)){button.disabled=false;button.textContent='⚠️';button.classList.remove('playing');button.classList.add('broken');button.title='Lecture bloquée ou indisponible'}
+    throw e
+  })
 }
 function renderAdminSoundRows(rows=adminSoundDrafts){
   const host=$('adminSoundList');if(!host)return;host.innerHTML=''

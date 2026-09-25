@@ -1,5 +1,14 @@
 # CHANGELOG MamiNa
 
+## v1.1.19
+**Synthèse :** corrige la publication des paramètres Telegram et fiabilise l’écoute des sons dans l’administration.
+
+La mise à jour du message `params` utilise maintenant la forme attendue par `@mtcute/web 0.32.1` pour `editMessage` : `{ chatId, message, ... }`. L’ancien champ `messageId` provoquait une requête Telegram incomplète et l’erreur `messages.editMessage is missing required property id`.
+
+Les boutons ▶️ de la bibliothèque et des résultats Freesound utilisent désormais un élément audio natif démarré immédiatement dans le geste utilisateur. Cela évite de perdre l’autorisation de lecture sur Safari/iOS pendant un téléchargement puis un décodage Web Audio asynchrones. Démarrer un autre aperçu arrête le précédent ; la fin de lecture restaure ▶️ et une erreur réelle affiche ⚠️.
+
+La lecture des sons dans les articles conserve le pipeline Web Audio avec cache hors ligne existant.
+
 ## v1.1.18
 **Synthèse :** rend la bibliothèque de sons persistante avant publication et ajoute une publication dédiée.
 
