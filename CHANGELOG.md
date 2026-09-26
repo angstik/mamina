@@ -1,5 +1,11 @@
 # CHANGELOG MamiNa
 
+
+## v1.1.23
+**Synthèse :** affiche la taille des sons dans l’administration et le sélecteur utilisateur.
+
+Les recherches Freesound demandent maintenant le champ `filesize` et enregistrent cette valeur dans le catalogue sous `fileSize`. Le récapitulatif administrateur, les résultats de recherche, l’étape de confirmation et les tuiles de sélection affichent la taille dans un format lisible (Ko/Mo). Les anciens sons sans métadonnée de taille restent compatibles et affichent « taille inconnue ».
+
 ## v1.1.22
 **Synthèse :** rend la lecture des sons cache-first, expose l’état du cache dans l’en-tête et permet de supprimer le son depuis « Mes contributions ».
 
