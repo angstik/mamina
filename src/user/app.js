@@ -577,7 +577,45 @@ async function cachedSoundObjectUrl(entry){
     return URL.createObjectURL(blob)
   }catch{return null}
 }
-function primeSoundCache(entry){fetchSoundBlob(entry).catch(()=>{})}
+function clearPreparedSoundUrls(){
+  for(const url of preparedSoundUrls.values())try{URL.revokeObjectURL(url)}catch{}
+  preparedSoundUrls.clear();preparingSoundUrls.clear();soundCachedKey=null
+}
+function markSoundCached(articleKey){
+  if(currentArticle()?.articleKey!==articleKey)return
+  soundLoadingKey=null;soundCachedKey=articleKey;soundUnavailableKey=null;updateSoundHeader()
+}
+async function prepareSoundEntry(entry,{articleKey=null,visitToken=articleSoundVisitToken}={}){
+  const url=soundUrl(entry);if(!url)return null
+  if(preparedSoundUrls.has(url)){if(articleKey)markSoundCached(articleKey);return preparedSoundUrls.get(url)}
+  if(preparingSoundUrls.has(url))return preparingSoundUrls.get(url)
+  if(articleKey&&currentArticle()?.articleKey===articleKey){soundLoadingKey=articleKey;soundCachedKey=null;updateSoundHeader()}
+  const job=(async()=>{
+    try{
+      const blob=await fetchSoundBlob(entry)
+      const objectUrl=URL.createObjectURL(blob)
+      preparedSoundUrls.set(url,objectUrl)
+      if(articleKey)markSoundCached(articleKey)
+      return objectUrl
+    }catch(e){
+      if(articleKey&&currentArticle()?.articleKey===articleKey){
+        soundLoadingKey=null;soundCachedKey=null
+        if(/HTTP 404/.test(String(e?.message||e))){soundUnavailableKey=articleKey;updateSoundHeader();pulseBrokenSoundIcon(articleKey,visitToken)}
+        else updateSoundHeader()
+      }
+      throw e
+    }finally{preparingSoundUrls.delete(url)}
+  })()
+  preparingSoundUrls.set(url,job)
+  return job
+}
+function warmArticleSoundsAround(index){
+  for(const i of [index,index+1,index-1,index+2,index-2]){
+    const article=displayArticles[i],entry=soundEntry(article?.sound?.soundId)
+    if(entry)prepareSoundEntry(entry,{articleKey:i===currentArticleIndex?article.articleKey:null,visitToken:articleSoundVisitToken}).catch(()=>{})
+  }
+}
+function primeSoundCache(entry){prepareSoundEntry(entry).catch(()=>{})}
 async function playArticleSoundNative(sound,{articleKey=null,visitToken=articleSoundVisitToken,gestureDelay=null}={}){
   const entry=soundEntry(sound?.soundId)
   if(!entry||!soundGlobalEnabled)return false
@@ -609,11 +647,10 @@ async function playArticleSoundNative(sound,{articleKey=null,visitToken=articleS
   audio.addEventListener('error',markBroken,{once:true})
   audio.addEventListener('ended',finish,{once:true})
   try{
-    let src=soundUrl(entry)
-    if(!navigator.onLine){
-      const cached=await cachedSoundObjectUrl(entry)
-      if(cached){articleSoundObjectUrl=cached;src=cached}
-    }else primeSoundCache(entry)
+    const url=soundUrl(entry),prepared=preparedSoundUrls.get(url)
+    let src=prepared||url
+    if(prepared){soundCachedKey=articleKey;soundLoadingKey=null}
+    else prepareSoundEntry(entry,{articleKey,visitToken}).catch(()=>{})
     if(token!==soundPlaybackToken)return false
     audio.src=src
     const delayed=Number.isFinite(gestureDelay)&&gestureDelay>0
@@ -653,14 +690,18 @@ function updateSoundHeader(){
   const b=$('soundReplayHeader'),a=currentArticle(),has=Boolean(a?.sound)
   if(!b)return
   b.hidden=!has||!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden
-  b.classList.toggle('loading',Boolean(a&&soundLoadingKey===a.articleKey))
-  b.classList.toggle('unavailable',Boolean(a&&soundUnavailableKey===a.articleKey))
+  const loading=Boolean(a&&soundLoadingKey===a.articleKey),cached=Boolean(a&&soundCachedKey===a.articleKey),unavailable=Boolean(a&&soundUnavailableKey===a.articleKey)
+  b.classList.toggle('loading',loading)
+  b.classList.toggle('cached',cached&&!loading&&!unavailable)
+  b.classList.toggle('unavailable',unavailable)
   b.classList.toggle('playing',Boolean(a&&articleSoundSource&&!articleSoundSource.paused&&!articleSoundSource.muted&&soundManuallyStoppedKey!==a.articleKey))
+  b.title=unavailable?'Son indisponible (404)':loading?'Récupération du son…':cached?'Son disponible en cache':'Arrêter ou rejouer le son'
 }
 function scheduleArticleSound(article,index,delay=1000){
   clearTimeout(soundStartTimer);soundStartTimer=null
   if(!article?.sound||!soundGlobalEnabled||soundManuallyStoppedKey===article.articleKey){updateSoundHeader();return}
-  const visitToken=articleSoundVisitToken
+  const visitToken=articleSoundVisitToken,entry=soundEntry(article.sound.soundId)
+  if(entry)prepareSoundEntry(entry,{articleKey:article.articleKey,visitToken}).catch(()=>{})
   soundStartTimer=setTimeout(()=>{
     if(currentArticleIndex!==index||currentArticle()?.articleKey!==article.articleKey||!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden||!$('focusOverlay').hidden)return
     playArticleSoundNative(article.sound,{articleKey:article.articleKey,visitToken})
