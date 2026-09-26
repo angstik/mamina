@@ -315,6 +315,13 @@
       <button type="button" data-sound-duration="15">15 s</button>
       <button type="button" data-sound-duration="continuous" title="Tant que l’article est affiché">🎞️</button>
     </div>
+    <div id="soundPreviewControls" class="sound-preview-controls">
+      <button id="soundPreviewStop" type="button" class="sound-preview-stop" aria-label="Arrêter l’écoute" disabled>⏹️</button>
+      <div class="sound-preview-progress-wrap">
+        <progress id="soundPreviewProgress" max="1" value="0"></progress>
+        <div class="sound-preview-time"><span id="soundPreviewElapsed">0:00</span><span id="soundPreviewTotal">0:00</span></div>
+      </div>
+    </div>
     <div id="soundStatus" class="status"></div>
     <div class="sound-sheet-actions">
       <button id="soundSend" type="button" class="sound-send" aria-label="Envoyer" disabled>✓</button>

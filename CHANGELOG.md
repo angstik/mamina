@@ -1,5 +1,16 @@
 # CHANGELOG MamiNa
 
+## v1.1.20
+**Synthèse :** remplace la lecture des sons d’article par un moteur audio natif et ajoute un aperçu contrôlé dans le sélecteur.
+
+Dans l’administration, le bouton ⏸️ arrête maintenant réellement l’aperçu en cours lorsqu’il est touché une seconde fois.
+
+Dans l’écran de choix d’un son pour un article, toucher un emoji démarre immédiatement l’aperçu. Un bouton ⏹️ arrête la lecture. Une barre de progression et un chrono affichent l’avancement. Fermer l’écran, changer de son, changer de durée ou envoyer le choix arrête toujours l’aperçu. Tout changement de durée remet explicitement la barre et le chrono à zéro.
+
+La lecture sur l’article utilise maintenant un élément `Audio` natif, aussi bien pour le démarrage différé à l’arrivée que pour le bouton 🎶 de l’en-tête. Les durées fichier, 5 s, 15 s et lecture continue restent prises en charge. Le cache 7 jours existant est conservé et sert de source locale hors connexion.
+
+L’icône 🎶 de l’en-tête ne s’anime plus à l’arrivée simplement parce qu’un son existe. Elle effectue une seule vibration visuelle uniquement lorsqu’une ressource audio est réellement détectée comme cassée ou indisponible. Un refus d’autoplay du navigateur n’est pas considéré comme un son cassé.
+
 ## v1.1.19
 **Synthèse :** corrige la publication des paramètres Telegram et fiabilise l’écoute des sons dans l’administration.
 

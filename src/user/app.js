@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.19'
+const APP_VERSION='1.1.20'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -39,6 +39,8 @@ let adminSoundDrafts=[],adminSoundWizard=null,adminSoundPreviewSource=null,admin
 let soundGlobalEnabled=localStorage.getItem(SOUND_ENABLED_KEY)!=='0'
 let audioContext=null,articleSoundSource=null,articleSoundStopTimer=null,soundStartTimer=null,soundPlaybackToken=0
 let soundLoadingKey=null,soundUnavailableKey=null,soundManuallyStoppedKey=null,previewSoundSource=null
+let articleSoundObjectUrl=null,articleSoundVisitToken=0
+let soundComposerAudio=null,soundComposerObjectUrl=null,soundComposerProgressTimer=null
 
 const status=(id,text,ok=null)=>{const e=$(id);if(!e)return;e.textContent=text;e.className='status'+(ok===true?' ok':ok===false?' error':'')}
 const debug=e=>logError('ui',e?.stack||e?.message||String(e),e)
@@ -539,75 +541,168 @@ async function fetchSoundBlob(entry){
 }
 function stopNode(node){try{node?.stop?.()}catch{}try{node?.disconnect?.()}catch{}}
 function stopPreviewSound(){stopNode(previewSoundSource);previewSoundSource=null}
+function revokeArticleSoundObjectUrl(){if(articleSoundObjectUrl){try{URL.revokeObjectURL(articleSoundObjectUrl)}catch{}articleSoundObjectUrl=null}}
+function pulseBrokenSoundIcon(articleKey,visitToken){
+  const a=currentArticle(),b=$('soundReplayHeader')
+  if(!b||!a||a.articleKey!==articleKey||visitToken!==articleSoundVisitToken)return
+  b.classList.remove('broken-pulse');void b.offsetWidth;b.classList.add('broken-pulse')
+  setTimeout(()=>b.classList.remove('broken-pulse'),760)
+}
 function stopArticleSound({manual=false}={}){
   clearTimeout(soundStartTimer);clearTimeout(articleSoundStopTimer);soundStartTimer=articleSoundStopTimer=null
-  stopNode(articleSoundSource);articleSoundSource=null;soundPlaybackToken++
+  const audio=articleSoundSource;articleSoundSource=null;soundPlaybackToken++
+  if(audio){try{audio.pause()}catch{}try{audio.removeAttribute('src');audio.load()}catch{}}
+  revokeArticleSoundObjectUrl()
   if(manual&&currentArticle()?.articleKey)soundManuallyStoppedKey=currentArticle().articleKey
   soundLoadingKey=null
   updateSoundHeader()
 }
-async function decodeSound(entry){
-  const ctx=ensureAudioContext();if(!ctx)throw new Error('Audio indisponible')
-  const blob=await fetchSoundBlob(entry),bytes=await blob.arrayBuffer()
-  return ctx.decodeAudioData(bytes.slice(0))
-}
-async function playSoundDefinition(sound,{articleKey=null,preview=false}={}){
-  const entry=soundEntry(sound?.soundId);if(!entry)return false
-  if(!preview&&!soundGlobalEnabled)return false
-  const ctx=ensureAudioContext();if(!ctx)return false
-  if(preview)stopPreviewSound();else stopArticleSound()
-  const token=++soundPlaybackToken
-  if(!preview){soundLoadingKey=articleKey;soundUnavailableKey=null;updateSoundHeader()}
+async function cachedSoundObjectUrl(entry){
+  if(!('caches'in window))return null
+  const url=soundUrl(entry),meta=soundCacheMeta(),at=Number(meta[url]||0)
+  if(!url||Date.now()-at>SOUND_CACHE_TTL)return null
   try{
-    const buffer=await decodeSound(entry)
+    const cache=await caches.open(SOUND_CACHE_NAME),response=await cache.match(url)
+    if(!response)return null
+    const blob=await response.blob()
+    return URL.createObjectURL(blob)
+  }catch{return null}
+}
+function primeSoundCache(entry){fetchSoundBlob(entry).catch(()=>{})}
+async function playArticleSoundNative(sound,{articleKey=null,visitToken=articleSoundVisitToken}={}){
+  const entry=soundEntry(sound?.soundId)
+  if(!entry||!soundGlobalEnabled)return false
+  stopArticleSound()
+  const token=++soundPlaybackToken
+  soundLoadingKey=articleKey;soundUnavailableKey=null;updateSoundHeader()
+  const audio=new Audio()
+  audio.preload='auto'
+  const mode=String(sound?.duration||'source'),seconds=mode==='5'?5:mode==='15'?15:null
+  audio.loop=mode==='continuous'
+  articleSoundSource=audio
+  const markBroken=()=>{
+    if(token!==soundPlaybackToken)return
+    soundLoadingKey=null;soundUnavailableKey=articleKey
+    updateSoundHeader();pulseBrokenSoundIcon(articleKey,visitToken)
+  }
+  const finish=()=>{
+    if(articleSoundSource!==audio)return
+    articleSoundSource=null;clearTimeout(articleSoundStopTimer);articleSoundStopTimer=null
+    revokeArticleSoundObjectUrl();updateSoundHeader()
+  }
+  audio.addEventListener('error',markBroken,{once:true})
+  audio.addEventListener('ended',finish,{once:true})
+  try{
+    let src=soundUrl(entry)
+    if(!navigator.onLine){
+      const cached=await cachedSoundObjectUrl(entry)
+      if(cached){articleSoundObjectUrl=cached;src=cached}
+    }else primeSoundCache(entry)
     if(token!==soundPlaybackToken)return false
-    if(ctx.state==='suspended'){await ctx.resume().catch(()=>{});if(ctx.state==='suspended')return false}
-    const source=ctx.createBufferSource();source.buffer=buffer
-    const mode=String(sound?.duration||'source'),seconds=mode==='5'?5:mode==='15'?15:null
-    source.loop=mode==='continuous'||Boolean(seconds&&buffer.duration<seconds-.05)
-    source.connect(ctx.destination);source.start()
-    if(preview)previewSoundSource=source
-    else{
-      articleSoundSource=source;soundLoadingKey=null;soundUnavailableKey=null;updateSoundHeader()
-      if(seconds){articleSoundStopTimer=setTimeout(()=>{if(articleSoundSource===source){stopNode(source);articleSoundSource=null;updateSoundHeader()}},seconds*1000)}
-      source.onended=()=>{if(articleSoundSource===source){articleSoundSource=null;clearTimeout(articleSoundStopTimer);articleSoundStopTimer=null;updateSoundHeader()}}
+    audio.src=src
+    const started=audio.play()
+    await Promise.resolve(started)
+    if(token!==soundPlaybackToken)return false
+    soundLoadingKey=null;soundUnavailableKey=null;updateSoundHeader()
+    if(seconds){
+      audio.loop=audio.duration>0&&audio.duration<seconds-.05
+      articleSoundStopTimer=setTimeout(()=>{if(articleSoundSource===audio){try{audio.pause()}catch{}finish()}},seconds*1000)
     }
     return true
   }catch(e){
     debug(e)
-    if(!preview){soundLoadingKey=null;soundUnavailableKey=articleKey;updateSoundHeader()}
+    if(e?.name==='NotAllowedError'){
+      soundLoadingKey=null;updateSoundHeader()
+      return false
+    }
+    markBroken()
     return false
   }
 }
 function updateSoundHeader(){
   const b=$('soundReplayHeader'),a=currentArticle(),has=Boolean(a?.sound)
   if(!b)return
-  b.hidden=!has||!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden||!$('soundComposer').hidden
+  b.hidden=!has||!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden
   b.classList.toggle('loading',Boolean(a&&soundLoadingKey===a.articleKey))
   b.classList.toggle('unavailable',Boolean(a&&soundUnavailableKey===a.articleKey))
-  b.classList.toggle('playing',Boolean(a&&articleSoundSource&&soundManuallyStoppedKey!==a.articleKey))
+  b.classList.toggle('playing',Boolean(a&&articleSoundSource&&!articleSoundSource.paused&&soundManuallyStoppedKey!==a.articleKey))
 }
 function scheduleArticleSound(article,index,delay=1000){
   clearTimeout(soundStartTimer);soundStartTimer=null
   if(!article?.sound||!soundGlobalEnabled||soundManuallyStoppedKey===article.articleKey){updateSoundHeader();return}
+  const visitToken=articleSoundVisitToken
   soundStartTimer=setTimeout(()=>{
     if(currentArticleIndex!==index||currentArticle()?.articleKey!==article.articleKey||!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden||!$('focusOverlay').hidden)return
-    playSoundDefinition(article.sound,{articleKey:article.articleKey})
+    playArticleSoundNative(article.sound,{articleKey:article.articleKey,visitToken})
   },delay)
   updateSoundHeader()
 }
 $('soundReplayHeader').onclick=()=>{
   const a=currentArticle();if(!a?.sound)return
-  if(articleSoundSource||soundLoadingKey===a.articleKey){stopArticleSound({manual:true});return}
-  soundManuallyStoppedKey=null;soundUnavailableKey=null;playSoundDefinition(a.sound,{articleKey:a.articleKey})
+  if(articleSoundSource&&!articleSoundSource.paused||soundLoadingKey===a.articleKey){stopArticleSound({manual:true});return}
+  soundManuallyStoppedKey=null;soundUnavailableKey=null
+  playArticleSoundNative(a.sound,{articleKey:a.articleKey,visitToken:articleSoundVisitToken})
 }
 $('soundGlobalToggle').onclick=()=>{
   soundGlobalEnabled=!soundGlobalEnabled;localStorage.setItem(SOUND_ENABLED_KEY,soundGlobalEnabled?'1':'0');refreshSoundGlobalIcon()
   if(!soundGlobalEnabled)stopArticleSound()
-  else{soundManuallyStoppedKey=null;const a=currentArticle();if(a?.sound)playSoundDefinition(a.sound,{articleKey:a.articleKey})}
+  else{soundManuallyStoppedKey=null;const a=currentArticle();if(a?.sound)playArticleSoundNative(a.sound,{articleKey:a.articleKey,visitToken:articleSoundVisitToken})}
+}
+function fmtSoundTime(seconds){
+  const s=Math.max(0,Number(seconds)||0),m=Math.floor(s/60),r=Math.floor(s%60)
+  return `${m}:${String(r).padStart(2,'0')}`
+}
+function soundPreviewTarget(audio){
+  if(!soundDraft)return 0
+  if(soundDraft.duration==='5')return 5
+  if(soundDraft.duration==='15')return 15
+  if(soundDraft.duration==='continuous')return Number.isFinite(audio?.duration)?audio.duration:0
+  return Number.isFinite(audio?.duration)?audio.duration:0
+}
+function resetSoundComposerProgress(){
+  clearInterval(soundComposerProgressTimer);soundComposerProgressTimer=null
+  $('soundPreviewProgress').value=0;$('soundPreviewProgress').max=1
+  $('soundPreviewElapsed').textContent='0:00';$('soundPreviewTotal').textContent='0:00'
+}
+function stopSoundComposerPreview({reset=true}={}){
+  clearInterval(soundComposerProgressTimer);soundComposerProgressTimer=null
+  const audio=soundComposerAudio;soundComposerAudio=null
+  if(audio){try{audio.pause()}catch{}try{audio.removeAttribute('src');audio.load()}catch{}}
+  if(soundComposerObjectUrl){try{URL.revokeObjectURL(soundComposerObjectUrl)}catch{}soundComposerObjectUrl=null}
+  $('soundPreviewStop').disabled=true
+  if(reset)resetSoundComposerProgress()
+}
+function updateSoundComposerProgress(){
+  const audio=soundComposerAudio
+  if(!audio){resetSoundComposerProgress();return}
+  const target=soundPreviewTarget(audio),elapsed=Math.max(0,Number(audio.currentTime)||0)
+  $('soundPreviewElapsed').textContent=fmtSoundTime(elapsed)
+  $('soundPreviewTotal').textContent=target?fmtSoundTime(target):'0:00'
+  $('soundPreviewProgress').max=Math.max(.01,target||1)
+  $('soundPreviewProgress').value=Math.min(target||1,elapsed)
+  if(target&&soundDraft?.duration!=='continuous'&&elapsed>=target-.05)stopSoundComposerPreview({reset:false})
+}
+async function playSoundComposerPreview(){
+  stopSoundComposerPreview()
+  if(!soundDraft?.soundId)return
+  const entry=soundEntry(soundDraft.soundId);if(!entry)return
+  const audio=new Audio();audio.preload='auto';soundComposerAudio=audio
+  const mode=soundDraft.duration||'source'
+  audio.loop=mode==='continuous'
+  audio.addEventListener('loadedmetadata',()=>{if(soundComposerAudio!==audio)return;const target=soundPreviewTarget(audio);if((mode==='5'||mode==='15')&&target>audio.duration+.05)audio.loop=true;updateSoundComposerProgress()})
+  audio.addEventListener('timeupdate',updateSoundComposerProgress)
+  audio.addEventListener('ended',()=>{if(soundComposerAudio===audio)stopSoundComposerPreview({reset:false})},{once:true})
+  audio.addEventListener('error',()=>{if(soundComposerAudio===audio){stopSoundComposerPreview();$('soundStatus').textContent='Son indisponible.'}},{once:true})
+  let src=soundUrl(entry)
+  if(!navigator.onLine){const cached=await cachedSoundObjectUrl(entry);if(cached){soundComposerObjectUrl=cached;src=cached}}
+  else primeSoundCache(entry)
+  if(soundComposerAudio!==audio)return
+  audio.src=src;$('soundPreviewStop').disabled=false;$('soundStatus').textContent=''
+  try{await audio.play();soundComposerProgressTimer=setInterval(updateSoundComposerProgress,200)}
+  catch(e){debug(e);stopSoundComposerPreview();$('soundStatus').textContent='Lecture impossible.'}
 }
 function closeSoundComposer({resume=true}={}){
-  stopPreviewSound();soundDraft=null;$('soundComposer').hidden=true;$('soundStatus').textContent=''
+  stopSoundComposerPreview();soundDraft=null;$('soundComposer').hidden=true;$('soundStatus').textContent=''
   updateSoundHeader()
   if(resume){const a=currentArticle();if(a?.sound&&soundGlobalEnabled)scheduleArticleSound(a,currentArticleIndex,350)}
 }
@@ -616,7 +711,7 @@ function renderSoundPicker(){
   for(const entry of soundCatalog){
     if(!entry?.url)continue
     const b=document.createElement('button');b.type='button';b.textContent=entry.emoji||'🎶';b.title=entry.label||'Son';b.dataset.soundId=entry.id
-    b.onclick=async()=>{if(!soundDraft)return;soundDraft.soundId=entry.id;for(const x of host.querySelectorAll('button'))x.classList.toggle('selected',x===b);$('soundSend').disabled=false;await playSoundDefinition({soundId:entry.id,duration:'source'},{preview:true})}
+    b.onclick=()=>{if(!soundDraft)return;stopSoundComposerPreview();soundDraft.soundId=entry.id;for(const x of host.querySelectorAll('button'))x.classList.toggle('selected',x===b);$('soundSend').disabled=false;playSoundComposerPreview()}
     host.appendChild(b)
   }
   if(!host.children.length)host.innerHTML='<div class="empty">Aucun son configuré.</div>'
@@ -624,15 +719,22 @@ function renderSoundPicker(){
 function openSoundComposer(index){
   if(!$('composerModal').hidden||!$('motionComposer').hidden||!$('focusOverlay').hidden)return
   const a=displayArticles[index];if(!a)return
-  stopArticleSound();soundDraft={articleKey:a.articleKey,index,soundId:null,duration:'source'}
+  stopArticleSound();stopSoundComposerPreview();soundDraft={articleKey:a.articleKey,index,soundId:null,duration:'source'}
   renderSoundPicker();for(const b of document.querySelectorAll('[data-sound-duration]'))b.classList.toggle('selected',b.dataset.soundDuration==='source')
-  $('soundSend').disabled=true;$('soundStatus').textContent='';$('soundComposer').hidden=false;updateSoundHeader()
+  $('soundSend').disabled=true;$('soundStatus').textContent='';$('soundComposer').hidden=false;resetSoundComposerProgress();updateSoundHeader()
 }
 $('soundCancel').onclick=()=>closeSoundComposer()
 $('soundComposer').addEventListener('click',e=>{if(e.target===$('soundComposer'))closeSoundComposer()})
-for(const b of document.querySelectorAll('[data-sound-duration]'))b.onclick=()=>{if(!soundDraft)return;soundDraft.duration=b.dataset.soundDuration;for(const x of document.querySelectorAll('[data-sound-duration]'))x.classList.toggle('selected',x===b)}
+$('soundPreviewStop').onclick=()=>stopSoundComposerPreview()
+for(const b of document.querySelectorAll('[data-sound-duration]'))b.onclick=()=>{
+  if(!soundDraft)return
+  stopSoundComposerPreview()
+  soundDraft.duration=b.dataset.soundDuration
+  for(const x of document.querySelectorAll('[data-sound-duration]'))x.classList.toggle('selected',x===b)
+}
 $('soundSend').onclick=async()=>{
   if(!soundDraft?.soundId)return
+  stopSoundComposerPreview()
   const button=$('soundSend');button.disabled=true
   try{
     currentModel=await service.postArticleSound(soundDraft.articleKey,{soundId:soundDraft.soundId,duration:soundDraft.duration})
@@ -733,6 +835,8 @@ function activate(i){
   hideMotionAuthors()
   stopArticleSound()
   soundManuallyStoppedKey=null
+  soundUnavailableKey=null
+  articleSoundVisitToken++
   currentArticleIndex=i
   saveReaderState(currentArticle()?.articleKey)
   updateReaderPageLabel()
@@ -1503,6 +1607,10 @@ function stopAdminSoundPreview(){
   if(button&&document.body.contains(button)){button.disabled=false;button.textContent='▶️';button.classList.remove('playing')}
 }
 function playAdminSound(sound,button=null){
+  if(adminSoundPreviewSource&&!adminSoundPreviewSource.paused&&adminSoundPreviewButton===button){
+    stopAdminSoundPreview()
+    return Promise.resolve()
+  }
   stopAdminSoundPreview()
   const url=soundUrl(sound)
   if(!/^https?:\/\//i.test(url)){
