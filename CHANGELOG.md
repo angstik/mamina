@@ -1,5 +1,14 @@
 # CHANGELOG MamiNa
 
+## v1.1.22
+**Synthèse :** rend la lecture des sons cache-first, expose l’état du cache dans l’en-tête et permet de supprimer le son depuis « Mes contributions ».
+
+Les sons d’article sont maintenant préparés en avance autour de l’article courant. Le lecteur réutilise en priorité un `Blob` déjà présent dans Cache Storage (TTL 7 jours) via une URL objet préparée en mémoire ; si le cache est absent, le téléchargement réseau remplit le cache puis prépare cette source locale pour les lectures suivantes. Les articles voisins sont préchauffés afin que le swipe iOS puisse démarrer immédiatement depuis une source déjà locale lorsque c’est possible.
+
+L’icône 🎶 distingue trois états : clignotement pendant la récupération, rotation lorsque la ressource est disponible dans le cache local, vibration ponctuelle lorsqu’un HTTP 404 est détecté. Le refus d’autoplay reste distinct d’une ressource cassée.
+
+Le son actif créé par l’utilisateur apparaît désormais dans la feuille « Mes contributions » avec son emoji, son libellé et sa durée. Sa suppression publie un nouvel état « aucun son » plutôt que de supprimer seulement le dernier message Telegram, afin qu’un ancien son ne puisse pas réapparaître lors d’une resynchronisation complète. Un son encore en attente hors ligne peut aussi être retiré avant envoi.
+
 ## v1.1.21
 **Synthèse :** fiabilise les durées audio 5/15 s et amorce la lecture pendant le geste de changement d’article sur iOS/Safari.
 
