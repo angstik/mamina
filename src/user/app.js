@@ -908,9 +908,11 @@ function activate(i,{soundMode='scheduled'}={}){
   hideMotionAuthors()
   stopArticleSound()
   soundManuallyStoppedKey=null
+  soundCachedKey=null
   soundUnavailableKey=null
   articleSoundVisitToken++
   currentArticleIndex=i
+  warmArticleSoundsAround(i)
   saveReaderState(currentArticle()?.articleKey)
   updateReaderPageLabel()
   updateMotionReplayHeader()
