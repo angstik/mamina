@@ -811,7 +811,7 @@ export class UserMaminaService {
     const soundsBy=resolved.soundsBy
     const pendingSoundBy=new Map()
     for(const op of pendingTopicOps){
-      if(op.type==='set-sound'&&op.magazineId===magazine.magazineId)pendingSoundBy.set(op.articleKey,op.sound)
+      if(op.type==='set-sound'&&op.magazineId===magazine.magazineId)pendingSoundBy.set(op.articleKey,op)
     }
     const outbox=await listOutbox()
     const pendingBy=new Map(outbox.map(x=>[x.articleKey,x]))
@@ -836,11 +836,15 @@ export class UserMaminaService {
         text:pending.text,
       })
       const motions=[...(motionsBy.get(a.articleKey)||[]).sort((x,y)=>x.id-y.id),...(pendingMotionBy.get(a.articleKey)||[])]
-      const remoteSound=soundsBy.get(a.articleKey)?.sound||null
-      const pendingSound=pendingSoundBy.get(a.articleKey)
-      const sound=pendingSound?{...pendingSound,pending:true}:remoteSound
+      const remoteSoundRow=soundsBy.get(a.articleKey)||null
+      const pendingSoundOp=pendingSoundBy.get(a.articleKey)||null
+      const hasPendingSound=pendingSoundBy.has(a.articleKey)
+      const sound=hasPendingSound?(pendingSoundOp?.sound?{...pendingSoundOp.sound,pending:true}:null):(remoteSoundRow?.sound||null)
+      const soundContribution=hasPendingSound
+        ? (pendingSoundOp?.sound?{id:Number.MAX_SAFE_INTEGER-500,articleKey:a.articleKey,author:'Moi',isOutgoing:true,pending:true,pendingId:pendingSoundOp.id,date:pendingSoundOp.createdAt,sound:pendingSoundOp.sound}:null)
+        : (remoteSoundRow?.sound?{...remoteSoundRow,sound:remoteSoundRow.sound}:null)
       const lastRead=read.get(a.articleKey)||0
-      return {...a,comments,motions,sound,lastReadMessageId:lastRead,unreadCount:comments.filter(c=>!c.isOutgoing&&c.id>lastRead).length}
+      return {...a,comments,motions,sound,soundContribution,lastReadMessageId:lastRead,unreadCount:comments.filter(c=>!c.isOutgoing&&c.id>lastRead).length}
     })
     return {magazine,articles:withState,pdf}
   }
@@ -972,9 +976,26 @@ export class UserMaminaService {
       await this._savePendingMotions(after)
       return this.currentView()
     }
+    if(kind==='sound'&&pendingId){
+      const before=await this._listPendingTopicOps(),after=before.filter(x=>!(x.id===pendingId&&x.type==='set-sound'&&x.articleKey===ak))
+      if(after.length===before.length)throw new Error('Son en attente introuvable.')
+      await this._savePendingTopicOps(after)
+      return this.currentView()
+    }
     if(kind==='message'&&!messageId){await deleteOutbox(ak);return this.currentView()}
     const id=Number(messageId||0),row=this.current.rows.find(r=>Number(r.id)===id&&r.articleKey===ak)
     if(!row||!row.isOutgoing)throw new Error('Seules tes contributions peuvent être supprimées.')
+    if(kind==='sound'){
+      const op={id:`op:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,createdAt:new Date().toISOString(),type:'set-sound',magazineId:this.current.magazine.magazineId,topicId:this.current.magazine.topicId,articleKey:ak,sound:null}
+      await this._queueArticleSound(op)
+      const online=typeof navigator==='undefined'||navigator.onLine!==false
+      if(!this.gateway||!this.dialog||!online||this.gateway.connectionState!=='connected')return this.currentView()
+      try{
+        await this._executeSetSoundTopicOp(op)
+        await this._savePendingTopicOps((await this._listPendingTopicOps()).filter(x=>x.id!==op.id))
+      }catch(e){warn('sound.outbox','Suppression du son différée après échec réseau',{messageId:id,message:e?.message||String(e)})}
+      return this.currentView()
+    }
     const op={type:'delete-contribution',magazineId:this.current.magazine.magazineId,topicId:this.current.magazine.topicId,articleKey:ak,targetMessageId:id,targetKind:kind}
     // Hide immediately on this device. The pending op acts as a local tombstone
     // and prevents a sync from resurrecting the row while offline.
