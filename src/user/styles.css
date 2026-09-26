@@ -87,7 +87,9 @@ button,input,select{font:inherit}button{cursor:pointer}
 
 .sound-sheet{max-width:520px}
 .sound-emoji-grid{display:grid;grid-template-columns:repeat(5,minmax(52px,1fr));gap:8px;overflow-y:auto;padding:3px 0 8px}
-.sound-emoji-grid button{min-height:52px;border:1px solid var(--line);border-radius:12px;background:#8881;color:inherit;font-size:1.55rem}
+.sound-emoji-grid button{min-height:58px;border:1px solid var(--line);border-radius:12px;background:#8881;color:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:5px 3px}
+.sound-choice-emoji{font-size:1.55rem;line-height:1.05}
+.sound-choice-size{font-size:.62rem;line-height:1;opacity:.68;white-space:nowrap}
 .sound-emoji-grid button.selected{background:color-mix(in srgb,var(--accent) 22%,transparent);border-color:var(--accent)}
 .sound-duration-row{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;padding:7px 0}
 .sound-duration-row button{min-height:40px;border:1px solid var(--line);border-radius:10px;background:#8881;color:inherit}
