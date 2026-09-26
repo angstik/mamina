@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.22'
+const APP_VERSION='1.1.23'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -513,6 +513,14 @@ function ensureAudioContext(){
 }
 document.addEventListener('pointerdown',()=>ensureAudioContext(),{capture:true,passive:true})
 function soundEntry(soundId){return soundCatalog.find(x=>String(x.id)===String(soundId))||null}
+function formatSoundBytes(bytes){
+  let n=Number(bytes||0)
+  if(!Number.isFinite(n)||n<=0)return 'taille inconnue'
+  const units=['o','Ko','Mo','Go'];let i=0
+  while(n>=1024&&i<units.length-1){n/=1024;i++}
+  return `${n.toLocaleString('fr-FR',{maximumFractionDigits:i?1:0})} ${units[i]}`
+}
+function soundFileSize(entry){return Number(entry?.fileSize||entry?.filesize||0)||0}
 function soundUrl(entry){
   const key=encodeURIComponent(freesoundApiKey||'')
   return String(entry?.url||'').replaceAll('{API_KEY}',key).replaceAll('{apiKey}',key).replaceAll('%APIKEY%',key)
@@ -783,7 +791,10 @@ function renderSoundPicker(){
   const host=$('soundEmojiGrid');host.innerHTML=''
   for(const entry of soundCatalog){
     if(!entry?.url)continue
-    const b=document.createElement('button');b.type='button';b.textContent=entry.emoji||'🎶';b.title=entry.label||'Son';b.dataset.soundId=entry.id
+    const b=document.createElement('button');b.type='button';b.title=[entry.label||'Son',formatSoundBytes(soundFileSize(entry))].join(' · ');b.dataset.soundId=entry.id
+    const emoji=document.createElement('span');emoji.className='sound-choice-emoji';emoji.textContent=entry.emoji||'🎶'
+    const size=document.createElement('span');size.className='sound-choice-size';size.textContent=formatSoundBytes(soundFileSize(entry))
+    b.append(emoji,size)
     b.onclick=()=>{if(!soundDraft)return;stopSoundComposerPreview();soundDraft.soundId=entry.id;for(const x of host.querySelectorAll('button'))x.classList.toggle('selected',x===b);$('soundSend').disabled=false;playSoundComposerPreview()}
     host.appendChild(b)
   }
@@ -1723,7 +1734,7 @@ function renderAdminSoundRows(rows=adminSoundDrafts){
     const emoji=document.createElement('span');emoji.className='admin-sound-row-emoji';emoji.textContent=sound.emoji||'🎶'
     const info=document.createElement('div');info.className='admin-sound-row-info'
     const label=document.createElement('strong');label.textContent=sound.label||'Son'
-    const meta=document.createElement('span');meta.textContent=[sound.license||'',sound.provider==='freesound'&&sound.providerId?`Freesound #${sound.providerId}`:''].filter(Boolean).join(' · ')||'URL configurée'
+    const meta=document.createElement('span');meta.textContent=[formatSoundBytes(soundFileSize(sound)),sound.license||'',sound.provider==='freesound'&&sound.providerId?`Freesound #${sound.providerId}`:''].filter(Boolean).join(' · ')||'URL configurée'
     info.append(label,meta)
     const listen=document.createElement('button');listen.type='button';listen.className='admin-sound-listen';listen.textContent='▶️';listen.title='Écouter';listen.onclick=()=>playAdminSound(sound,listen).catch(()=>{})
     const replace=document.createElement('button');replace.type='button';replace.className='admin-sound-replace';replace.textContent='🔄';replace.title='Remplacer / réparer';replace.onclick=()=>openAdminSoundWizard({replaceId:sound.id})
@@ -1751,7 +1762,7 @@ function freesoundSearchUrl(query){
   const u=new URL('https://freesound.org/apiv2/search/')
   u.searchParams.set('query',query)
   u.searchParams.set('filter','license:"Creative Commons 0"')
-  u.searchParams.set('fields','id,name,username,license,duration,previews,url,tags')
+  u.searchParams.set('fields','id,name,username,license,duration,filesize,previews,url,tags')
   u.searchParams.set('page_size','12')
   u.searchParams.set('sort','rating_desc')
   u.searchParams.set('token',$('adminFreesoundApiKey').value.trim())
@@ -1799,7 +1810,7 @@ async function searchAdminSounds(){
       const card=document.createElement('div');card.className='admin-sound-result'
       const info=document.createElement('div');info.className='admin-sound-result-info'
       const title=document.createElement('strong');title.textContent=result.name||`Son ${result.id}`
-      const meta=document.createElement('span');meta.textContent=`${result.username||'—'} · ${Number(result.duration||0).toFixed(1)} s · ${result.license||'CC0'}`
+      const meta=document.createElement('span');meta.textContent=`${result.username||'—'} · ${Number(result.duration||0).toFixed(1)} s · ${formatSoundBytes(result.filesize)} · ${result.license||'CC0'}`
       info.append(title,meta)
       const play=document.createElement('button');play.type='button';play.textContent='▶️';play.title='Écouter';play.onclick=()=>playAdminSound({url:preview},play).catch(()=>{})
       const choose=document.createElement('button');choose.type='button';choose.textContent='Choisir';choose.onclick=()=>chooseAdminSoundResult(result,preview,q)
@@ -1810,9 +1821,9 @@ async function searchAdminSounds(){
 }
 function chooseAdminSoundResult(result,preview,keywords){
   stopAdminSoundPreview()
-  adminSoundWizard.selected={provider:'freesound',providerId:String(result.id),license:'CC0',label:String(result.name||'Son'),url:String(preview),keywords:String(keywords||'')}
+  adminSoundWizard.selected={provider:'freesound',providerId:String(result.id),license:'CC0',label:String(result.name||'Son'),url:String(preview),keywords:String(keywords||''),fileSize:Number(result.filesize||0)||null,sourceDuration:Number(result.duration||0)||null}
   $('adminSoundSearchStep').hidden=true;$('adminSoundEmojiStep').hidden=false
-  $('adminSoundChosen').innerHTML=`<strong>${esc(adminSoundWizard.selected.label)}</strong><span>Freesound #${esc(result.id)} · CC0 · ${Number(result.duration||0).toFixed(1)} s</span>`
+  $('adminSoundChosen').innerHTML=`<strong>${esc(adminSoundWizard.selected.label)}</strong><span>Freesound #${esc(result.id)} · CC0 · ${Number(result.duration||0).toFixed(1)} s · ${esc(formatSoundBytes(result.filesize))}</span>`
   const current=adminSoundWizard.replaceId?adminSoundDrafts.find(x=>x.id===adminSoundWizard.replaceId):null
   const initial=current?.emoji||adminSoundWizard.emoji||''
   $('adminSoundEmojiInput').value=initial;$('adminSoundEmojiPreview').textContent=initial||'🎶';$('adminSoundWizardValidate').disabled=!initial
