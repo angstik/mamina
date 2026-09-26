@@ -1,5 +1,12 @@
 # CHANGELOG MamiNa
 
+## v1.1.21
+**Synthèse :** fiabilise les durées audio 5/15 s et amorce la lecture pendant le geste de changement d’article sur iOS/Safari.
+
+Les modes 5 s et 15 s mesurent désormais une vraie durée de session indépendante de `Audio.currentTime`. Un fichier plus court boucle jusqu’à la durée demandée, aussi bien dans l’article que dans l’aperçu, sans pouvoir tourner indéfiniment dans le sélecteur.
+
+Lors d’un swipe horizontal, l’article cible est activé immédiatement pendant le `touchend`. Son élément `Audio` est démarré silencieusement dans ce geste utilisateur puis revient au début et devient audible après le délai d’une seconde. Cela conserve le délai d’arrivée tout en évitant la perte d’autorisation de lecture Safari/iOS provoquée auparavant par le `setTimeout`.
+
 ## v1.1.20
 **Synthèse :** remplace la lecture des sons d’article par un moteur audio natif et ajoute un aperçu contrôlé dans le sélecteur.
 
