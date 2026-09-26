@@ -408,7 +408,7 @@ function renderContributionPopup(){
   for(const item of items){
     const row=item.row,e=document.createElement('div');e.className='contribution-row'
     const preview=document.createElement('div');preview.className='contribution-preview'
-    const kind=document.createElement('div');kind.className='contribution-kind';kind.textContent=(item.kind==='motion'?'Animation':'Message')+(row.pending?' · hors ligne':'')
+    const kind=document.createElement('div');kind.className='contribution-kind';kind.textContent=(item.kind==='motion'?'Animation':item.kind==='sound'?'Son':'Message')+(row.pending?' · hors ligne':'')
     const body=document.createElement('div')
     if(item.kind==='motion'){
       body.className='contribution-motion'
@@ -416,10 +416,16 @@ function renderContributionPopup(){
       const em=document.createElement('span');em.className='contribution-motion-emoji';em.textContent=emojis||'✨'
       const type=document.createElement('span');type.className='contribution-motion-type';type.textContent=motionOptionLabel(motion.scale)
       body.append(em,motionMiniShape(motion.curve),type)
+    }else if(item.kind==='sound'){
+      body.className='contribution-sound'
+      const entry=soundEntry(row.sound?.soundId),emoji=document.createElement('span'),label=document.createElement('span')
+      emoji.className='contribution-sound-emoji';emoji.textContent=entry?.emoji||'🎶'
+      label.className='contribution-sound-label';label.textContent=[entry?.label||'Son',row.sound?.duration==='continuous'?'continu':row.sound?.duration==='source'?'fichier':row.sound?.duration?row.sound.duration+' s':''].filter(Boolean).join(' · ')
+      body.append(emoji,label)
     }else{body.className='contribution-message';body.textContent=row.displayText||row.text||''}
     preview.append(kind,body)
     const del=document.createElement('button');del.type='button';del.className='contribution-delete';del.textContent='🗑️';del.title='Supprimer';del.setAttribute('aria-label','Supprimer cette contribution')
-    del.onclick=async()=>{del.disabled=true;status('contributionPopupStatus','Suppression…');try{const view=await service.deleteOwnContribution({articleKey:currentArticle().articleKey,kind:item.kind,messageId:row.pending?null:row.id,pendingId:row.pendingId||null});await refreshReaderAfterContributionChange(view,currentArticle().articleKey);renderContributionPopup();requestAnimationFrame(()=>{const h=$('contributionPopupList');h.scrollTop=h.scrollHeight});status('contributionPopupStatus','Supprimé.',true)}catch(err){debug(err);status('contributionPopupStatus','Erreur : '+(err.message||err),false);del.disabled=false}}
+    del.onclick=async()=>{del.disabled=true;status('contributionPopupStatus','Suppression…');try{const articleKey=currentArticle().articleKey;if(item.kind==='sound')stopArticleSound();const view=await service.deleteOwnContribution({articleKey,kind:item.kind,messageId:row.pending?null:row.id,pendingId:row.pendingId||null});await refreshReaderAfterContributionChange(view,articleKey);renderContributionPopup();requestAnimationFrame(()=>{const h=$('contributionPopupList');h.scrollTop=h.scrollHeight});status('contributionPopupStatus','Supprimé.',true)}catch(err){debug(err);status('contributionPopupStatus','Erreur : '+(err.message||err),false);del.disabled=false}}
     e.append(preview,del);host.appendChild(e)
   }
   requestAnimationFrame(()=>{host.scrollTop=host.scrollHeight})
