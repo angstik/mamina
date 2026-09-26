@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.21'
+const APP_VERSION='1.1.22'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -38,9 +38,10 @@ let soundCatalog=[],freesoundApiKey='',soundDraft=null
 let adminSoundDrafts=[],adminSoundWizard=null,adminSoundPreviewSource=null,adminSoundPreviewButton=null,adminSoundGroupId=''
 let soundGlobalEnabled=localStorage.getItem(SOUND_ENABLED_KEY)!=='0'
 let audioContext=null,articleSoundSource=null,articleSoundStopTimer=null,soundStartTimer=null,soundPlaybackToken=0
-let soundLoadingKey=null,soundUnavailableKey=null,soundManuallyStoppedKey=null,previewSoundSource=null
+let soundLoadingKey=null,soundCachedKey=null,soundUnavailableKey=null,soundManuallyStoppedKey=null,previewSoundSource=null
 let articleSoundObjectUrl=null,articleSoundVisitToken=0
 let soundComposerAudio=null,soundComposerObjectUrl=null,soundComposerProgressTimer=null,soundComposerStartedAt=null
+const preparedSoundUrls=new Map(),preparingSoundUrls=new Map()
 
 const status=(id,text,ok=null)=>{const e=$(id);if(!e)return;e.textContent=text;e.className='status'+(ok===true?' ok':ok===false?' error':'')}
 const debug=e=>logError('ui',e?.stack||e?.message||String(e),e)
@@ -350,7 +351,7 @@ $('back').onclick=async()=>{
   if(!$('composerModal').hidden)return
   stopArticleSound()
   clearReaderState();$('reader').hidden=true;$('home').hidden=false
-  freeUrls(readerUrls);zoomStates.clear();await service.closeMagazine();currentModel=null;await localHome()
+  freeUrls(readerUrls);zoomStates.clear();clearPreparedSoundUrls();await service.closeMagazine();currentModel=null;await localHome()
 }
 
 function magRank(a){return[Number(a.page||0),({h:0,p:0,b:1}[a.slot]??0)]}
@@ -373,6 +374,8 @@ function ownContributions(article=currentArticle()){
   const rows=[]
   for(const m of article.comments||[]){if(m.isOutgoing||m.pending)rows.push({kind:'message',date:m.date||'',id:Number(m.id||0),row:m})}
   for(const m of article.motions||[]){if(m.isOutgoing||m.pending)rows.push({kind:'motion',date:m.date||'',id:Number(m.id||0),row:m})}
+  const s=article.soundContribution
+  if(s&&(s.isOutgoing||s.pending))rows.push({kind:'sound',date:s.date||'',id:Number(s.id||0),row:s})
   return rows.sort((a,b)=>{const da=Date.parse(a.date)||0,db=Date.parse(b.date)||0;return da-db||a.id-b.id})
 }
 function updateReaderPageLabel(){
@@ -389,7 +392,7 @@ async function refreshReaderAfterContributionChange(view,articleKey){
   const fresh=view?.articles?.find(a=>a.articleKey===articleKey),idx=displayArticles.findIndex(a=>a.articleKey===articleKey)
   if(fresh&&idx>=0)displayArticles[idx]=fresh
   const list=$('articleDeck').querySelector(`[data-index="${idx}"] .reaction-list`);if(list&&fresh)renderComments(fresh,list)
-  updateReaderPageLabel();updateMotionReplayHeader();await refreshPending()
+  updateReaderPageLabel();updateMotionReplayHeader();updateSoundHeader();await refreshPending()
 }
 function motionMiniShape(curve){
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('contribution-motion-shape');svg.setAttribute('viewBox','0 0 40 20');svg.setAttribute('aria-hidden','true')
