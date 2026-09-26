@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.20'
+const APP_VERSION='1.1.21'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -40,7 +40,7 @@ let soundGlobalEnabled=localStorage.getItem(SOUND_ENABLED_KEY)!=='0'
 let audioContext=null,articleSoundSource=null,articleSoundStopTimer=null,soundStartTimer=null,soundPlaybackToken=0
 let soundLoadingKey=null,soundUnavailableKey=null,soundManuallyStoppedKey=null,previewSoundSource=null
 let articleSoundObjectUrl=null,articleSoundVisitToken=0
-let soundComposerAudio=null,soundComposerObjectUrl=null,soundComposerProgressTimer=null
+let soundComposerAudio=null,soundComposerObjectUrl=null,soundComposerProgressTimer=null,soundComposerStartedAt=null
 
 const status=(id,text,ok=null)=>{const e=$(id);if(!e)return;e.textContent=text;e.className='status'+(ok===true?' ok':ok===false?' error':'')}
 const debug=e=>logError('ui',e?.stack||e?.message||String(e),e)
@@ -569,7 +569,7 @@ async function cachedSoundObjectUrl(entry){
   }catch{return null}
 }
 function primeSoundCache(entry){fetchSoundBlob(entry).catch(()=>{})}
-async function playArticleSoundNative(sound,{articleKey=null,visitToken=articleSoundVisitToken}={}){
+async function playArticleSoundNative(sound,{articleKey=null,visitToken=articleSoundVisitToken,gestureDelay=null}={}){
   const entry=soundEntry(sound?.soundId)
   if(!entry||!soundGlobalEnabled)return false
   stopArticleSound()
@@ -590,6 +590,13 @@ async function playArticleSoundNative(sound,{articleKey=null,visitToken=articleS
     articleSoundSource=null;clearTimeout(articleSoundStopTimer);articleSoundStopTimer=null
     revokeArticleSoundObjectUrl();updateSoundHeader()
   }
+  const armDuration=()=>{
+    if(!seconds)return
+    if(Number.isFinite(audio.duration)&&audio.duration>0)audio.loop=audio.duration<seconds-.05
+    clearTimeout(articleSoundStopTimer)
+    articleSoundStopTimer=setTimeout(()=>{if(articleSoundSource===audio){try{audio.pause()}catch{}finish()}},seconds*1000)
+  }
+  audio.addEventListener('loadedmetadata',()=>{if(articleSoundSource===audio&&seconds&&Number.isFinite(audio.duration))audio.loop=audio.duration<seconds-.05})
   audio.addEventListener('error',markBroken,{once:true})
   audio.addEventListener('ended',finish,{once:true})
   try{
@@ -600,13 +607,27 @@ async function playArticleSoundNative(sound,{articleKey=null,visitToken=articleS
     }else primeSoundCache(entry)
     if(token!==soundPlaybackToken)return false
     audio.src=src
+    const delayed=Number.isFinite(gestureDelay)&&gestureDelay>0
+    if(delayed)audio.muted=true
     const started=audio.play()
     await Promise.resolve(started)
     if(token!==soundPlaybackToken)return false
-    soundLoadingKey=null;soundUnavailableKey=null;updateSoundHeader()
-    if(seconds){
-      audio.loop=audio.duration>0&&audio.duration<seconds-.05
-      articleSoundStopTimer=setTimeout(()=>{if(articleSoundSource===audio){try{audio.pause()}catch{}finish()}},seconds*1000)
+    soundUnavailableKey=null
+    if(delayed){
+      clearTimeout(soundStartTimer)
+      soundStartTimer=setTimeout(()=>{
+        soundStartTimer=null
+        if(token!==soundPlaybackToken||articleSoundSource!==audio)return
+        try{audio.currentTime=0}catch{}
+        audio.muted=false
+        soundLoadingKey=null
+        updateSoundHeader()
+        armDuration()
+      },gestureDelay)
+    }else{
+      soundLoadingKey=null
+      updateSoundHeader()
+      armDuration()
     }
     return true
   }catch(e){
@@ -625,7 +646,7 @@ function updateSoundHeader(){
   b.hidden=!has||!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden
   b.classList.toggle('loading',Boolean(a&&soundLoadingKey===a.articleKey))
   b.classList.toggle('unavailable',Boolean(a&&soundUnavailableKey===a.articleKey))
-  b.classList.toggle('playing',Boolean(a&&articleSoundSource&&!articleSoundSource.paused&&soundManuallyStoppedKey!==a.articleKey))
+  b.classList.toggle('playing',Boolean(a&&articleSoundSource&&!articleSoundSource.paused&&!articleSoundSource.muted&&soundManuallyStoppedKey!==a.articleKey))
 }
 function scheduleArticleSound(article,index,delay=1000){
   clearTimeout(soundStartTimer);soundStartTimer=null
@@ -660,12 +681,12 @@ function soundPreviewTarget(audio){
   return Number.isFinite(audio?.duration)?audio.duration:0
 }
 function resetSoundComposerProgress(){
-  clearInterval(soundComposerProgressTimer);soundComposerProgressTimer=null
+  clearInterval(soundComposerProgressTimer);soundComposerProgressTimer=null;soundComposerStartedAt=null
   $('soundPreviewProgress').value=0;$('soundPreviewProgress').max=1
   $('soundPreviewElapsed').textContent='0:00';$('soundPreviewTotal').textContent='0:00'
 }
 function stopSoundComposerPreview({reset=true}={}){
-  clearInterval(soundComposerProgressTimer);soundComposerProgressTimer=null
+  clearInterval(soundComposerProgressTimer);soundComposerProgressTimer=null;soundComposerStartedAt=null
   const audio=soundComposerAudio;soundComposerAudio=null
   if(audio){try{audio.pause()}catch{}try{audio.removeAttribute('src');audio.load()}catch{}}
   if(soundComposerObjectUrl){try{URL.revokeObjectURL(soundComposerObjectUrl)}catch{}soundComposerObjectUrl=null}
@@ -675,7 +696,9 @@ function stopSoundComposerPreview({reset=true}={}){
 function updateSoundComposerProgress(){
   const audio=soundComposerAudio
   if(!audio){resetSoundComposerProgress();return}
-  const target=soundPreviewTarget(audio),elapsed=Math.max(0,Number(audio.currentTime)||0)
+  const target=soundPreviewTarget(audio)
+  const fixed=soundDraft?.duration==='5'||soundDraft?.duration==='15'
+  const elapsed=fixed&&soundComposerStartedAt!==null?Math.max(0,(performance.now()-soundComposerStartedAt)/1000):Math.max(0,Number(audio.currentTime)||0)
   $('soundPreviewElapsed').textContent=fmtSoundTime(elapsed)
   $('soundPreviewTotal').textContent=target?fmtSoundTime(target):'0:00'
   $('soundPreviewProgress').max=Math.max(.01,target||1)
@@ -698,7 +721,7 @@ async function playSoundComposerPreview(){
   else primeSoundCache(entry)
   if(soundComposerAudio!==audio)return
   audio.src=src;$('soundPreviewStop').disabled=false;$('soundStatus').textContent=''
-  try{await audio.play();soundComposerProgressTimer=setInterval(updateSoundComposerProgress,200)}
+  try{await audio.play();soundComposerStartedAt=performance.now();soundComposerProgressTimer=setInterval(updateSoundComposerProgress,200)}
   catch(e){debug(e);stopSoundComposerPreview();$('soundStatus').textContent='Lecture impossible.'}
 }
 function closeSoundComposer({resume=true}={}){
@@ -831,7 +854,7 @@ function warmAround(i){
   for(const j of [i+1,i-1])if(j>=0&&j<displayArticles.length)keys.push(displayArticles[j].articleKey)
   if(keys.length)setTimeout(()=>service.warmArticleImages(keys),120)
 }
-function activate(i){
+function activate(i,{soundMode='scheduled'}={}){
   hideMotionAuthors()
   stopArticleSound()
   soundManuallyStoppedKey=null
@@ -849,11 +872,12 @@ function activate(i){
   requestAnimationFrame(()=>{if(unread.length)list.querySelector(`[data-message-id="${unread[0].id}"]`)?.scrollIntoView({block:'start'});else list.scrollTop=reactionOrder==='asc'?list.scrollHeight:0})
   clearTimeout(readTimer);readTimer=setTimeout(()=>service.markArticleRead(a.articleKey),1400)
   scheduleArticleMotions(a,i)
-  scheduleArticleSound(a,i,1000)
+  if(soundMode==='gesture'&&a?.sound&&soundGlobalEnabled)playArticleSoundNative(a.sound,{articleKey:a.articleKey,visitToken:articleSoundVisitToken,gestureDelay:1000})
+  else scheduleArticleSound(a,i,1000)
 }
 let scrollTimer
 $('articleDeck').onscroll=()=>{if(!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{const d=$('articleDeck'),i=Math.max(0,Math.min(displayArticles.length-1,Math.round(d.scrollLeft/d.clientWidth))),left=i*d.clientWidth;if(Math.abs(d.scrollLeft-left)>1)d.scrollTo({left,behavior:'auto'});if(i!==currentArticleIndex)activate(i)},90)}
-function goArticle(delta){if(!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return;const next=Math.max(0,Math.min(displayArticles.length-1,currentArticleIndex+delta));if(next===currentArticleIndex)return;const d=$('articleDeck');d.scrollTo({left:next*d.clientWidth,behavior:'smooth'});setTimeout(()=>activate(next),190)}
+function goArticle(delta){if(!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return;const next=Math.max(0,Math.min(displayArticles.length-1,currentArticleIndex+delta));if(next===currentArticleIndex)return;const d=$('articleDeck');activate(next,{soundMode:'gesture'});d.scrollTo({left:next*d.clientWidth,behavior:'smooth'})}
 
 function clampPan(container,img,scale,tx,ty){
   if(!img||scale<=1)return {tx:0,ty:0}
