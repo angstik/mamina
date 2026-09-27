@@ -5,6 +5,12 @@
 
 
 
+
+## v1.1.28
+**Hors ligne : séparation stricte entre mot de passe local et connexion réseau.**
+
+Le déverrouillage du secret MamiNa est désormais traité séparément de la connexion Telegram. Une absence de réseau ou une erreur Telegram ne peut plus réafficher le formulaire comme si le mot de passe était faux. Avec des revues locales, l'application reste directement utilisable hors ligne. Sans données locales, elle affiche un état « Hors ligne » sans champ de mot de passe. Le champ n'apparaît qu'en ligne pour une première connexion ou après un échec explicite du déchiffrement du secret.
+
 ## v1.1.27
 **Pré-production : build reproductible, contrôles automatiques et shell hors ligne.**
 
