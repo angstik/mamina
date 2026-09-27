@@ -170,6 +170,15 @@
       <p class="subtle">Touchez la pastille de connexion dans l’en-tête pour forcer une reconnexion et l’envoi des messages en attente.</p>
     </section>
 
+    <section class="panel guide-menu-panel">
+      <h2>Guides</h2>
+      <p class="subtle">Assistants pas à pas pour préparer un groupe ou découvrir les fonctions de MamiNa.</p>
+      <div class="guide-menu-actions">
+        <button id="openAdminGroupGuide" type="button">🛠️ Créer un nouveau groupe</button>
+        <button id="startUserTutorial" type="button" class="secondary">👋 Découvrir MamiNa</button>
+      </div>
+    </section>
+
     <details id="adminPanel" class="panel admin-panel">
       <summary>Administration / publication</summary>
       <p class="subtle">Ces actions utilisent le compte Telegram connecté. Telegram refusera celles pour lesquelles le compte n’a pas les droits nécessaires.</p>
@@ -275,6 +284,84 @@
     </details>
   </div>
 </section>
+
+
+<section id="adminGuideView" class="settings-view admin-guide-view" hidden>
+  <header class="settings-bar">
+    <button id="closeAdminGuide" class="icon-button mamina-back" type="button" aria-label="Retour"><img src="./mamina-v08-192.png?v=10" alt=""></button>
+    <strong>Nouveau groupe MamiNa</strong>
+  </header>
+  <div class="settings-body admin-guide-body">
+    <div class="admin-guide-progress"><span id="adminGuideProgress">Étape 1/5</span><progress id="adminGuideProgressBar" max="5" value="1"></progress></div>
+
+    <section class="panel admin-guide-step" data-admin-guide-step="0">
+      <h2>1. Préparer Telegram</h2>
+      <p>Crée d’abord le groupe familial dans Telegram puis active le mode <strong>Sujets / Forum</strong>.</p>
+      <p class="subtle">Le compte utilisé ici doit pouvoir créer des sujets et publier des messages/documents. MamiNa créera lui-même les sujets techniques et les sujets de revues.</p>
+      <label class="check-row"><input id="guideTelegramReady" type="checkbox"> Le groupe existe et les sujets sont activés</label>
+    </section>
+
+    <section class="panel admin-guide-step" data-admin-guide-step="1" hidden>
+      <h2>2. Choisir le groupe</h2>
+      <p class="subtle">Seuls les groupes Telegram avec sujets sont proposés.</p>
+      <div class="inline-actions">
+        <select id="guideGroupSelect"></select>
+        <button id="guideRefreshGroups" type="button">Actualiser</button>
+      </div>
+      <div id="guideGroupStatus" class="status"></div>
+    </section>
+
+    <section class="panel admin-guide-step" data-admin-guide-step="2" hidden>
+      <h2>3. Installer le catalogue</h2>
+      <p class="subtle">Sélectionne les trois fichiers du dossier <code>parse pdf/catalog-publish/</code>. Cette opération crée automatiquement les sujets <code>params</code> et <code>catalog</code>.</p>
+      <label>Empreintes emoji <code>emoji-sha256.json</code></label>
+      <input id="guideCatalogShaFile" type="file" accept="application/json">
+      <label>Catalogue JSON <code>emoji-catalog.json</code></label>
+      <input id="guideCatalogJsonFile" type="file" accept="application/json">
+      <label>Catalogue binaire <code>emoji-catalog.bin</code></label>
+      <input id="guideCatalogBinFile" type="file" accept="application/octet-stream,.bin">
+      <button id="guideInitSystem" type="button">Installer params + catalog</button>
+      <div id="guideCatalogStatus" class="status"></div>
+    </section>
+
+    <section class="panel admin-guide-step" data-admin-guide-step="3" hidden>
+      <h2>4. Régler le groupe</h2>
+      <label for="guideAppTitle">Nom affiché dans MamiNa</label>
+      <input id="guideAppTitle" value="MamiNa" maxlength="30">
+      <label class="check-row"><input id="guideStoragePassword" type="checkbox" checked> Autoriser la mémorisation locale du mot de passe MamiNa</label>
+      <button id="guideSaveParams" type="button">Enregistrer la configuration</button>
+      <div id="guideParamsStatus" class="status"></div>
+      <p class="subtle">Les sons peuvent être ajoutés ensuite dans Administration / publication sans bloquer la mise en service du groupe.</p>
+    </section>
+
+    <section class="panel admin-guide-step" data-admin-guide-step="4" hidden>
+      <h2>5. Publier la première revue</h2>
+      <p class="subtle">Choisis le PDF Famileo. MamiNa créera automatiquement le sujet de la revue, publiera le PDF et son index JSON.</p>
+      <input id="guidePdf" type="file" accept="application/pdf">
+      <button id="guidePublishPdf" type="button">Créer la première revue</button>
+      <div id="guidePdfStatus" class="status"></div>
+      <pre id="guidePdfTrace" class="tech-logs"></pre>
+    </section>
+
+    <div class="admin-guide-nav">
+      <button id="adminGuidePrev" type="button" class="secondary">← Précédent</button>
+      <button id="adminGuideNext" type="button">Suivant →</button>
+    </div>
+  </div>
+</section>
+
+<div id="tutorialCoach" class="tutorial-coach" hidden>
+  <div class="tutorial-card" role="dialog" aria-modal="false" aria-labelledby="tutorialTitle">
+    <div class="tutorial-counter" id="tutorialCounter"></div>
+    <strong id="tutorialTitle"></strong>
+    <p id="tutorialText"></p>
+    <div class="tutorial-actions">
+      <button id="tutorialStop" type="button" class="secondary">Quitter</button>
+      <button id="tutorialPrev" type="button" class="secondary">←</button>
+      <button id="tutorialNext" type="button">Suivant →</button>
+    </div>
+  </div>
+</div>
 
 <div id="contributionPopup" class="sheet-overlay" hidden>
   <section class="compact-sheet contribution-sheet" role="dialog" aria-modal="true" aria-labelledby="contributionPopupTitle">
