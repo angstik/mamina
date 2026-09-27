@@ -2,17 +2,17 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.31'
+const APP_VERSION='1.1.30'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
-const PAGE_TURN_KEY='MAMINA_PAGE_TURN_MODE'
 const $=id=>document.getElementById(id)
 const service=new UserMaminaService()
 
 let magazines=[],currentModel=null,displayArticles=[],currentArticleIndex=0
 let reactionOrder='asc',articleOrderMode='magazine',appName='MamiNa'
-let pageTurnMode=localStorage.getItem(PAGE_TURN_KEY)==='page'?'page':'slide',pageTurnAnimating=false
+const IS_BETA_PAGE_TURN=Boolean(window.MAMINA_BETA_PAGE_TURN)
+let pageTurnMode=IS_BETA_PAGE_TURN?'page':'slide',pageTurnAnimating=false
 let composerArticleKey=null,safetyTimer=null,reconnectTimer=null,connectionClock=null,readTimer=null
 let telegramState='offline',reconnecting=false,lastConnectedAt=Number(localStorage.getItem('MAMINA_LAST_CONNECTED_AT')||0)
 let currentColor='#000000',savedRange=null,lastArticleCopy={text:'',at:0}
@@ -47,6 +47,7 @@ const preparedSoundUrls=new Map(),preparingSoundUrls=new Map()
 
 const status=(id,text,ok=null)=>{const e=$(id);if(!e)return;e.textContent=text;e.className='status'+(ok===true?' ok':ok===false?' error':'')}
 const debug=e=>logError('ui',e?.stack||e?.message||String(e),e)
+if(IS_BETA_PAGE_TURN)import('./beta-page-turn.css').catch(debug)
 const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')
 const objectUrl=(blob,bucket)=>{const u=URL.createObjectURL(blob);bucket.push(u);return u}
 const freeUrls=b=>{while(b.length)URL.revokeObjectURL(b.pop())}
@@ -93,7 +94,6 @@ async function loadSettings(){
   setAppName(c.appTitle)
   $('reactionOrder').value=reactionOrder
   $('themeSelect').value=c.theme
-  $('pageTurnSelect').value=pageTurnMode
   $('adminAppTitle').value=c.appTitle
   $('adminStoragePassword').checked=Boolean(c.storagePassword)
   soundCatalog=Array.isArray(c.sounds)?c.sounds:[]
@@ -2004,10 +2004,6 @@ $('refreshStorageStats').onclick=refreshStorageStats
 $('clearStoredMaminaPassword').onclick=async()=>{localStorage.removeItem(STORED_PASSWORD_KEY);$('password').value='';await loadSettings();status('storageStatus','Mot de passe MamiNa supprimé de cet appareil.',true)}
 $('themeSelect').onchange=async()=>{applyTheme($('themeSelect').value);await service.setTheme($('themeSelect').value)}
 $('reactionOrder').onchange=async()=>{reactionOrder=$('reactionOrder').value;await service.setReactionOrder(reactionOrder);if(currentModel)await rebuild(currentArticle()?.articleKey)}
-$('pageTurnSelect').onchange=()=>{
-  pageTurnMode=$('pageTurnSelect').value==='page'?'page':'slide'
-  localStorage.setItem(PAGE_TURN_KEY,pageTurnMode)
-}
 $('forceUpdate').onclick=async()=>{
   try{
     $('forceUpdate').disabled=true
