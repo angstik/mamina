@@ -9,12 +9,11 @@
 
 
 
-## v1.1.31
-**Prototype optionnel de transition « page qui se tourne ».**
+## Bêta expérimentale — /beta/
+Le prototype « page qui se tourne » est isolé de la version de production. Il est accessible uniquement via `/beta/` et utilise la même application/données, avec un badge BÊTA visible. La production reste en v1.1.30 avec le glissement historique.
 
-Réglages → Affichage propose désormais deux transitions entre articles : le glissement historique et « Page qui se tourne (test) ». Le prototype conserve la page suivante déjà chargée sous la page courante, puis anime uniquement une copie DOM temporaire avec CSS 3D, découpe et ombre de coin. Il ne relance ni PDF.js ni le réseau et n'ajoute aucun rendu canvas.
+Le prototype anime uniquement une copie DOM temporaire de l'article courant avec CSS 3D et révèle l'article suivant déjà chargé. Aucun nouveau rendu PDF, canvas ou appel réseau n'est déclenché par l'effet. La préférence système « réduire les animations » désactive automatiquement l'animation.
 
-En mode page, le défilement horizontal natif est neutralisé pendant le geste afin d'éviter de cumuler glissement et pliage. L'effet dure environ 480 ms et est automatiquement désactivé lorsque le système demande une réduction des animations. Le mode reste local à l'appareil et peut être remis instantanément sur « Glissement ».
 
 ## v1.1.30
 **Tutoriel enrichi, accès Aide direct et fiche imprimable.**
