@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.23'
+const APP_VERSION='1.1.24'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -596,7 +596,11 @@ function markSoundCached(articleKey){
 async function prepareSoundEntry(entry,{articleKey=null,visitToken=articleSoundVisitToken}={}){
   const url=soundUrl(entry);if(!url)return null
   if(preparedSoundUrls.has(url)){if(articleKey)markSoundCached(articleKey);return preparedSoundUrls.get(url)}
-  if(preparingSoundUrls.has(url))return preparingSoundUrls.get(url)
+  if(preparingSoundUrls.has(url)){
+    const pending=preparingSoundUrls.get(url)
+    if(articleKey)pending.then(()=>markSoundCached(articleKey)).catch(()=>{})
+    return pending
+  }
   if(articleKey&&currentArticle()?.articleKey===articleKey){soundLoadingKey=articleKey;soundCachedKey=null;updateSoundHeader()}
   const job=(async()=>{
     try{
@@ -791,10 +795,7 @@ function renderSoundPicker(){
   const host=$('soundEmojiGrid');host.innerHTML=''
   for(const entry of soundCatalog){
     if(!entry?.url)continue
-    const b=document.createElement('button');b.type='button';b.title=[entry.label||'Son',formatSoundBytes(soundFileSize(entry))].join(' · ');b.dataset.soundId=entry.id
-    const emoji=document.createElement('span');emoji.className='sound-choice-emoji';emoji.textContent=entry.emoji||'🎶'
-    const size=document.createElement('span');size.className='sound-choice-size';size.textContent=formatSoundBytes(soundFileSize(entry))
-    b.append(emoji,size)
+    const b=document.createElement('button');b.type='button';b.textContent=entry.emoji||'🎶';b.title=entry.label||'Son';b.dataset.soundId=entry.id
     b.onclick=()=>{if(!soundDraft)return;stopSoundComposerPreview();soundDraft.soundId=entry.id;for(const x of host.querySelectorAll('button'))x.classList.toggle('selected',x===b);$('soundSend').disabled=false;playSoundComposerPreview()}
     host.appendChild(b)
   }
@@ -850,7 +851,7 @@ async function renderReader(){
     const v=document.createElement('div');v.className='article-visual'
     v.innerHTML=`<div class="subtle">Chargement…</div><span class="article-source-badge" hidden></span><div class="article-actions"><button class="article-float add-sound" title="Son">🎶</button><button class="article-float add-motion" title="Réaction animée">♥</button><button class="article-float add-message" title="Ajouter">＋</button></div><svg class="motion-draw-layer" hidden aria-hidden="true"><path class="motion-draw-path"></path></svg><div class="motion-play-layer" aria-hidden="true"></div>`
     p.appendChild(v)
-    const list=document.createElement('div');list.className='reaction-list';renderComments(a,list);p.appendChild(list)
+    const list=document.createElement('div');list.className='reaction-list';renderComments(a,list);p.appendChild(list);installReactionSwipe(list)
     d.appendChild(p)
     v.querySelector('.add-message').onclick=()=>openComposer(a.articleKey)
     v.querySelector('.add-motion').onclick=()=>openMotionComposer(i)
@@ -894,7 +895,7 @@ async function loadVisual(i){
     const img=document.createElement('img')
     img.src=objectUrl(result.blob,readerUrls)
     img.onload=()=>{
-      const desired=Math.min(innerHeight*.58, v.clientWidth*(img.naturalHeight/img.naturalWidth))
+      const desired=Math.min(innerHeight*.64, v.clientWidth*(img.naturalHeight/img.naturalWidth))
       if(Number.isFinite(desired)&&desired>180) v.style.flexBasis=`${Math.round(desired)}px`
       v._pz?.apply()
       if(i===currentArticleIndex){const deck=$('articleDeck');deck.scrollLeft=i*deck.clientWidth}
@@ -941,6 +942,21 @@ function activate(i,{soundMode='scheduled'}={}){
 let scrollTimer
 $('articleDeck').onscroll=()=>{if(!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{const d=$('articleDeck'),i=Math.max(0,Math.min(displayArticles.length-1,Math.round(d.scrollLeft/d.clientWidth))),left=i*d.clientWidth;if(Math.abs(d.scrollLeft-left)>1)d.scrollTo({left,behavior:'auto'});if(i!==currentArticleIndex)activate(i)},90)}
 function goArticle(delta){if(!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return;const next=Math.max(0,Math.min(displayArticles.length-1,currentArticleIndex+delta));if(next===currentArticleIndex)return;const d=$('articleDeck');activate(next,{soundMode:'gesture'});d.scrollTo({left:next*d.clientWidth,behavior:'smooth'})}
+function installReactionSwipe(list){
+  let start=null
+  list.addEventListener('touchstart',e=>{
+    if(e.touches.length!==1||!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return
+    const t=e.touches[0];start={x:t.clientX,y:t.clientY}
+  },{passive:true})
+  list.addEventListener('touchend',e=>{
+    if(!start||!e.changedTouches?.length)return
+    const t=e.changedTouches[0],dx=t.clientX-start.x,dy=t.clientY-start.y
+    start=null
+    if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.15)goArticle(dx<0?1:-1)
+  },{passive:true})
+  list.addEventListener('touchcancel',()=>{start=null},{passive:true})
+}
+
 
 function clampPan(container,img,scale,tx,ty){
   if(!img||scale<=1)return {tx:0,ty:0}
@@ -1005,6 +1021,7 @@ function installArticleGestures(container,index){
         raf=requestAnimationFrame(inertia)
       }
       if(Math.abs(dx)<14&&Math.abs(dy)<14&&dur<280){
+        if(createTapMotionAt(index,t.clientX,t.clientY)){start=null;pinch=null;return}
         const now=Date.now()
         if(now-lastTap<330){handleDoubleTap(container,index,t.clientX,t.clientY);lastTap=0}else lastTap=now
       }
@@ -1142,7 +1159,7 @@ function updateMotionPanel(){
   $('motionNext').disabled=!hasEmoji
   $('motionEmojiGrid').hidden=false
   $('motionTitle').textContent=ready?'Prévisualisation':'Réaction animée'
-  $('motionHint').textContent=ready?'Rejoue, ajuste ou envoie':hasEmoji?'Ajoute jusqu’à 3 emoji puis trace':'Choisis 1 à 3 emoji'
+  $('motionHint').textContent=ready?'Rejoue, ajuste ou envoie':hasEmoji?'Touche l’article pour une petite boucle, ou trace avec 🖊️':'Choisis 1 à 3 emoji'
 }
 function openMotionComposer(index){
   if(!$('composerModal').hidden||!$('focusOverlay').hidden)return
@@ -1210,6 +1227,26 @@ function finishMotionDrawing(){
   const v=motionVisual(motionDraft.index);v?._pz?.reset?.()
   updateMotionPanel();drawFittedCurve(motionDraft.index,motionDraft.curve)
   setTimeout(()=>playMotionPreview(),140)
+}
+function createTapMotionAt(index,clientX,clientY){
+  if(!motionDraft||motionDraft.index!==index||motionDraft.curve||motionDraw||!motionDraft.emoji?.length)return false
+  const v=motionVisual(index),img=motionImage(index);if(!v||!img)return false
+  const ir=renderedImageRect(img)
+  if(clientX<ir.left||clientX>ir.right||clientY<ir.top||clientY>ir.bottom)return false
+  const cx=clamp01Motion((clientX-ir.left)/Math.max(1,ir.width)),cy=clamp01Motion((clientY-ir.top)/Math.max(1,ir.height))
+  const radius=Math.max(7,Math.min(13,Math.min(ir.width,ir.height)*.025)),rx=radius/Math.max(1,ir.width),ry=radius/Math.max(1,ir.height)
+  const cp=p=>p.map(clamp01Motion)
+  motionDraft.curve={
+    p0:cp([cx,cy-ry]),
+    p1:cp([cx+rx*1.75,cy-ry*.35]),
+    p2:cp([cx-rx*1.75,cy+ry*1.55]),
+    p3:cp([cx,cy-ry]),
+  }
+  motionDraft.duration=1250
+  v._pz?.reset?.()
+  updateMotionPanel();drawFittedCurve(index,motionDraft.curve,520)
+  setTimeout(()=>playMotionPreview(),100)
+  return true
 }
 function motionParticleEmoji(emojis,i){return emojis[i%emojis.length]}
 function motionPlaybackDuration(motion){return Math.max(1200,Math.min(4500,(Number(motion?.duration)||2200)*1.18))}
