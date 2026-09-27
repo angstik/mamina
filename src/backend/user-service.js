@@ -65,6 +65,31 @@ function canvasBlob(canvas, type='image/jpeg', quality=.82) {
   }, type, quality))
 }
 
+function unreadArticleKeysForRows(rows,readMap=new Map()){
+  const deletedIds=new Set(rows.filter(r=>r.meta?.kind==='delete').map(r=>Number(r.meta?.targetMessageId||0)).filter(x=>x>0))
+  const rowById=new Map(rows.map(r=>[Number(r.id),r]))
+  const rootById=new Map(rows.filter(r=>r.meta?.kind==='root'&&r.meta?.articleKey).map(r=>[Number(r.id),String(r.meta.articleKey)]))
+  const resolveKey=row=>{
+    const direct=String(row?.articleKey||row?.meta?.articleKey||'')
+    if(direct)return direct
+    let id=Number(row?.replyToId||0),guard=0
+    while(id&&guard++<50){
+      if(rootById.has(id))return rootById.get(id)
+      id=Number(rowById.get(id)?.replyToId||0)
+    }
+    return ''
+  }
+  const keys=new Set()
+  for(const row of rows){
+    if(row?.meta?.kind==='delete'||deletedIds.has(Number(row?.id))||row?.isOutgoing)continue
+    const isComment=row?.meta?.kind==='message'||(!row?.meta&&row?.replyToId)
+    if(!isComment)continue
+    const key=resolveKey(row);if(!key)continue
+    if(Number(row.id)>Number(readMap.get(key)||0))keys.add(key)
+  }
+  return [...keys]
+}
+
 function resolveRowsToArticles(rows, articles) {
   const articleKeys = new Set(articles.map(a => a.articleKey))
   // Deletion markers are tombstones. Missing targets are intentionally ignored:
@@ -561,12 +586,13 @@ export class UserMaminaService {
     const read=await this.readMap()
     const comments=[...resolved.byArticle.values()].flat()
     const motions=[...resolved.motionsBy.values()].flat()
-    const unread=comments.filter(c=>!c.isOutgoing && c.id>(read.get(c.articleKey)||0)).length
+    const unreadArticleKeys=unreadArticleKeysForRows(comments,read)
+    const unread=unreadArticleKeys.length
     const record={
       ...magazine,
       appTitle:String(pdfRow.meta?.appTitle||'MamiNa'),
       topicId:tid, topicKey:key, topicTitle:topic.title||'', pdfMessageId:pdfRow.id,
-      reactionCount:comments.length, motionCount:motions.length, unreadCount:unread, fullyCached:false,
+      reactionCount:comments.length, motionCount:motions.length, unreadCount:unread, unreadArticleKeys, fullyCached:false,
       lastMessageId:rows.reduce((m,r)=>Math.max(m,r.id),0), updatedAt:new Date().toISOString(),
     }
     this.activity('Base locale · index revue')
@@ -588,21 +614,34 @@ export class UserMaminaService {
     this.activity(`Telegram · messages N°${magazine.issue||''}`)
     const raw=await this.gateway.topicMessages(peer,magazine.topicId,{minId:cursor,limit:Infinity})
     this.activity(raw.length?`Telegram · ${raw.length} nouveau${raw.length>1?'x':''} message${raw.length>1?'s':''}`:'Telegram · aucun nouveau message')
-    if(!raw.length){info('sync.known','Aucun nouveau message',{magazineId:magazine.magazineId,cursor});return magazine}
     const models=raw.map(TelegramGateway.messageModel)
-    await this.cacheMotionAvatars(raw,models)
+    if(raw.length)await this.cacheMotionAvatars(raw,models)
     const rows=models.filter(r=>r.id>cursor)
     const messages=rows.filter(r=>r.meta?.kind==='message')
     const motionAdd=rows.filter(r=>r.meta?.kind==='motion'&&r.meta?.type==='emoji').length
     const messageDelete=rows.filter(r=>r.meta?.kind==='delete'&&r.meta?.targetKind==='message').length
     const motionDelete=rows.filter(r=>r.meta?.kind==='delete'&&r.meta?.targetKind==='motion').length
-    let unreadAdd=0
-    for(const m of messages) {
-      if(m.isOutgoing) continue
-      const rs=await getReadState(m.meta?.articleKey||'')
-      if(m.id>Number(rs?.lastReadMessageId||0)) unreadAdd++
+    const read=await this.readMap()
+    let unreadArticleKeys
+    const rebuildUnread=!Array.isArray(magazine.unreadArticleKeys)||messageDelete>0
+    if(rebuildUnread){
+      const fullRaw=await this.gateway.topicMessages(peer,magazine.topicId,{limit:Infinity})
+      const fullRows=fullRaw.map(TelegramGateway.messageModel)
+      unreadArticleKeys=unreadArticleKeysForRows(fullRows,read)
+    }else{
+      const keys=new Set(magazine.unreadArticleKeys.map(String))
+      for(const m of messages){
+        if(m.isOutgoing)continue
+        const key=String(m.meta?.articleKey||m.articleKey||'')
+        if(key&&Number(m.id)>Number(read.get(key)||0))keys.add(key)
+      }
+      unreadArticleKeys=[...keys]
     }
-    const next={...magazine,reactionCount:Math.max(0,Number(magazine.reactionCount||0)+messages.length-messageDelete),motionCount:Math.max(0,Number(magazine.motionCount||0)+motionAdd-motionDelete),unreadCount:Number(magazine.unreadCount||0)+unreadAdd,lastMessageId:Math.max(cursor,...rows.map(r=>r.id)),updatedAt:new Date().toISOString()}
+    if(!raw.length&&Array.isArray(magazine.unreadArticleKeys)){
+      info('sync.known','Aucun nouveau message',{magazineId:magazine.magazineId,cursor})
+      return magazine
+    }
+    const next={...magazine,reactionCount:Math.max(0,Number(magazine.reactionCount||0)+messages.length-messageDelete),motionCount:Math.max(0,Number(magazine.motionCount||0)+motionAdd-motionDelete),unreadCount:unreadArticleKeys.length,unreadArticleKeys,lastMessageId:rows.length?Math.max(cursor,...rows.map(r=>r.id)):cursor,updatedAt:new Date().toISOString()}
     this.activity('Base locale · mise à jour des messages')
     await putMagazine(next)
     await putTopicState({topicKey:magazine.topicKey,topicId:magazine.topicId,cursor:next.lastMessageId,updatedAt:next.updatedAt})
@@ -656,8 +695,9 @@ export class UserMaminaService {
     const resolved=resolveRowsToArticles(rows,articles)
     const comments=[...resolved.byArticle.values()].flat()
     const motions=[...resolved.motionsBy.values()].flat()
-    const unread=await this.countUnread(comments)
-    const next={...fresh,reactionCount:comments.length,motionCount:motions.length,unreadCount:unread,fullyCached:true,lastMessageId:rows.reduce((m,r)=>Math.max(m,r.id),0),updatedAt:new Date().toISOString()}
+    const unreadArticleKeys=await this.unreadArticleKeys(comments)
+    const unread=unreadArticleKeys.length
+    const next={...fresh,reactionCount:comments.length,motionCount:motions.length,unreadCount:unread,unreadArticleKeys,fullyCached:true,lastMessageId:rows.reduce((m,r)=>Math.max(m,r.id),0),updatedAt:new Date().toISOString()}
     await putMagazine(next)
     await putTopicState({topicKey:next.topicKey,topicId:next.topicId,cursor:next.lastMessageId,updatedAt:next.updatedAt})
     return next
@@ -711,9 +751,13 @@ export class UserMaminaService {
     return new Map(states.map(s=>[s.articleKey,Number(s.lastReadMessageId||0)]))
   }
 
-  async countUnread(comments) {
+  async unreadArticleKeys(comments) {
     const map=await this.readMap()
-    return comments.filter(c=>!c.isOutgoing && c.id>(map.get(c.articleKey)||0)).length
+    return unreadArticleKeysForRows(comments,map)
+  }
+
+  async countUnread(comments) {
+    return (await this.unreadArticleKeys(comments)).length
   }
 
   async magazineSummaries(rows=null) {
@@ -724,7 +768,8 @@ export class UserMaminaService {
         const local=await listMessagesByMagazine(m.magazineId)
         motionCount=local.filter(r=>r.meta?.kind==='motion'&&r.meta?.type==='emoji').length
       }
-      return {...m,motionCount,cover:await getAsset(`cover:${m.magazineId}`)}
+      const unreadCount=Array.isArray(m.unreadArticleKeys)?m.unreadArticleKeys.length:Number(m.unreadCount||0)
+      return {...m,motionCount,unreadCount,cover:await getAsset(`cover:${m.magazineId}`)}
     }))
   }
 
@@ -851,16 +896,19 @@ export class UserMaminaService {
 
   async markArticleRead(articleKey) {
     if(!this.current) return
-    const rows=this.current.rows.filter(r=>r.articleKey===articleKey && r.meta?.kind!=='motion' && !r.isOutgoing)
-    if(!rows.length) return
-    const max=Math.max(...rows.map(r=>r.id))
+    const resolved=resolveRowsToArticles(this.current.rows,this.current.articles)
+    const comments=[...resolved.byArticle.values()].flat()
+    const rows=comments.filter(r=>r.articleKey===articleKey&&!r.isOutgoing)
+    if(!rows.length)return
+    const max=Math.max(...rows.map(r=>Number(r.id)||0))
     await putReadState(articleKey,max)
     const magazine=await getMagazine(this.current.magazine.magazineId)
-    if(magazine) {
-      const all=this.current.rows
-      const unread=await this.countUnread(all)
-      await putMagazine({...magazine,unreadCount:unread})
-      this.current.magazine={...magazine,unreadCount:unread}
+    if(magazine){
+      const unreadArticleKeys=await this.unreadArticleKeys(comments)
+      const unread=unreadArticleKeys.length
+      const next={...magazine,unreadCount:unread,unreadArticleKeys}
+      await putMagazine(next)
+      this.current.magazine=next
     }
   }
 
