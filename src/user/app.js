@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.29'
+const APP_VERSION='1.1.30'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -1842,34 +1842,69 @@ $('adminGuideNext').onclick=async()=>{
   renderAdminGuide()
 }
 
-let tutorialIndex=0,tutorialHighlighted=null
+let tutorialIndex=0,tutorialHighlighted=null,tutorialTransient=null
 const tutorialSteps=[
-  {screen:'home',selector:'#magazines',title:'Tes magazines',text:'Les revues disponibles apparaissent ici. Le nombre « non lues » correspond aux nouveaux messages. Touchez une couverture pour ouvrir la revue.'},
-  {screen:'home',selector:'#openSettingsHome',title:'Paramètres',text:'La roue dentée ouvre les réglages, le stockage, le diagnostic et les guides. La pastille voisine indique l’état de Telegram.'},
-  {screen:'reader',selector:'.article-visual',title:'Lire et naviguer',text:'Balaye horizontalement pour changer d’article. Tu peux pincer pour zoomer et double-toucher la photo ou le texte pour les afficher en grand.'},
-  {screen:'reader',selector:'.article-actions',title:'Réagir à un article',text:'🎶 ajoute un son, ♥ une réaction animée et ＋ un message. Après avoir choisi un emoji d’animation, un simple toucher sur l’article crée une petite boucle.'},
-  {screen:'reader',selector:'#articleOrderButton',title:'Ordre de lecture',text:'« Revue » suit l’ordre imprimé. « Récent » place d’abord les articles avec de nouveaux messages.'},
-  {screen:'settings',selector:'.guide-menu-panel',title:'Retrouver le tutoriel',text:'Tu peux relancer cette découverte à tout moment depuis Paramètres → Guides.'},
+  {screen:'home',selector:'#magazines',title:'Choisir un magazine',text:'Les revues disponibles apparaissent ici. Le nombre « non lues » correspond aux nouveaux messages. Touche une couverture pour ouvrir la revue.'},
+  {screen:'home',selector:'#startTutorialHome',title:'Le bouton Aide',text:'Tu peux relancer ce tutoriel à tout moment avec le bouton Aide, placé juste à gauche de Réglages.'},
+  {screen:'home',selector:'#openSettingsHome',title:'Réglages',text:'La roue dentée ouvre les préférences, le stockage, le diagnostic et les guides. La pastille de connexion indique l’état de Telegram.'},
+  {screen:'reader',selector:'.article-visual',title:'Lire et naviguer',text:'Balaye horizontalement pour changer d’article. Pince pour zoomer. Un double toucher sur la photo ou le texte les ouvre en grand.'},
+  {screen:'reader',selector:'.article-actions',title:'Les trois réactions',text:'Sur chaque article : 🎶 ajoute un son, ♥ ouvre les animations et ＋ ouvre le commentaire.'},
+  {screen:'comment',selector:'#composerText',title:'Écrire un commentaire',text:'Après ＋, écris ton message dans cette zone. Le commentaire peut aussi rester en attente si le réseau est absent et partir plus tard.'},
+  {screen:'comment',selector:'#formatRow',title:'Les boutons du commentaire',text:'Couleur : change la couleur. G : gras. I : italique. S : souligné. B : barré. 🧹 efface le texte. ⋯ est réservé aux options complémentaires. ❌ annule sans envoyer. ✅ envoie le commentaire.'},
+  {screen:'motion',selector:'#motionEmojiGrid',title:'Choisir les emoji',text:'Après ♥, choisis de 1 à 3 emoji. Tu peux prendre les emoji proposés ou ouvrir le clavier emoji avec ⌨️.'},
+  {screen:'motionTap',selector:'.article-visual.motion-mode',title:'Animation - toucher simple',text:'Premier mode : après avoir choisi au moins un emoji, touche simplement l’endroit voulu sur l’article. MamiNa crée une toute petite boucle autour de ce point et montre un aperçu.'},
+  {screen:'motionDraw',selector:'#motionNext',title:'Animation - dessiner une trajectoire',text:'Deuxième mode : touche 🖊️ puis dessine directement sur l’article avec le doigt. Le trajet dessiné devient la trajectoire des emoji.'},
+  {screen:'motion',selector:'.motion-inline-actions',title:'Valider une animation',text:'❌ annule. 🖊️ lance le dessin ou permet de refaire la trajectoire. ▶️ rejoue l’aperçu lorsqu’une trajectoire existe. ✅ envoie l’animation une fois prête.'},
+  {screen:'reader',selector:'#articleOrderButton',title:'Ordre de lecture',text:'« Revue » suit l’ordre imprimé. « Récent » place d’abord les articles qui ont de nouveaux messages.'},
+  {screen:'reader',selector:'#back',title:'Retour aux magazines',text:'Touche l’icône MamiNa en haut à gauche pour revenir à la liste des magazines.'},
+  {screen:'settings',selector:'.guide-menu-panel',title:'Retrouver le tutoriel',text:'Le tutoriel reste aussi disponible dans Paramètres → Guides → Découvrir MamiNa.'},
 ]
 function clearTutorialHighlight(){
   tutorialHighlighted?.classList.remove('tutorial-highlight')
   tutorialHighlighted=null
 }
+function closeTutorialTransient(){
+  if(!$('composerModal').hidden)closeComposer()
+  if(!$('motionComposer').hidden)closeMotionComposer({restoreZoom:true})
+  tutorialTransient=null
+}
+async function ensureTutorialReader(){
+  $('settingsView').hidden=true;$('adminGuideView').hidden=true
+  if(currentModel){$('home').hidden=true;$('reader').hidden=false;return true}
+  if(!magazines.length)return false
+  await openMagazine(magazines[0].magazineId,null,false)
+  return Boolean(currentModel)
+}
 async function tutorialScreen(screen){
   if(screen==='home'){
+    closeTutorialTransient()
     $('settingsView').hidden=true;$('adminGuideView').hidden=true
     $('reader').hidden=true;$('home').hidden=false
     return true
   }
-  if(screen==='reader'){
-    $('settingsView').hidden=true;$('adminGuideView').hidden=true
-    if(currentModel){$('home').hidden=true;$('reader').hidden=false;return true}
-    if(!magazines.length)return false
-    await openMagazine(magazines[0].magazineId,null,false)
-    return Boolean(currentModel)
-  }
   if(screen==='settings'){
+    closeTutorialTransient()
     $('adminGuideView').hidden=true;$('settingsView').hidden=false
+    return true
+  }
+  if(['reader','comment','motion','motionTap','motionDraw'].includes(screen)){
+    const ok=await ensureTutorialReader()
+    if(!ok)return false
+    if(screen==='reader'){
+      closeTutorialTransient()
+      $('reader').hidden=false
+      return true
+    }
+    if(screen==='comment'){
+      if(!$('motionComposer').hidden)closeMotionComposer({restoreZoom:true})
+      if($('composerModal').hidden)openComposer(currentArticle()?.articleKey,{focus:false})
+      tutorialTransient='comment'
+      return true
+    }
+    if(!$('composerModal').hidden)closeComposer()
+    if($('motionComposer').hidden)openMotionComposer(currentArticleIndex)
+    tutorialTransient='motion'
+    if((screen==='motionTap'||screen==='motionDraw')&&!motionDraft?.emoji?.length)addMotionEmoji('❤️')
     return true
   }
   return true
@@ -1879,8 +1914,8 @@ async function showTutorialStep(index){
   tutorialIndex=Math.max(0,Math.min(tutorialSteps.length-1,index))
   let step=tutorialSteps[tutorialIndex]
   const available=await tutorialScreen(step.screen)
-  if(!available&&step.screen==='reader'){
-    const next=tutorialSteps.findIndex((x,i)=>i>tutorialIndex&&x.screen!=='reader')
+  if(!available&&['reader','comment','motion','motionTap','motionDraw'].includes(step.screen)){
+    const next=tutorialSteps.findIndex((x,i)=>i>tutorialIndex&&!['reader','comment','motion','motionTap','motionDraw'].includes(x.screen))
     if(next>=0)return showTutorialStep(next)
   }
   step=tutorialSteps[tutorialIndex]
@@ -1898,8 +1933,13 @@ async function showTutorialStep(index){
     target.scrollIntoView?.({behavior:'smooth',block:'center',inline:'nearest'})
   })
 }
-function stopTutorial(){clearTutorialHighlight();$('tutorialCoach').hidden=true}
+function stopTutorial(){
+  clearTutorialHighlight()
+  closeTutorialTransient()
+  $('tutorialCoach').hidden=true
+}
 $('startUserTutorial').onclick=()=>showTutorialStep(0)
+$('startTutorialHome').onclick=()=>showTutorialStep(0)
 $('tutorialStop').onclick=stopTutorial
 $('tutorialPrev').onclick=()=>showTutorialStep(tutorialIndex-1)
 $('tutorialNext').onclick=()=>tutorialIndex>=tutorialSteps.length-1?stopTutorial():showTutorialStep(tutorialIndex+1)
@@ -2386,7 +2426,7 @@ document.addEventListener('selectionchange',()=>{
   requestAnimationFrame(updateToolbar)
 })
 
-function openComposer(k){
+function openComposer(k,{focus=true}={}){
   composerArticleKey=k
   const article=displayArticles.find(x=>x.articleKey===k)
   const pending=article?.comments?.find(c=>c.pending)
@@ -2403,13 +2443,18 @@ function openComposer(k){
   document.querySelector('.color-swatch').style.background=currentColor
 
   const editor=$('composerText')
-  editor.focus({preventScroll:true})
-  placeCaretEnd(editor)
-  try{document.execCommand('styleWithCSS',false,false)}catch{}
-  forceSaveSelection()
-  syncTypingStateFromCaret()
-  updateToolbar()
-  requestAnimationFrame(positionComposer)
+  if(focus){
+    editor.focus({preventScroll:true})
+    placeCaretEnd(editor)
+    try{document.execCommand('styleWithCSS',false,false)}catch{}
+    forceSaveSelection()
+    syncTypingStateFromCaret()
+    updateToolbar()
+    requestAnimationFrame(positionComposer)
+  }else{
+    savedRange=null
+    updateToolbar()
+  }
 }
 function closeComposer(){
   $('composerModal').hidden=true
