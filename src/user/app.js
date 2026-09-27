@@ -887,6 +887,15 @@ function rerenderCommentOrderOnly(){
   const list=$('articleDeck').querySelector(`[data-index="${currentArticleIndex}"] .reaction-list`)
   if(list)requestAnimationFrame(()=>{list.scrollTop=reactionOrder==='asc'?list.scrollHeight:0})
 }
+function fitArticleVisual(v,img){
+  if(!v||!img?.naturalWidth||!img?.naturalHeight)return
+  if(matchMedia('(orientation:landscape) and (min-width:620px)').matches){
+    v.style.removeProperty('flex-basis')
+    return
+  }
+  const desired=Math.min(innerHeight*.64,v.clientWidth*(img.naturalHeight/img.naturalWidth))
+  if(Number.isFinite(desired)&&desired>180)v.style.flexBasis=`${Math.round(desired)}px`
+}
 async function loadVisual(i){
   const p=$('articleDeck').querySelector(`[data-index="${i}"]`),v=p?.querySelector('.article-visual')
   if(!v||v.querySelector('img'))return
@@ -895,8 +904,7 @@ async function loadVisual(i){
     const img=document.createElement('img')
     img.src=objectUrl(result.blob,readerUrls)
     img.onload=()=>{
-      const desired=Math.min(innerHeight*.64, v.clientWidth*(img.naturalHeight/img.naturalWidth))
-      if(Number.isFinite(desired)&&desired>180) v.style.flexBasis=`${Math.round(desired)}px`
+      fitArticleVisual(v,img)
       v._pz?.apply()
       if(i===currentArticleIndex){const deck=$('articleDeck');deck.scrollLeft=i*deck.clientWidth}
     }
@@ -911,6 +919,17 @@ async function loadVisual(i){
     v.prepend(img);v._pz?.apply()
   }catch(e){debug(e)}
 }
+let articleLayoutResizeTimer=null
+window.addEventListener('resize',()=>{
+  clearTimeout(articleLayoutResizeTimer)
+  articleLayoutResizeTimer=setTimeout(()=>{
+    for(const v of document.querySelectorAll('.article-visual')){
+      const img=v.querySelector('img');if(img)fitArticleVisual(v,img)
+    }
+    const d=$('articleDeck');if(d&&!$('reader').hidden)d.scrollLeft=currentArticleIndex*d.clientWidth
+  },120)
+})
+
 function warmAround(i){
   const keys=[]
   for(const j of [i+1,i-1])if(j>=0&&j<displayArticles.length)keys.push(displayArticles[j].articleKey)
