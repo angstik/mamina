@@ -211,3 +211,7 @@ button,input,select{font:inherit}button{cursor:pointer}
 .tutorial-actions{display:grid;grid-template-columns:auto auto 1fr;gap:7px}
 .tutorial-highlight{position:relative!important;z-index:2990!important;outline:4px solid color-mix(in srgb,var(--accent) 85%,white);outline-offset:4px;border-radius:12px;box-shadow:0 0 0 9999px #0005!important}
 @media (orientation:landscape) and (min-width:700px){.tutorial-card{left:auto;right:20px;bottom:20px;width:min(420px,45vw)}}
+
+.help-button{min-height:38px;padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:inherit;font-weight:700}
+.help-button:active{transform:scale(.97)}
+@media(max-width:500px){.help-button{min-height:36px;padding:6px 9px;font-size:.82rem}}
