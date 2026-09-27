@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.28'
+const APP_VERSION='1.1.29'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -1737,6 +1737,172 @@ async function refreshStorageStats(){
     button.disabled=false
   }
 }
+
+/* Guided setup + user tutorial */
+let adminGuideStep=0,adminGuideGroupReady=false,adminGuideCatalogReady=false,adminGuideParamsReady=false
+function renderAdminGuide(){
+  const steps=[...document.querySelectorAll('[data-admin-guide-step]')]
+  steps.forEach((el,i)=>el.hidden=i!==adminGuideStep)
+  $('adminGuideProgress').textContent=`Étape ${adminGuideStep+1}/5`
+  $('adminGuideProgressBar').value=adminGuideStep+1
+  $('adminGuidePrev').disabled=adminGuideStep===0
+  const ready=[
+    $('guideTelegramReady').checked,
+    adminGuideGroupReady,
+    adminGuideCatalogReady,
+    adminGuideParamsReady,
+    true,
+  ][adminGuideStep]
+  $('adminGuideNext').disabled=!ready
+  $('adminGuideNext').textContent=adminGuideStep===4?'Terminer':'Suivant →'
+}
+async function refreshGuideGroups(){
+  status('guideGroupStatus','Recherche des groupes…')
+  try{
+    adminGroups=await service.adminListForumDialogs()
+    const s=$('guideGroupSelect');s.innerHTML=''
+    adminGroups.forEach((g,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=g.title;s.appendChild(o)})
+    if(!adminGroups.length){
+      adminGuideGroupReady=false
+      status('guideGroupStatus','Aucun groupe avec sujets détecté.',false)
+    }else{
+      s.value='0'
+      await service.selectDialog(adminGroups[0])
+      adminGuideGroupReady=true
+      status('guideGroupStatus',`${adminGroups.length} groupe(s) disponible(s). « ${adminGroups[0].title} » sélectionné.`,true)
+    }
+    renderAdminGuide()
+  }catch(e){debug(e);adminGuideGroupReady=false;status('guideGroupStatus','Erreur : '+(e.message||e),false);renderAdminGuide()}
+}
+$('openAdminGroupGuide').onclick=async()=>{
+  $('settingsView').hidden=true
+  $('adminGuideView').hidden=false
+  adminGuideStep=0;adminGuideGroupReady=false;adminGuideCatalogReady=false;adminGuideParamsReady=false
+  $('guideTelegramReady').checked=false
+  const cfg=await service.getSettings()
+  $('guideAppTitle').value=cfg.appTitle||'MamiNa'
+  $('guideStoragePassword').checked=Boolean(cfg.storagePassword)
+  renderAdminGuide()
+}
+$('closeAdminGuide').onclick=()=>{$('adminGuideView').hidden=true;$('settingsView').hidden=false}
+$('guideTelegramReady').onchange=renderAdminGuide
+$('guideRefreshGroups').onclick=refreshGuideGroups
+$('guideGroupSelect').onchange=async()=>{
+  const g=adminGroups[+$('guideGroupSelect').value]
+  if(!g)return
+  try{await service.selectDialog(g);adminGuideGroupReady=true;status('guideGroupStatus',`Groupe sélectionné : ${g.title}`,true);renderAdminGuide()}
+  catch(e){debug(e);adminGuideGroupReady=false;status('guideGroupStatus','Erreur : '+(e.message||e),false);renderAdminGuide()}
+}
+$('guideInitSystem').onclick=async()=>{
+  const button=$('guideInitSystem')
+  try{
+    const sha=$('guideCatalogShaFile').files?.[0],json=$('guideCatalogJsonFile').files?.[0],bin=$('guideCatalogBinFile').files?.[0]
+    if(!sha||!json||!bin)throw new Error('Sélectionne les trois fichiers du catalogue.')
+    button.disabled=true;status('guideCatalogStatus','Installation de params et catalog…')
+    const r=await service.adminInitializeSystem({shaFile:sha,catalogJsonFile:json,catalogBinFile:bin})
+    adminGuideCatalogReady=true
+    status('guideCatalogStatus',`Prêt · params ${r.paramsTopicId} · catalog ${r.catalogTopicId}`,true)
+    await loadSettings();renderAdminGuide()
+  }catch(e){debug(e);adminGuideCatalogReady=false;status('guideCatalogStatus','Erreur : '+(e.message||e),false);renderAdminGuide()}
+  finally{button.disabled=false}
+}
+$('guideSaveParams').onclick=async()=>{
+  const button=$('guideSaveParams')
+  try{
+    button.disabled=true;status('guideParamsStatus','Enregistrement…')
+    const title=await service.setAppTitle($('guideAppTitle').value)
+    const r=await service.adminSaveParams({storagePassword:$('guideStoragePassword').checked,sounds:soundCatalog})
+    setAppName(title);adminGuideParamsReady=true
+    status('guideParamsStatus',`Configuration enregistrée · ${r.params?.sounds?.length||0} son(s)`,true)
+    await loadSettings();renderAdminGuide()
+  }catch(e){debug(e);adminGuideParamsReady=false;status('guideParamsStatus','Erreur : '+(e.message||e),false);renderAdminGuide()}
+  finally{button.disabled=false}
+}
+$('guidePublishPdf').onclick=async()=>{
+  const file=$('guidePdf').files?.[0],button=$('guidePublishPdf'),trace=$('guidePdfTrace')
+  trace.textContent=''
+  try{
+    if(!file)throw new Error('Choisis le premier PDF Famileo.')
+    button.disabled=true;status('guidePdfStatus','Analyse et publication…')
+    const r=await service.adminCreateMagazine(file,{onStep:e=>{trace.textContent+=`${new Date(e.at).toLocaleTimeString()} ${e.name}\n`}})
+    status('guidePdfStatus',`Terminé · ${r.articles.length} article(s) publiés.`,true)
+    await localHome()
+  }catch(e){debug(e);status('guidePdfStatus','Erreur : '+(e.message||e),false)}
+  finally{button.disabled=false}
+}
+$('adminGuidePrev').onclick=()=>{if(adminGuideStep>0){adminGuideStep--;renderAdminGuide()}}
+$('adminGuideNext').onclick=async()=>{
+  if(adminGuideStep===0&&!$('guideTelegramReady').checked)return
+  if(adminGuideStep===1&&!adminGuideGroupReady)return
+  if(adminGuideStep===2&&!adminGuideCatalogReady)return
+  if(adminGuideStep===3&&!adminGuideParamsReady)return
+  if(adminGuideStep===4){$('adminGuideView').hidden=true;$('settingsView').hidden=false;return}
+  adminGuideStep++
+  if(adminGuideStep===1&&!adminGroups.length)await refreshGuideGroups()
+  renderAdminGuide()
+}
+
+let tutorialIndex=0,tutorialHighlighted=null
+const tutorialSteps=[
+  {screen:'home',selector:'#magazines',title:'Tes magazines',text:'Les revues disponibles apparaissent ici. Le nombre « non lues » correspond aux nouveaux messages. Touchez une couverture pour ouvrir la revue.'},
+  {screen:'home',selector:'#openSettingsHome',title:'Paramètres',text:'La roue dentée ouvre les réglages, le stockage, le diagnostic et les guides. La pastille voisine indique l’état de Telegram.'},
+  {screen:'reader',selector:'.article-visual',title:'Lire et naviguer',text:'Balaye horizontalement pour changer d’article. Tu peux pincer pour zoomer et double-toucher la photo ou le texte pour les afficher en grand.'},
+  {screen:'reader',selector:'.article-actions',title:'Réagir à un article',text:'🎶 ajoute un son, ♥ une réaction animée et ＋ un message. Après avoir choisi un emoji d’animation, un simple toucher sur l’article crée une petite boucle.'},
+  {screen:'reader',selector:'#articleOrderButton',title:'Ordre de lecture',text:'« Revue » suit l’ordre imprimé. « Récent » place d’abord les articles avec de nouveaux messages.'},
+  {screen:'settings',selector:'.guide-menu-panel',title:'Retrouver le tutoriel',text:'Tu peux relancer cette découverte à tout moment depuis Paramètres → Guides.'},
+]
+function clearTutorialHighlight(){
+  tutorialHighlighted?.classList.remove('tutorial-highlight')
+  tutorialHighlighted=null
+}
+async function tutorialScreen(screen){
+  if(screen==='home'){
+    $('settingsView').hidden=true;$('adminGuideView').hidden=true
+    $('reader').hidden=true;$('home').hidden=false
+    return true
+  }
+  if(screen==='reader'){
+    $('settingsView').hidden=true;$('adminGuideView').hidden=true
+    if(currentModel){$('home').hidden=true;$('reader').hidden=false;return true}
+    if(!magazines.length)return false
+    await openMagazine(magazines[0].magazineId,null,false)
+    return Boolean(currentModel)
+  }
+  if(screen==='settings'){
+    $('adminGuideView').hidden=true;$('settingsView').hidden=false
+    return true
+  }
+  return true
+}
+async function showTutorialStep(index){
+  clearTutorialHighlight()
+  tutorialIndex=Math.max(0,Math.min(tutorialSteps.length-1,index))
+  let step=tutorialSteps[tutorialIndex]
+  const available=await tutorialScreen(step.screen)
+  if(!available&&step.screen==='reader'){
+    const next=tutorialSteps.findIndex((x,i)=>i>tutorialIndex&&x.screen!=='reader')
+    if(next>=0)return showTutorialStep(next)
+  }
+  step=tutorialSteps[tutorialIndex]
+  $('tutorialCounter').textContent=`${tutorialIndex+1}/${tutorialSteps.length}`
+  $('tutorialTitle').textContent=step.title
+  $('tutorialText').textContent=step.text
+  $('tutorialPrev').disabled=tutorialIndex===0
+  $('tutorialNext').textContent=tutorialIndex===tutorialSteps.length-1?'Terminer':'Suivant →'
+  $('tutorialCoach').hidden=false
+  requestAnimationFrame(()=>{
+    const target=document.querySelector(step.selector)
+    if(!target)return
+    tutorialHighlighted=target
+    target.classList.add('tutorial-highlight')
+    target.scrollIntoView?.({behavior:'smooth',block:'center',inline:'nearest'})
+  })
+}
+function stopTutorial(){clearTutorialHighlight();$('tutorialCoach').hidden=true}
+$('startUserTutorial').onclick=()=>showTutorialStep(0)
+$('tutorialStop').onclick=stopTutorial
+$('tutorialPrev').onclick=()=>showTutorialStep(tutorialIndex-1)
+$('tutorialNext').onclick=()=>tutorialIndex>=tutorialSteps.length-1?stopTutorial():showTutorialStep(tutorialIndex+1)
 
 /* Settings */
 $('openSettingsHome').onclick=()=>{
