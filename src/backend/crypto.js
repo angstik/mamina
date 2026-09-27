@@ -46,7 +46,9 @@ export async function decryptCredentials(blob, password) {
   try {
     plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64Url(blob.iv), additionalData: AAD }, key, fromB64Url(blob.ciphertext))
   } catch {
-    throw new Error('Mot de passe incorrect ou secret altéré.')
+    const error=new Error('Mot de passe MamiNa incorrect.')
+    error.code='MAMINA_PASSWORD_INVALID'
+    throw error
   }
   const value = JSON.parse(dec.decode(plain))
   if (!Number.isInteger(value.apiId) || typeof value.apiHash !== 'string' || value.apiHash.length < 8) throw new Error('Secret déchiffré invalide.')
