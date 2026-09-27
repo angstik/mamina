@@ -4,6 +4,16 @@
 
 
 
+
+## v1.1.27
+**Pré-production : build reproductible, contrôles automatiques et shell hors ligne.**
+
+- ajout de `package-lock.json` et déploiement exclusivement via `npm ci` ;
+- ajout de `npm run check` avant chaque build : syntaxe JavaScript, résolution des imports locaux, fichiers requis/interdits, doublons et références DOM, cohérence des versions et entrées Vite ;
+- ajout d'un service worker versionné qui précharge le shell construit, y compris les assets Vite hashés découverts dans le HTML, et permet de relancer l'application sans réseau ;
+- stratégie réseau d'abord pour éviter de conserver une ancienne version quand le réseau est disponible ;
+- le bouton « Forcer la mise à jour » demande désormais aussi explicitement la mise à jour du service worker.
+
 ## v1.1.26
 **Synthèse :** corrige le compteur de messages non lus sur la vue magazines.
 
