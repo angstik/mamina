@@ -6,6 +6,14 @@
 
 
 
+
+## v1.1.29
+**Guides intégrés pour administrateurs et utilisateurs.**
+
+Un nouvel écran « Créer un nouveau groupe » guide l'administrateur en cinq étapes : préparation du forum Telegram, sélection du groupe, installation du catalogue, réglages du groupe et publication de la première revue. Les actions appellent directement les fonctions d'administration existantes afin de conserver un seul chemin métier.
+
+Un mode « Découvrir MamiNa » est également disponible depuis Paramètres → Guides. Il parcourt les vues Magazines, lecteur et Paramètres, surligne les contrôles concernés et explique navigation, zoom, réactions, sons, animations, messages et ordre de lecture. Le tutoriel est manuel et relançable ; s'il n'existe aucune revue locale, il saute les étapes du lecteur au lieu de bloquer.
+
 ## v1.1.28
 **Hors ligne : séparation stricte entre mot de passe local et connexion réseau.**
 
