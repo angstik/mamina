@@ -9,6 +9,7 @@ export default defineConfig({
       input: {
         user: resolve(process.cwd(), 'index.html'),
         master: resolve(process.cwd(), 'master.html'),
+        beta: resolve(process.cwd(), 'beta/index.html'),
       },
     },
   },
