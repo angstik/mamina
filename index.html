@@ -40,11 +40,13 @@
   </header>
   <div id="activityHome" class="activity-strip" hidden></div>
 
-  <section id="setup" class="panel setup-panel">
+  <section id="setup" class="panel setup-panel" hidden>
     <h2>Connexion Telegram</h2>
     <p class="subtle">La lecture et la saisie locale restent disponibles sans connexion.</p>
-    <input id="password" type="password" autocomplete="current-password" placeholder="Mot de passe MamiNa">
-    <button id="start">Connecter Telegram</button>
+    <div id="maminaPasswordControls">
+      <input id="password" type="password" autocomplete="current-password" placeholder="Mot de passe MamiNa">
+      <button id="start">Connecter Telegram</button>
+    </div>
     <div id="setupStatus" class="status"></div>
     <div id="groupChooser" hidden>
       <label for="groupSelect">Groupe familial</label>
