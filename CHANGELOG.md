@@ -1,6 +1,18 @@
 # CHANGELOG MamiNa
 
 
+
+## v1.1.24
+**Synthèse :** fiabilise le déclenchement des sons au changement d’article, améliore l’affichage portrait/paysage et ajoute une animation tactile simplifiée.
+
+Les balayages horizontaux initiés depuis la liste des messages utilisent désormais le même chemin de lecture audio lié au geste utilisateur que les balayages sur l’article. La préparation audio en cours rattache aussi correctement l’article courant à la ressource mise en cache, afin d’éviter un état « en cache » sans déclenchement automatique.
+
+La taille des fichiers reste visible dans l’administration, mais elle est retirée des tuiles de choix lorsqu’on ajoute un son à un article.
+
+En portrait, l’article utilise davantage de hauteur pour occuper plus souvent toute la largeur. La taille est recalculée après rotation. En paysage à partir de 620 px, l’article est placé à gauche et les messages à droite.
+
+Pour les réactions animées, après le choix du premier emoji, un simple toucher sur l’article crée une très petite boucle centrée sur le point touché, comme un tracé rapide au stylo. Le mode de tracé manuel reste disponible.
+
 ## v1.1.23
 **Synthèse :** affiche la taille des sons dans l’administration et le sélecteur utilisateur.
 
