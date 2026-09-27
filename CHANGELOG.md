@@ -2,6 +2,14 @@
 
 
 
+
+## v1.1.25
+**Synthèse :** corrige le compteur « non lus » de la vue magazines pour compter des articles, pas des messages.
+
+Le résumé de chaque revue conserve désormais la liste des `articleKey` ayant au moins un message entrant non lu. Plusieurs nouveaux messages sur le même article ne comptent donc plus plusieurs fois. Le marquage lu ne prend plus en compte les sons ou animations lors du calcul du dernier message lu.
+
+Les anciennes revues sans cet index sont recalculées automatiquement lors de leur prochaine synchronisation complète/incrémentale, puis utilisent le nouveau compteur stable.
+
 ## v1.1.24
 **Synthèse :** fiabilise le déclenchement des sons au changement d’article, améliore l’affichage portrait/paysage et ajoute une animation tactile simplifiée.
 
