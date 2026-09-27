@@ -7,6 +7,16 @@
 
 
 
+
+## v1.1.30
+**Tutoriel enrichi, accès Aide direct et fiche imprimable.**
+
+Le tutoriel utilisateur détaille désormais le menu commentaire : zone de texte, couleur, gras, italique, souligné, barré, effacement, annulation et envoi. Il ouvre le vrai éditeur en mode démonstration sans forcer le clavier.
+
+Le parcours animation présente séparément le choix de 1 à 3 emoji, le mode « toucher simple » qui crée une petite boucle au point touché, et le mode « dessin » qui transforme le tracé du doigt en trajectoire. Les actions annuler, tracer/refaire, rejouer et envoyer sont aussi expliquées.
+
+Un bouton « Aide » est ajouté directement sur la vue Magazines, à gauche de Réglages, pour relancer le tutoriel sans passer par les paramètres.
+
 ## v1.1.29
 **Guides intégrés pour administrateurs et utilisateurs.**
 
