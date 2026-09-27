@@ -190,3 +190,24 @@ button,input,select{font:inherit}button{cursor:pointer}
   .reader.composer-open .article-page{display:block}
   .reader.composer-open .article-visual{height:100%}
 }
+
+
+/* Guides v1.1.29 */
+.guide-menu-actions{display:grid;grid-template-columns:1fr;gap:8px}
+.admin-guide-view{z-index:1200}
+.admin-guide-body{max-width:760px;margin:0 auto;width:100%}
+.admin-guide-progress{position:sticky;top:0;z-index:2;background:var(--bg);padding:10px 0;display:grid;gap:5px}
+.admin-guide-progress progress{width:100%;height:8px}
+.admin-guide-step{animation:guide-step-in .18s ease}
+.admin-guide-step label:not(.check-row){display:block;margin-top:10px}
+.admin-guide-step input[type=file],.admin-guide-step input:not([type=checkbox]),.admin-guide-step select{width:100%;margin:5px 0 9px}
+.admin-guide-nav{display:flex;gap:10px;position:sticky;bottom:0;background:var(--bg);padding:10px 0 max(10px,env(safe-area-inset-bottom))}
+.admin-guide-nav button{flex:1}
+@keyframes guide-step-in{from{opacity:.2;transform:translateY(5px)}to{opacity:1;transform:none}}
+.tutorial-coach{position:fixed;inset:0;z-index:3000;pointer-events:none}
+.tutorial-card{position:absolute;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));margin:auto;max-width:560px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:15px;box-shadow:0 10px 40px #0006;pointer-events:auto}
+.tutorial-card strong{font-size:1.08rem}.tutorial-card p{margin:.55rem 0 .8rem}
+.tutorial-counter{font-size:.76rem;opacity:.65;margin-bottom:3px}
+.tutorial-actions{display:grid;grid-template-columns:auto auto 1fr;gap:7px}
+.tutorial-highlight{position:relative!important;z-index:2990!important;outline:4px solid color-mix(in srgb,var(--accent) 85%,white);outline-offset:4px;border-radius:12px;box-shadow:0 0 0 9999px #0005!important}
+@media (orientation:landscape) and (min-width:700px){.tutorial-card{left:auto;right:20px;bottom:20px;width:min(420px,45vw)}}
