@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <base href="../">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=yes">
+  <meta name="color-scheme" content="light dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="MamiNa">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon-v08.png?v=8">
+  <link rel="icon" type="image/png" sizes="192x192" href="./mamina-v08-192.png?v=8">
+  <title>MamiNa · Bêta effet page</title>
+</head>
+<body>
+<div style="position:fixed;z-index:5000;top:6px;left:50%;transform:translateX(-50%);padding:5px 10px;border-radius:999px;background:#f0a020;color:#201600;font:700 12px system-ui;box-shadow:0 2px 8px #0003;pointer-events:none">BÊTA · effet page</div>
+
+<div id="splash" class="splash" hidden>
+  <img class="splash-brand-image" src="./mamina-v08-512.png?v=101" alt="MamiNa">
+  <div class="splash-title">MamiNa</div>
+  <div id="splashVersion" class="splash-version subtle"></div>
+  <div class="splash-user-row">
+    <img id="splashAvatar" class="splash-avatar" alt="">
+    <div id="splashHello" class="splash-hello"></div>
+  </div>
+</div>
+
+<main id="home" class="home">
+  <div class="home-logo-wrap">
+    <img class="home-logo" src="./mamina-v08-192.png?v=10" alt="MamiNa">
+  </div>
+  <header class="homebar">
+    <div class="homebrand">
+      <h1 id="homeAppName">MamiNa</h1>
+      <div id="syncStatus" class="subtle">Données locales</div>
+    </div>
+    <div class="status-cluster">
+      <button id="startTutorialHome" class="help-button" type="button" aria-label="Aide">Aide</button>
+      <button id="openSettingsHome" class="icon-button" type="button" aria-label="Paramètres">⚙️</button>
+      <span id="pendingHome" class="pending-count zero">0</span>
+      <button id="connectionPillHome" class="connection-pill unknown" type="button" title="Connexion Telegram">—</button>
+    </div>
+  </header>
+  <div id="activityHome" class="activity-strip" hidden></div>
+
+  <section id="setup" class="panel setup-panel" hidden>
+    <h2>Connexion Telegram</h2>
+    <p class="subtle">La lecture et la saisie locale restent disponibles sans connexion.</p>
+    <div id="maminaPasswordControls">
+      <input id="password" type="password" autocomplete="current-password" placeholder="Mot de passe MamiNa">
+      <button id="start">Connecter Telegram</button>
+    </div>
+    <div id="setupStatus" class="status"></div>
+    <div id="groupChooser" hidden>
+      <label for="groupSelect">Groupe familial</label>
+      <select id="groupSelect"></select>
+      <button id="chooseGroup">Utiliser ce groupe</button>
+    </div>
+  </section>
+
+  <section id="magazines" class="magazine-list"></section>
+</main>
+
+<section id="reader" class="reader" hidden>
+  <header class="reader-bar">
+    <button id="back" class="icon-button mamina-back" aria-label="Retour"><img src="./mamina-v08-192.png?v=10" alt=""></button>
+    <div class="reader-ident">
+      <strong id="readerAppName">MamiNa</strong>
+      <span id="readerDate"></span>
+    </div>
+    <button id="articleOrderButton" class="reader-order-button" type="button" title="Ordre des articles">Revue</button>
+    <button id="messageOrderHeader" class="reader-order-button message-order-header" type="button" title="Ordre des messages">↑</button>
+    <button id="soundGlobalToggle" class="sound-global-toggle" type="button" title="Son global" aria-label="Activer ou couper le son">🔊</button>
+    <span id="pendingReader" class="pending-count zero">0</span>
+    <button id="connectionPillReader" class="connection-pill unknown" type="button" title="Connexion Telegram">—</button>
+    <div id="readerPage" class="reader-page subtle"></div>
+    <div id="motionAuthorsHeader" class="motion-authors-header" aria-label="Auteurs des animations" hidden></div>
+    <div id="mediaReplayHeader" class="media-replay-header">
+      <button id="motionReplayHeader" class="motion-replay-header" type="button" title="Rejouer les animations" aria-label="Rejouer les animations" hidden>✨</button>
+      <button id="soundReplayHeader" class="sound-replay-header" type="button" title="Arrêter ou rejouer le son" aria-label="Arrêter ou rejouer le son" hidden>🎶</button>
+    </div>
+  </header>
+  <div id="activityReader" class="activity-strip" hidden></div>
+  <div id="articleDeck" class="article-deck"></div>
+</section>
+
+<div id="focusOverlay" class="focus-overlay" hidden>
+  <button id="focusCloseButton" class="focus-close" type="button" aria-label="Fermer">✕</button>
+  <div id="focusImageStage" class="focus-image-stage" hidden>
+    <img id="focusImage" alt="Photo de l’article">
+  </div>
+  <div id="focusTextStage" class="focus-text-stage" hidden>
+    <div class="focus-text-card">
+      <div class="focus-author-row">
+        <img id="focusAuthorAvatar" class="focus-author-avatar" alt="" hidden>
+        <div>
+          <div id="focusAuthor" class="focus-author"></div>
+          <div id="focusArticleDate" class="focus-article-date"></div>
+        </div>
+      </div>
+      <div id="focusText" class="focus-text"></div>
+    </div>
+  </div>
+</div>
+
+<section id="settingsView" class="settings-view" hidden>
+  <header class="settings-bar">
+    <button id="closeSettings" class="icon-button mamina-back" type="button" aria-label="Retour"><img src="./mamina-v08-192.png?v=10" alt=""></button>
+    <strong>Paramètres</strong>
+  </header>
+
+  <div class="settings-body">
+    <section class="panel">
+      <h2>Affichage</h2>
+      <label for="themeSelect">Mode</label>
+      <select id="themeSelect">
+        <option value="system">Système</option>
+        <option value="light">Clair</option>
+        <option value="dark">Sombre</option>
+      </select>
+
+      <label for="reactionOrder">Ordre des réactions</label>
+      <select id="reactionOrder">
+        <option value="asc">Anciennes → récentes</option>
+        <option value="desc">Récentes → anciennes</option>
+      </select>
+
+      <p class="subtle">MamiNa travaille d’abord depuis le cache local. Les deux dernières revues restent disponibles hors connexion. Un commentaire texte par article peut rester en attente puis partir automatiquement.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Application</h2>
+      <div class="settings-version">Version <strong id="appVersion">0.8.0</strong></div>
+      <button id="forceUpdate" type="button">Forcer la mise à jour</button>
+      <div id="updateStatus" class="status"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Stockage</h2>
+      <div class="storage-grid">
+        <div><span>Application / code chargé</span><strong id="appCodeSize">—</strong></div>
+        <div><span>IndexedDB MamiNa</span><strong id="indexedDbSize">—</strong></div>
+        <div><span>Usage navigateur</span><strong id="originUsage">—</strong></div>
+        <div><span>Quota disponible</span><strong id="originQuota">—</strong></div>
+      </div>
+      <details class="storage-details">
+        <summary>Détail IndexedDB</summary>
+        <div id="indexedDbBreakdown" class="storage-breakdown"></div>
+      </details>
+      <button id="refreshStorageStats" type="button">Actualiser les tailles</button>
+      <div id="storageStatus" class="status"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Sécurité de connexion</h2>
+      <p><strong>Mot de passe MamiNa</strong></p>
+      <p class="subtle">Il peut être mémorisé en clair dans le localStorage de cet appareil pour éviter sa ressaisie. Le topic <code>params</code> peut l’autoriser ou l’interdire avec <code>storagePassword</code>.</p>
+      <div class="storage-grid">
+        <div><span>Stockage mot de passe MamiNa</span><strong id="rememberMaminaPassword">—</strong></div>
+        <div><span>État local</span><strong id="storedMaminaPasswordState">—</strong></div>
+      </div>
+      <button id="clearStoredMaminaPassword" type="button" class="secondary">Effacer le mot de passe MamiNa mémorisé</button>
+    </section>
+
+    <section class="panel">
+      <h2>Connexion</h2>
+      <div class="diagnostic-grid">
+        <div><span>Réseau</span><strong id="networkState">—</strong></div>
+        <div><span>Telegram</span><strong id="telegramState">—</strong></div>
+        <div><span>Dernière synchro</span><strong id="lastSyncState">—</strong></div>
+        <div><span>À transmettre</span><strong id="pendingSettings">0</strong></div>
+      </div>
+      <p class="subtle">Touchez la pastille de connexion dans l’en-tête pour forcer une reconnexion et l’envoi des messages en attente.</p>
+    </section>
+
+    <section class="panel guide-menu-panel">
+      <h2>Guides</h2>
+      <p class="subtle">Assistants pas à pas pour préparer un groupe ou découvrir les fonctions de MamiNa.</p>
+      <div class="guide-menu-actions">
+        <button id="openAdminGroupGuide" type="button">🛠️ Créer un nouveau groupe</button>
+        <button id="startUserTutorial" type="button" class="secondary">👋 Découvrir MamiNa</button>
+      </div>
+    </section>
+
+    <details id="adminPanel" class="panel admin-panel">
+      <summary>Administration / publication</summary>
+      <p class="subtle">Ces actions utilisent le compte Telegram connecté. Telegram refusera celles pour lesquelles le compte n’a pas les droits nécessaires.</p>
+
+      <label for="adminAppTitle">Nom de l’application</label>
+      <input id="adminAppTitle" value="MamiNa" maxlength="30">
+      <button id="saveAdminTitle" type="button">Enregistrer</button>
+      <div id="adminTitleStatus" class="status"></div>
+
+      <label for="adminGroupSelect">Groupe avec sujets</label>
+      <div class="inline-actions">
+        <select id="adminGroupSelect"></select>
+        <button id="adminRefreshGroups" type="button">Actualiser</button>
+      </div>
+
+      <section class="admin-system-block">
+        <h3>Configuration du groupe</h3>
+        <p class="subtle">Crée/alimente les topics réservés <code>params</code> et <code>catalog</code>. Les lecteurs ne téléchargent jamais le catalogue lourd.</p>
+        <label class="check-row"><input id="adminStoragePassword" type="checkbox" checked> Mémoriser le mot de passe MamiNa sur l’appareil</label>
+        <div class="admin-sound-config">
+          <div class="admin-sound-heading">
+            <h4>Sons des articles</h4>
+            <span id="adminSoundCount" class="admin-sound-count">0</span>
+          </div>
+          <label for="adminFreesoundApiKey">Clé API Freesound</label>
+          <input id="adminFreesoundApiKey" type="password" autocomplete="off" placeholder="Clé API">
+          <div id="adminSoundList" class="admin-sound-list"></div>
+          <div class="admin-sound-actions">
+            <button id="adminAddSound" type="button" class="secondary">＋ Ajouter un son</button>
+            <button id="adminCheckSounds" type="button" class="secondary">Vérifier les sons</button>
+          </div>
+          <div class="admin-sound-publish-row">
+            <button id="adminPublishSounds" type="button">Publier les sons</button>
+            <button id="adminDiscardSounds" type="button" class="secondary" disabled>Annuler les modifications</button>
+          </div>
+          <div id="adminSoundPublishStatus" class="status"></div>
+          <p class="subtle">10 sons ou moins sont recommandés. Au-delà, MamiNa avertit mais n’impose aucune limite.</p>
+
+          <div id="adminSoundWizard" class="admin-sound-wizard" hidden>
+            <div class="admin-sound-wizard-head">
+              <strong id="adminSoundWizardTitle">Ajouter un son CC0</strong>
+              <button id="adminSoundWizardClose" type="button" aria-label="Annuler">✕</button>
+            </div>
+            <div id="adminSoundSearchStep">
+              <label for="adminSoundKeywords">Mots-clés</label>
+              <div class="inline-actions">
+                <input id="adminSoundKeywords" type="search" autocomplete="off" placeholder="rain forest train factory…">
+                <button id="adminSoundSearch" type="button">Rechercher</button>
+              </div>
+              <div class="admin-cc0-note">CC0 uniquement · aucune attribution requise</div>
+              <div id="adminSoundSearchStatus" class="status"></div>
+              <div id="adminSoundResults" class="admin-sound-results"></div>
+            </div>
+            <div id="adminSoundEmojiStep" hidden>
+              <div id="adminSoundChosen" class="admin-sound-chosen"></div>
+              <label for="adminSoundEmojiInput">Emoji</label>
+              <input id="adminSoundEmojiInput" class="admin-sound-emoji-picker" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Touchez puis ouvrez le clavier emoji">
+              <div id="adminSoundEmojiPreview" class="admin-sound-emoji-preview">🎶</div>
+              <div class="admin-sound-wizard-actions">
+                <button id="adminSoundWizardCancel" type="button" class="secondary">✕</button>
+                <button id="adminSoundWizardValidate" type="button" class="admin-sound-validate" disabled>✓</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button id="adminSaveParams" type="button">Publier / mettre à jour params</button>
+        <div id="adminParamsStatus" class="status"></div>
+        <button id="adminShowAvatars" type="button" class="secondary">Gérer les avatars associés</button>
+        <div id="adminAvatarAdmin" class="admin-avatar-admin" hidden>
+          <div id="adminAvatarList" class="admin-avatar-list"></div>
+          <div id="adminAvatarStatus" class="status"></div>
+        </div>
+        <label>Ressources catalogue</label>
+        <input id="catalogShaFile" type="file" accept="application/json">
+        <input id="catalogJsonFile" type="file" accept="application/json">
+        <input id="catalogBinFile" type="file" accept="application/octet-stream,.bin">
+        <button id="adminInitSystem" type="button">Initialiser params + catalog</button>
+        <div id="adminSystemStatus" class="status"></div>
+      </section>
+
+      <label for="adminTopicSelect">Sujets existants</label>
+      <div class="inline-actions">
+        <select id="adminTopicSelect"></select>
+        <button id="adminRefreshTopics" type="button">Actualiser</button>
+      </div>
+
+      <label for="adminPdf">Nouveau PDF Famileo</label>
+      <input id="adminPdf" type="file" accept="application/pdf">
+      <button id="adminPublish" type="button">Créer le sujet + publier le PDF</button>
+      <div id="adminStatus" class="status"></div>
+      <button id="copyAdminError" type="button" class="secondary" hidden>Copier l’erreur</button>
+      <pre id="adminTrace" class="tech-logs"></pre>
+    </details>
+
+    <details class="panel">
+      <summary>Diagnostic et journaux techniques</summary>
+      <label class="check-row"><input id="verboseLogs" type="checkbox"> Logs mtcute détaillés au prochain démarrage</label>
+      <div class="log-actions">
+        <button id="copyLogs" type="button">Copier les logs</button>
+        <button id="clearLogs" type="button" class="secondary">Effacer les logs</button>
+      </div>
+      <pre id="techLogs" class="tech-logs"></pre>
+    </details>
+  </div>
+</section>
+
+
+<section id="adminGuideView" class="settings-view admin-guide-view" hidden>
+  <header class="settings-bar">
+    <button id="closeAdminGuide" class="icon-button mamina-back" type="button" aria-label="Retour"><img src="./mamina-v08-192.png?v=10" alt=""></button>
+    <strong>Nouveau groupe MamiNa</strong>
+  </header>
+  <div class="settings-body admin-guide-body">
+    <div class="admin-guide-progress"><span id="adminGuideProgress">Étape 1/5</span><progress id="adminGuideProgressBar" max="5" value="1"></progress></div>
+
+    <section class="panel admin-guide-step" data-admin-guide-step="0">
+      <h2>1. Préparer Telegram</h2>
+      <p>Crée d’abord le groupe familial dans Telegram puis active le mode <strong>Sujets / Forum</strong>.</p>
+      <p class="subtle">Le compte utilisé ici doit pouvoir créer des sujets et publier des messages/documents. MamiNa créera lui-même les sujets techniques et les sujets de revues.</p>
+      <label class="check-row"><input id="guideTelegramReady" type="checkbox"> Le groupe existe et les sujets sont activés</label>
+    </section>
+
+    <section class="panel admin-guide-step" data-admin-guide-step="1" hidden>
+      <h2>2. Choisir le groupe</h2>
+      <p class="subtle">Seuls les groupes Telegram avec sujets sont proposés.</p>
+      <div class="inline-actions">
+        <select id="guideGroupSelect"></select>
+        <button id="guideRefreshGroups" type="button">Actualiser</button>
+      </div>
+      <div id="guideGroupStatus" class="status"></div>
+    </section>
+
+    <section class="panel admin-guide-step" data-admin-guide-step="2" hidden>
+      <h2>3. Installer le catalogue</h2>
+      <p class="subtle">Sélectionne les trois fichiers du dossier <code>parse pdf/catalog-publish/</code>. Cette opération crée automatiquement les sujets <code>params</code> et <code>catalog</code>.</p>
+      <label>Empreintes emoji <code>emoji-sha256.json</code></label>
+      <input id="guideCatalogShaFile" type="file" accept="application/json">
+      <label>Catalogue JSON <code>emoji-catalog.json</code></label>
+      <input id="guideCatalogJsonFile" type="file" accept="application/json">
+      <label>Catalogue binaire <code>emoji-catalog.bin</code></label>
+      <input id="guideCatalogBinFile" type="file" accept="application/octet-stream,.bin">
+      <button id="guideInitSystem" type="button">Installer params + catalog</button>
+      <div id="guideCatalogStatus" class="status"></div>
+    </section>
+
+    <section class="panel admin-guide-step" data-admin-guide-step="3" hidden>
+      <h2>4. Régler le groupe</h2>
+      <label for="guideAppTitle">Nom affiché dans MamiNa</label>
+      <input id="guideAppTitle" value="MamiNa" maxlength="30">
+      <label class="check-row"><input id="guideStoragePassword" type="checkbox" checked> Autoriser la mémorisation locale du mot de passe MamiNa</label>
+      <button id="guideSaveParams" type="button">Enregistrer la configuration</button>
+      <div id="guideParamsStatus" class="status"></div>
+      <p class="subtle">Les sons peuvent être ajoutés ensuite dans Administration / publication sans bloquer la mise en service du groupe.</p>
+    </section>
+
+    <section class="panel admin-guide-step" data-admin-guide-step="4" hidden>
+      <h2>5. Publier la première revue</h2>
+      <p class="subtle">Choisis le PDF Famileo. MamiNa créera automatiquement le sujet de la revue, publiera le PDF et son index JSON.</p>
+      <input id="guidePdf" type="file" accept="application/pdf">
+      <button id="guidePublishPdf" type="button">Créer la première revue</button>
+      <div id="guidePdfStatus" class="status"></div>
+      <pre id="guidePdfTrace" class="tech-logs"></pre>
+    </section>
+
+    <div class="admin-guide-nav">
+      <button id="adminGuidePrev" type="button" class="secondary">← Précédent</button>
+      <button id="adminGuideNext" type="button">Suivant →</button>
+    </div>
+  </div>
+</section>
+
+<div id="tutorialCoach" class="tutorial-coach" hidden>
+  <div class="tutorial-card" role="dialog" aria-modal="false" aria-labelledby="tutorialTitle">
+    <div class="tutorial-counter" id="tutorialCounter"></div>
+    <strong id="tutorialTitle"></strong>
+    <p id="tutorialText"></p>
+    <div class="tutorial-actions">
+      <button id="tutorialStop" type="button" class="secondary">Quitter</button>
+      <button id="tutorialPrev" type="button" class="secondary">←</button>
+      <button id="tutorialNext" type="button">Suivant →</button>
+    </div>
+  </div>
+</div>
+
+<div id="contributionPopup" class="sheet-overlay" hidden>
+  <section class="compact-sheet contribution-sheet" role="dialog" aria-modal="true" aria-labelledby="contributionPopupTitle">
+    <div class="sheet-title-row">
+      <strong id="contributionPopupTitle">Mes contributions</strong>
+      <button id="contributionPopupClose" type="button" class="sheet-close" aria-label="Fermer">✕</button>
+    </div>
+    <div id="contributionPopupList" class="contribution-popup-list"></div>
+    <div id="contributionPopupStatus" class="status"></div>
+  </section>
+</div>
+
+<div id="avatarPopup" class="sheet-overlay" hidden>
+  <section class="compact-sheet avatar-sheet" role="dialog" aria-modal="true" aria-labelledby="avatarPopupTitle">
+    <div class="sheet-title-row">
+      <div>
+        <strong id="avatarPopupTitle">Ton avatar dans les magazines</strong>
+        <div class="subtle">Choisis ton profil Famileo, ou ferme si tu ne veux pas l’associer.</div>
+      </div>
+      <button id="avatarPopupClose" type="button" class="sheet-close" aria-label="Fermer">✕</button>
+    </div>
+    <div id="avatarPopupGrid" class="avatar-popup-grid"></div>
+    <div id="avatarPopupStatus" class="status"></div>
+  </section>
+</div>
+
+<div id="soundComposer" class="sheet-overlay" hidden>
+  <section class="compact-sheet sound-sheet" role="dialog" aria-modal="true" aria-labelledby="soundComposerTitle">
+    <div class="sheet-title-row">
+      <div>
+        <strong id="soundComposerTitle">Son de l’article</strong>
+        <div class="subtle">Choisis un son puis sa durée.</div>
+      </div>
+      <button id="soundCancel" type="button" class="sheet-close" aria-label="Annuler">✕</button>
+    </div>
+    <div id="soundEmojiGrid" class="sound-emoji-grid"></div>
+    <div class="sound-duration-row" role="group" aria-label="Durée du son">
+      <button type="button" data-sound-duration="source" class="selected" title="Durée du son">⌚</button>
+      <button type="button" data-sound-duration="5">5 s</button>
+      <button type="button" data-sound-duration="15">15 s</button>
+      <button type="button" data-sound-duration="continuous" title="Tant que l’article est affiché">🎞️</button>
+    </div>
+    <div id="soundPreviewControls" class="sound-preview-controls">
+      <button id="soundPreviewStop" type="button" class="sound-preview-stop" aria-label="Arrêter l’écoute" disabled>⏹️</button>
+      <div class="sound-preview-progress-wrap">
+        <progress id="soundPreviewProgress" max="1" value="0"></progress>
+        <div class="sound-preview-time"><span id="soundPreviewElapsed">0:00</span><span id="soundPreviewTotal">0:00</span></div>
+      </div>
+    </div>
+    <div id="soundStatus" class="status"></div>
+    <div class="sound-sheet-actions">
+      <button id="soundSend" type="button" class="sound-send" aria-label="Envoyer" disabled>✓</button>
+    </div>
+  </section>
+</div>
+
+<div id="motionComposer" class="motion-composer" hidden>
+  <div id="motionPanel" class="motion-panel">
+    <div class="motion-head">
+      <strong id="motionTitle">Réaction animée</strong>
+      <span id="motionHint" class="subtle">Choisis 1 à 3 emoji</span>
+    </div>
+    <div class="motion-selection-row">
+      <div id="motionSelected" class="motion-selected" aria-label="Emoji sélectionnés"></div>
+      <div class="motion-inline-actions">
+        <button id="motionReplay" type="button" title="Rejouer" aria-label="Rejouer" hidden>▶️</button>
+        <button id="motionRedraw" type="button" title="Refaire le tracé" aria-label="Refaire le tracé" hidden>🖊️</button>
+        <button id="motionCancel" type="button" class="secondary" title="Annuler" aria-label="Annuler">✕</button>
+        <button id="motionNext" type="button" title="Tracer" aria-label="Tracer">🖊️</button>
+        <button id="motionSend" type="button" title="Envoyer" aria-label="Envoyer" hidden>✓</button>
+      </div>
+    </div>
+    <div id="motionEmojiGrid" class="motion-emoji-grid" aria-label="Emoji récents et fréquents"></div>
+    <input id="motionEmojiInput" class="motion-native-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Saisie depuis le clavier emoji">
+    <div id="motionControls" class="motion-controls" hidden>
+      <label class="motion-range">Taille <input id="motionSize" type="range" min="4" max="14" step="1" value="8"><span id="motionSizeLabel">8</span></label>
+      <label>Dynamique
+        <select id="motionScaleMode">
+          <option value="stable">Stable</option>
+          <option value="grow">Agrandit</option>
+          <option value="shrink">Rétrécit</option>
+          <option value="pulse">Petit → grand → petit</option>
+          <option value="inverse-pulse">Grand → petit → grand</option>
+          <option value="explosion">Explosion</option>
+          <option value="rain">Pluie</option>
+          <option value="cloud">Nuage</option>
+          <option value="random">Aléatoire</option>
+        </select>
+      </label>
+    </div>
+    <div id="motionStatus" class="status"></div>
+  </div>
+</div>
+
+<div id="composerModal" class="composer-overlay" hidden>
+  <div id="composerSheet" class="composer-sheet">
+    <div id="composerText" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Écrire un message…"></div>
+
+    <div id="formatRow" class="format-row">
+      <button id="colorButton" type="button" title="Couleur"><span class="color-swatch"></span></button>
+      <button data-command="bold" class="format-toggle" type="button" title="Gras" aria-pressed="false"><strong>G</strong></button>
+      <button data-command="italic" class="format-toggle" type="button" title="Italique" aria-pressed="false"><em>I</em></button>
+      <button data-command="underline" class="format-toggle" type="button" title="Souligné" aria-pressed="false"><u>S</u></button>
+      <button data-command="strikeThrough" class="format-toggle" type="button" title="Barré" aria-pressed="false"><s>B</s></button>
+      <button id="composerOptions" type="button" title="Options">⋯</button>
+      <button id="clearText" type="button" title="Vider">🧹</button>
+      <span class="toolbar-spacer"></span>
+      <button id="cancelComposer" type="button" title="Annuler">❌</button>
+      <button id="sendText" class="send-button" type="button" title="Envoyer">✅</button>
+    </div>
+
+    <div id="colorRow" class="color-row" hidden></div>
+  </div>
+</div>
+
+<dialog id="telegramAuthModal" class="auth-dialog">
+  <form method="dialog" id="telegramAuthForm">
+    <h2 id="telegramAuthTitle">Telegram</h2>
+    <p id="telegramAuthHint" class="subtle"></p>
+    <input id="telegramAuthInput">
+    <div class="dialog-actions">
+      <button value="cancel" type="button" id="telegramAuthCancel" class="secondary">Annuler</button>
+      <button value="ok" type="submit">Continuer</button>
+    </div>
+  </form>
+</dialog>
+
+<script>window.MAMINA_BETA_PAGE_TURN=true</script>
+<script type="module" src="../src/user/app.js"></script>
+</body>
+</html>
