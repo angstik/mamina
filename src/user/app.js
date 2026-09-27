@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.26'
+const APP_VERSION='1.1.27'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -161,6 +161,16 @@ async function showWelcomeSplash(force=false){
     setTimeout(()=>{splash.style.opacity='0';setTimeout(()=>splash.hidden=true,430)},2200)
   }catch{}
 }
+async function registerOfflineShell(){
+  if(!('serviceWorker'in navigator))return
+  try{
+    const registration=await navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'})
+    if(navigator.onLine)registration.update().catch(()=>{})
+  }catch(e){debug(e)}
+}
+
+registerOfflineShell()
+
 async function init(){
   $('networkState').textContent=navigator.onLine?'En ligne':'Hors ligne'
   const previousBeat=Number(localStorage.getItem(HEARTBEAT_KEY)||0)
@@ -1655,6 +1665,8 @@ $('forceUpdate').onclick=async()=>{
         await refreshPending()
       }catch(e){debug(e)}
     }
+    const registration=await navigator.serviceWorker?.getRegistration?.('./')
+    if(registration)await registration.update().catch(()=>{})
     await fetch(`./?update=${Date.now()}`,{cache:'reload'})
     status('updateStatus','Rechargement…',true)
     location.replace(`${location.pathname}?refresh=${Date.now()}`)
