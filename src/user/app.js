@@ -2,7 +2,7 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.27'
+const APP_VERSION='1.1.28'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -143,6 +143,83 @@ async function localHome(){
   await renderMagazineList()
   await refreshPending()
 }
+
+function setPasswordPromptVisible(visible,message='',ok=null){
+  $('setup').hidden=!visible
+  $('maminaPasswordControls').hidden=!visible
+  $('groupChooser').hidden=true
+  if(message)status('setupStatus',message,ok)
+}
+function showOfflineLocalState(){
+  if(magazines.length){
+    $('setup').hidden=true
+    return
+  }
+  $('setup').hidden=false
+  $('maminaPasswordControls').hidden=true
+  $('groupChooser').hidden=true
+  status('setupStatus','Hors ligne — aucune revue locale disponible. Reconnecte le réseau pour initialiser MamiNa.')
+}
+function isMaminaPasswordError(error){
+  return error?.code==='MAMINA_PASSWORD_INVALID'||/mot de passe mamina incorrect/i.test(String(error?.message||''))
+}
+async function connectTelegramAfterUnlock(){
+  if(!navigator.onLine){
+    showOfflineLocalState()
+    return false
+  }
+  const me=await service.login()
+  await showWelcomeSplash(true)
+  const {models,selected}=await service.restoreOrSelectDialog()
+  if(!selected){
+    const s=$('groupSelect');s.innerHTML=''
+    models.forEach((m,i)=>{const o=document.createElement('option');o.value=i;o.textContent=m.title;s.appendChild(o)})
+    window.__groups=models
+    $('setup').hidden=false
+    $('maminaPasswordControls').hidden=true
+    $('groupChooser').hidden=false
+    status('setupStatus',`Connecté : ${me.displayName||'Telegram'} — choisis le groupe.`,true)
+    return false
+  }
+  $('setup').hidden=true
+  startNetwork()
+  return true
+}
+async function unlockStoredPasswordAndConnect(){
+  const cfg=await service.getSettings()
+  const stored=cfg.storagePassword?localStorage.getItem(STORED_PASSWORD_KEY)||'':''
+  if(!stored){
+    if(navigator.onLine)setPasswordPromptVisible(true,'Connexion requise pour synchroniser Telegram.')
+    else showOfflineLocalState()
+    return
+  }
+  try{
+    await service.unlock(stored)
+    $('password').value=stored
+  }catch(e){
+    debug(e)
+    localStorage.removeItem(STORED_PASSWORD_KEY)
+    if(isMaminaPasswordError(e))setPasswordPromptVisible(true,'Mot de passe MamiNa incorrect.',false)
+    else {
+      $('setup').hidden=false
+      $('maminaPasswordControls').hidden=true
+      status('setupStatus','Impossible de déverrouiller la configuration locale : '+(e.message||e),false)
+    }
+    return
+  }
+  if(!navigator.onLine){
+    $('setup').hidden=true
+    return
+  }
+  try{
+    await connectTelegramAfterUnlock()
+  }catch(e){
+    debug(e)
+    $('setup').hidden=true
+    setConnectionUi('offline')
+    showActivity('Telegram indisponible · données locales utilisées')
+  }
+}
 async function showWelcomeSplash(force=false){
   try{
     if($('splashVersion'))$('splashVersion').textContent=`v${APP_VERSION}`
@@ -177,6 +254,7 @@ async function init(){
   await showWelcomeSplash()
   try{await service.migrateDerivedArticleGeometry()}catch(e){debug(e)}
   await localHome()
+  $('setup').hidden=true
   purgeExpiredSoundCache().catch(()=>{})
   renderLogs()
   connectionClock=setInterval(refreshPills,1000)
@@ -185,9 +263,7 @@ async function init(){
     if(previousBeat && Date.now()-previousBeat<30000) info('lifecycle','Reprise automatique après rechargement probable',{saved})
     await openMagazine(saved.magazineId,saved.articleKey,true)
   }
-  const cfg=await service.getSettings()
-  const stored=cfg.storagePassword?localStorage.getItem(STORED_PASSWORD_KEY)||'':''
-  if(stored){$('password').value=stored;setTimeout(()=>$('start').click(),120)}
+  await unlockStoredPasswordAndConnect()
 }
 init()
 
@@ -210,29 +286,39 @@ service.setAuthProvider({phone:()=>askTelegram('phone'),code:()=>askTelegram('co
 
 $('start').onclick=async()=>{
   $('start').disabled=true
+  const maminaPassword=$('password').value
   try{
     status('setupStatus','Déverrouillage…')
     showActivity('Déverrouillage des accès…')
-    const maminaPassword=$('password').value
     await service.unlock(maminaPassword)
+  }catch(e){
+    debug(e)
+    if(isMaminaPasswordError(e)){
+      setPasswordPromptVisible(true,'Mot de passe MamiNa incorrect.',false)
+      $('password').select()
+    }else{
+      $('setup').hidden=false
+      $('maminaPasswordControls').hidden=true
+      status('setupStatus','Impossible de déverrouiller la configuration : '+(e.message||e),false)
+    }
+    $('start').disabled=false
+    return
+  }
+  try{
     if(await service.maminaPasswordStorageEnabled())localStorage.setItem(STORED_PASSWORD_KEY,maminaPassword)
     else localStorage.removeItem(STORED_PASSWORD_KEY)
     $('setup').hidden=true
     await localHome()
-    const me=await service.login()
-    await showWelcomeSplash(true)
-    const {models,selected}=await service.restoreOrSelectDialog()
-    if(!selected){
-      const s=$('groupSelect');s.innerHTML=''
-      models.forEach((m,i)=>{const o=document.createElement('option');o.value=i;o.textContent=m.title;s.appendChild(o)})
-      window.__groups=models
-      $('setup').hidden=false;$('groupChooser').hidden=false
-      status('setupStatus',`Connecté : ${me.displayName||'Telegram'} — choisis le groupe.`,true)
+    if(!navigator.onLine){
+      setConnectionUi('offline')
       return
     }
-    startNetwork()
+    await connectTelegramAfterUnlock()
   }catch(e){
-    debug(e);$('setup').hidden=false;status('setupStatus','Erreur : '+(e.message||e),false)
+    debug(e)
+    $('setup').hidden=true
+    setConnectionUi('offline')
+    showActivity('Telegram indisponible · données locales utilisées')
   }finally{$('start').disabled=false}
 }
 $('chooseGroup').onclick=async()=>{try{const m=(window.__groups||[])[+$('groupSelect').value];await service.selectDialog(m);$('setup').hidden=true;startNetwork()}catch(e){debug(e)}}
@@ -299,8 +385,17 @@ async function backgroundSync(){
   }catch(e){debug(e)}
 }
 const resume=()=>{if(document.visibilityState==='visible'&&navigator.onLine)forceReconnect('reprise')}
-window.addEventListener('online',()=>{$('networkState').textContent='En ligne';setTimeout(()=>forceReconnect('retour réseau'),150)})
-window.addEventListener('offline',()=>{$('networkState').textContent='Hors ligne';setConnectionUi('offline')})
+window.addEventListener('online',()=>{
+  $('networkState').textContent='En ligne'
+  if(!service.hasGateway())setTimeout(()=>unlockStoredPasswordAndConnect(),150)
+  else if(!service.hasDialog())setTimeout(()=>connectTelegramAfterUnlock().catch(debug),150)
+  else setTimeout(()=>forceReconnect('retour réseau'),150)
+})
+window.addEventListener('offline',()=>{
+  $('networkState').textContent='Hors ligne'
+  setConnectionUi('offline')
+  if(!$('setup').hidden)showOfflineLocalState()
+})
 window.addEventListener('focus',resume)
 window.addEventListener('pageshow',resume)
 document.addEventListener('visibilitychange',resume)
