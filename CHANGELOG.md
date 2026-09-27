@@ -3,6 +3,14 @@
 
 
 
+
+## v1.1.26
+**Synthèse :** corrige le compteur de messages non lus sur la vue magazines.
+
+Le compteur reste bien un compteur de **messages**. Le recalcul ignore désormais strictement les sons, animations, racines techniques et marqueurs de suppression. Les suppressions de messages déclenchent un recalcul complet pour éviter les écarts, et les anciennes valeurs potentiellement polluées sont remises à plat automatiquement grâce au marqueur `unreadMode: messages-v2`.
+
+Le marquage d’un article comme lu ne considère plus que ses commentaires, puis recalcule le nombre total de messages entrants non lus de la revue.
+
 ## v1.1.25
 **Synthèse :** corrige le compteur « non lus » de la vue magazines pour compter des articles, pas des messages.
 
