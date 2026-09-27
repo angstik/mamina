@@ -2,15 +2,17 @@ import './styles.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.30'
+const APP_VERSION='1.1.31'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
+const PAGE_TURN_KEY='MAMINA_PAGE_TURN_MODE'
 const $=id=>document.getElementById(id)
 const service=new UserMaminaService()
 
 let magazines=[],currentModel=null,displayArticles=[],currentArticleIndex=0
 let reactionOrder='asc',articleOrderMode='magazine',appName='MamiNa'
+let pageTurnMode=localStorage.getItem(PAGE_TURN_KEY)==='page'?'page':'slide',pageTurnAnimating=false
 let composerArticleKey=null,safetyTimer=null,reconnectTimer=null,connectionClock=null,readTimer=null
 let telegramState='offline',reconnecting=false,lastConnectedAt=Number(localStorage.getItem('MAMINA_LAST_CONNECTED_AT')||0)
 let currentColor='#000000',savedRange=null,lastArticleCopy={text:'',at:0}
@@ -91,6 +93,7 @@ async function loadSettings(){
   setAppName(c.appTitle)
   $('reactionOrder').value=reactionOrder
   $('themeSelect').value=c.theme
+  $('pageTurnSelect').value=pageTurnMode
   $('adminAppTitle').value=c.appTitle
   $('adminStoragePassword').checked=Boolean(c.storagePassword)
   soundCatalog=Array.isArray(c.sounds)?c.sounds:[]
@@ -1064,14 +1067,58 @@ function activate(i,{soundMode='scheduled'}={}){
   else scheduleArticleSound(a,i,1000)
 }
 let scrollTimer
-$('articleDeck').onscroll=()=>{if(!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{const d=$('articleDeck'),i=Math.max(0,Math.min(displayArticles.length-1,Math.round(d.scrollLeft/d.clientWidth))),left=i*d.clientWidth;if(Math.abs(d.scrollLeft-left)>1)d.scrollTo({left,behavior:'auto'});if(i!==currentArticleIndex)activate(i)},90)}
-function goArticle(delta){if(!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return;const next=Math.max(0,Math.min(displayArticles.length-1,currentArticleIndex+delta));if(next===currentArticleIndex)return;const d=$('articleDeck');activate(next,{soundMode:'gesture'});d.scrollTo({left:next*d.clientWidth,behavior:'smooth'})}
+$('articleDeck').onscroll=()=>{if(pageTurnAnimating||!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{const d=$('articleDeck'),i=Math.max(0,Math.min(displayArticles.length-1,Math.round(d.scrollLeft/d.clientWidth))),left=i*d.clientWidth;if(Math.abs(d.scrollLeft-left)>1)d.scrollTo({left,behavior:'auto'});if(i!==currentArticleIndex)activate(i)},90)}
+function stripCloneIds(root){
+  if(root.id)root.removeAttribute('id')
+  for(const el of root.querySelectorAll('[id]'))el.removeAttribute('id')
+  for(const el of root.querySelectorAll('button,input,select,textarea,[contenteditable]')){el.setAttribute('tabindex','-1');el.setAttribute('aria-hidden','true')}
+}
+function pageTurnArticle(next,delta){
+  const d=$('articleDeck'),current=d.querySelector(`[data-index="${currentArticleIndex}"]`)
+  if(!current||pageTurnAnimating){activate(next,{soundMode:'gesture'});d.scrollTo({left:next*d.clientWidth,behavior:'auto'});return}
+  const rect=current.getBoundingClientRect(),clone=current.cloneNode(true)
+  stripCloneIds(clone)
+  clone.removeAttribute('data-index')
+  const overlay=document.createElement('div')
+  overlay.className=`page-turn-overlay ${delta>0?'forward':'backward'}`
+  overlay.style.left=`${Math.max(0,rect.left)}px`
+  overlay.style.top=`${Math.max(0,rect.top)}px`
+  overlay.style.width=`${Math.min(innerWidth,rect.width)}px`
+  overlay.style.height=`${Math.min(innerHeight-Math.max(0,rect.top),rect.height)}px`
+  clone.classList.add('page-turn-sheet')
+  clone.style.width='100%';clone.style.height='100%';clone.style.minWidth='0';clone.style.overflow='hidden'
+  const fold=document.createElement('div');fold.className='page-turn-fold'
+  overlay.append(clone,fold)
+  document.body.appendChild(overlay)
+  pageTurnAnimating=true
+  d.scrollTo({left:next*d.clientWidth,behavior:'auto'})
+  activate(next,{soundMode:'gesture'})
+  void overlay.offsetWidth
+  overlay.classList.add('turning')
+  const finish=()=>{if(!pageTurnAnimating)return;pageTurnAnimating=false;overlay.remove()}
+  overlay.addEventListener('animationend',finish,{once:true})
+  setTimeout(finish,620)
+}
+function goArticle(delta){
+  if(pageTurnAnimating||!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return
+  const next=Math.max(0,Math.min(displayArticles.length-1,currentArticleIndex+delta))
+  if(next===currentArticleIndex)return
+  const d=$('articleDeck')
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches
+  if(pageTurnMode==='page'&&!reduced)pageTurnArticle(next,delta)
+  else{activate(next,{soundMode:'gesture'});d.scrollTo({left:next*d.clientWidth,behavior:'smooth'})}
+}
 function installReactionSwipe(list){
   let start=null
   list.addEventListener('touchstart',e=>{
     if(e.touches.length!==1||!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return
     const t=e.touches[0];start={x:t.clientX,y:t.clientY}
   },{passive:true})
+  list.addEventListener('touchmove',e=>{
+    if(pageTurnMode!=='page'||!start||e.touches.length!==1)return
+    const t=e.touches[0],dx=t.clientX-start.x,dy=t.clientY-start.y
+    if(Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)*1.1)e.preventDefault()
+  },{passive:false})
   list.addEventListener('touchend',e=>{
     if(!start||!e.changedTouches?.length)return
     const t=e.changedTouches[0],dx=t.clientX-start.x,dy=t.clientY-start.y
@@ -1123,6 +1170,9 @@ function installArticleGestures(container,index){
       const[a,b]=e.touches
       st.scale=Math.max(1,Math.min(4,pinch.scale*Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)/pinch.d))
       apply()
+    }else if(e.touches.length===1&&start&&st.scale===1&&pageTurnMode==='page'){
+      const t=e.touches[0],dx=t.clientX-start.x,dy=t.clientY-start.y
+      if(Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)*1.1)e.preventDefault()
     }else if(e.touches.length===1&&start&&st.scale>1){
       e.preventDefault()
       const t=e.touches[0],now=performance.now(),dt=Math.max(1,now-lastMove.time)
@@ -1954,6 +2004,10 @@ $('refreshStorageStats').onclick=refreshStorageStats
 $('clearStoredMaminaPassword').onclick=async()=>{localStorage.removeItem(STORED_PASSWORD_KEY);$('password').value='';await loadSettings();status('storageStatus','Mot de passe MamiNa supprimé de cet appareil.',true)}
 $('themeSelect').onchange=async()=>{applyTheme($('themeSelect').value);await service.setTheme($('themeSelect').value)}
 $('reactionOrder').onchange=async()=>{reactionOrder=$('reactionOrder').value;await service.setReactionOrder(reactionOrder);if(currentModel)await rebuild(currentArticle()?.articleKey)}
+$('pageTurnSelect').onchange=()=>{
+  pageTurnMode=$('pageTurnSelect').value==='page'?'page':'slide'
+  localStorage.setItem(PAGE_TURN_KEY,pageTurnMode)
+}
 $('forceUpdate').onclick=async()=>{
   try{
     $('forceUpdate').disabled=true
