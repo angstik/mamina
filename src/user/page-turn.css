@@ -29,7 +29,7 @@
   object-position:center center;
   user-select:none;
   pointer-events:none;
-  transform:none!important;
+  transform:var(--mamina-article-transform,none)!important;
 }
 .article-visual>.article-actions,
 .article-visual>.article-source-badge{
@@ -101,4 +101,9 @@
 /* v1.1.32: allow MamiNa's tap/pinch layer to own the article when needed. */
 .mamina-pageflip-host.article-gesture-owns-input{
   pointer-events:none;
+}
+
+/* v1.1.33: the zoom transform is mirrored onto the PageFlip copy that is visible. */
+.mamina-pageflip-leaf-inner .article-sheet-image{
+  will-change:transform;
 }

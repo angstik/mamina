@@ -3,7 +3,7 @@ import './page-turn.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.32'
+const APP_VERSION='1.1.33'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -1291,6 +1291,7 @@ async function preparePageFlipForCurrent(){
   pageFlipSession=session
   currentVisual.classList.add('pageflip-active')
   currentPage?.classList.add('pageflip-active-page')
+  currentVisual._pz?.apply?.()
 
   // The finger position AT RELEASE decides the outcome. Only the farthest
   // quarter commits the turn; otherwise the same curl returns. Velocity is irrelevant.
@@ -1480,22 +1481,46 @@ function clampPan(container,img,scale,tx,ty){
 function installArticleGestures(container,index){
   const key=displayArticles[index].articleKey
   let st=zoomStates.get(key)||{scale:1,tx:0,ty:0}
-  let start=null,pinch=null,lastTap=0,lastMove=null,raf=null
-  const img=()=>container.querySelector('img')
+  let start=null,pinch=null,lastTap=0,lastMove=null,raf=null,zoomIdleTimer=null
+  const img=()=>container.querySelector('.article-turn-sheet > .article-sheet-image')||container.querySelector('img')
   const persist=()=>zoomStates.set(key,{scale:st.scale,tx:st.tx,ty:st.ty})
-  const apply=()=>{
+  const clearZoomIdle=()=>{clearTimeout(zoomIdleTimer);zoomIdleTimer=null}
+  const visibleFlipImages=()=>{
+    const s=pageFlipSession
+    if(pageTurnMode!=='page'||s?.current!==index||!s?.host)return[]
+    const slot=s.indices?.indexOf(index)
+    if(!Number.isInteger(slot)||slot<0)return[]
+    return [...s.host.querySelectorAll(`.mamina-pageflip-leaf[data-slot="${slot}"] .article-sheet-image`)]
+  }
+  const scheduleZoomIdle=()=>{
+    clearZoomIdle()
+    if(st.scale<=1)return
+    zoomIdleTimer=setTimeout(()=>{
+      if(st.scale<=1)return
+      st={scale:1,tx:0,ty:0}
+      apply({armIdle:false})
+    },30000)
+  }
+  const apply=({armIdle=true}={})=>{
     const im=img();if(!im)return
     const c=clampPan(container,im,st.scale,st.tx,st.ty);st.tx=c.tx;st.ty=c.ty
-    im.style.transform=`translate(${st.tx}px,${st.ty}px) scale(${st.scale})`;persist()
+    const transform=`translate(${st.tx}px,${st.ty}px) scale(${st.scale})`
+    im.style.transform=transform
+    for(const clone of visibleFlipImages())clone.style.setProperty('--mamina-article-transform',transform)
+    persist()
     const s=pageFlipSession
     if(pageTurnMode==='page'&&s?.current===index&&s.host)s.host.classList.toggle('article-gesture-owns-input',st.scale>1)
+    if(armIdle)scheduleZoomIdle()
+    else if(st.scale<=1)clearZoomIdle()
   }
-  const reset=()=>{st={scale:1,tx:0,ty:0};apply()}
+  const reset=()=>{clearZoomIdle();st={scale:1,tx:0,ty:0};apply({armIdle:false})}
   const setState=next=>{st={scale:Math.max(1,Math.min(4,Number(next?.scale)||1)),tx:Number(next?.tx)||0,ty:Number(next?.ty)||0};apply()}
+  const noteInteraction=()=>{if(st.scale>1)scheduleZoomIdle()}
   container._pz={get scale(){return st.scale},reset,apply,snapshot:()=>({...st}),setState}
 
   container.addEventListener('touchstart',e=>{
     if(motionDraw?.v===container)return
+    noteInteraction()
     if(e.target.closest('button'))return
     if(raf)cancelAnimationFrame(raf)
     if(e.touches.length===1){
@@ -1516,6 +1541,7 @@ function installArticleGestures(container,index){
   },{passive:true})
   container.addEventListener('touchmove',e=>{
     if(motionDraw?.v===container)return
+    noteInteraction()
     if(e.touches.length===2&&pinch){
       e.preventDefault()
       const[a,b]=e.touches
@@ -1530,6 +1556,7 @@ function installArticleGestures(container,index){
     }
   },{passive:false})
   container.addEventListener('touchend',e=>{
+    noteInteraction()
     if(motionDraw?.v===container){start=null;pinch=null;return}
     if(start&&e.changedTouches?.length){
       const t=e.changedTouches[0],dx=t.clientX-start.x,dy=t.clientY-start.y,dur=performance.now()-start.time
