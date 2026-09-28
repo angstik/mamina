@@ -3,7 +3,7 @@ import './page-turn.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.33'
+const APP_VERSION='1.1.34'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -1509,7 +1509,16 @@ function installArticleGestures(container,index){
     for(const clone of visibleFlipImages())clone.style.setProperty('--mamina-article-transform',transform)
     persist()
     const s=pageFlipSession
-    if(pageTurnMode==='page'&&s?.current===index&&s.host)s.host.classList.toggle('article-gesture-owns-input',st.scale>1)
+    if(pageTurnMode==='page'&&s?.current===index&&s.host){
+      const zoomOwns=st.scale>1
+      s.host.classList.toggle('article-gesture-owns-input',zoomOwns)
+      if(zoomOwns&&s.pointer){
+        s.pointer=null
+        try{
+          if(s.flipUi&&s.dropPointerSymbol)s.flipUi[s.dropPointerSymbol]()
+        }catch(err){debug(err)}
+      }
+    }
     if(armIdle)scheduleZoomIdle()
     else if(st.scale<=1)clearZoomIdle()
   }
@@ -1532,7 +1541,14 @@ function installArticleGestures(container,index){
       start=null
       const s=pageFlipSession
       if(pageTurnMode==='page'&&s?.current===index){
+        // The first finger may already have initialized MamiNa's release-threshold
+        // state. Once a second finger makes this a pinch, PageFlip no longer owns
+        // that gesture; clear both our pointer state and the fork's pointer capture.
+        s.pointer=null
         try{s.flip?.cancelTurn?.()}catch(err){debug(err)}
+        try{
+          if(s.flipUi&&s.dropPointerSymbol)s.flipUi[s.dropPointerSymbol]()
+        }catch(err){debug(err)}
         pageTurnAnimating=false
         const list=$('articleDeck').querySelector(`[data-index="${index}"] .reaction-list`)
         list?.classList.remove('pageflip-comments-out')
