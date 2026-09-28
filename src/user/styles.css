@@ -31,7 +31,9 @@ button,input,select{font:inherit}button{cursor:pointer}
 .article-deck{flex:1;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;overscroll-behavior-x:contain}.article-deck.aligning{opacity:0;pointer-events:none}.reader.composer-open .article-deck{overflow-x:hidden;scroll-snap-type:none}
 .article-page{flex:0 0 100%;width:100%;min-width:100%;height:100%;scroll-snap-align:start;scroll-snap-stop:always;display:flex;flex-direction:column;overflow:hidden}
 .article-visual{position:relative;flex:0 0 min(62dvh,560px);margin:0;padding:0;background:#8881;display:flex;justify-content:center;align-items:center;overflow:hidden;touch-action:none;user-select:none;min-width:0}
-.article-visual img{display:block;width:100%;height:100%;object-fit:contain;transform-origin:center center;will-change:transform}
+.article-turn-sheet{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;overflow:hidden;background:var(--bg)}
+.article-turn-sheet>.article-sheet-image{display:block;width:100%;height:100%;object-fit:contain;object-position:center center;transform-origin:center center;will-change:transform}
+.article-visual img{display:block}
 .article-source-badge{position:absolute;left:9px;top:9px;z-index:3;padding:4px 8px;border-radius:999px;background:#555c;color:#fff;font-size:.69rem;font-weight:750;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}.article-actions{position:absolute;right:9px;bottom:3px;display:flex;gap:6px;align-items:center;z-index:3}.article-float{width:39px;height:39px;border:1px solid #ffffff55;border-radius:50%;font-size:1.18rem;background:color-mix(in srgb,var(--accent) 48%,transparent);color:#fff;box-shadow:0 2px 7px #0004;backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);opacity:.66}.reader.composer-open .article-actions{opacity:.72}.reader.composer-open .add-message,.reader.composer-open .add-motion{pointer-events:none;opacity:.42}.reader.composer-open .reaction-list{display:none}.reader.composer-open .article-visual{flex:1 1 auto;height:100%;max-height:none}.reader.composer-open .article-page{height:100%}
 .reaction-list{flex:1;overflow-y:auto;padding:6px 8px 18px;overscroll-behavior-y:contain}.reaction{padding:9px 6px;border-bottom:1px solid var(--line)}.reaction.pending{border:1px dashed color-mix(in srgb,var(--fg) 48%,transparent);border-radius:9px;margin:5px 0;cursor:pointer}.reaction-meta{font-size:.78rem;opacity:.68;margin-bottom:4px}.reaction-text{white-space:pre-wrap;overflow-wrap:anywhere}.unread-reaction{border-left:3px solid var(--accent);padding-left:8px}
 
@@ -215,3 +217,10 @@ button,input,select{font:inherit}button{cursor:pointer}
 .help-button{min-height:38px;padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:inherit;font-weight:700}
 .help-button:active{transform:scale(.97)}
 @media(max-width:500px){.help-button{min-height:36px;padding:6px 9px;font-size:.82rem}}
+
+/* Settings additions v1.1.31 */
+.settings-check{margin-top:12px}
+.settings-menu-actions{display:grid;gap:8px;margin-top:10px}
+.settings-menu-actions button{width:100%}
+.avatar-choice.selected{outline:3px solid var(--accent);outline-offset:1px}
+#groupSwitchModal select{width:100%;margin:8px 0;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:inherit}

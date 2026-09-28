@@ -1,0 +1,99 @@
+/* MamiNa page turn: flipbook is confined to the article sheet. */
+.mamina-pageflip-host{
+  position:absolute;
+  inset:0;
+  z-index:3;
+  overflow:visible;
+  background:var(--bg);
+  touch-action:none;
+}
+.mamina-pageflip-leaf{overflow:hidden}
+.mamina-pageflip-leaf-inner{
+  width:100%;
+  height:100%;
+  display:block;
+  overflow:hidden;
+  background:var(--bg);
+}
+.mamina-pageflip-leaf-inner .article-turn-sheet{
+  position:relative;
+  inset:auto;
+  width:100%;
+  height:100%;
+}
+.mamina-pageflip-leaf-inner .article-sheet-image{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  object-position:center center;
+  user-select:none;
+  pointer-events:none;
+  transform:none!important;
+}
+.article-visual>.article-actions,
+.article-visual>.article-source-badge{
+  z-index:5;
+}
+.pageflip-comments-out{
+  opacity:0;
+  transition:opacity 1s ease;
+}
+@media (prefers-reduced-motion:reduce){
+  .mamina-pageflip-host{display:none!important}
+  .pageflip-comments-out{opacity:1!important}
+}
+
+/* beta.1: the curl owns the complete article surface; the original render must
+   not remain underneath it while a leaf is being peeled. */
+.mamina-pageflip-host{direction:ltr}
+.mamina-pageflip-leaf,
+.mamina-pageflip-leaf-inner{direction:ltr}
+
+
+/* v1.1.31: PageFlip is the only visible horizontal transition. */
+.article-deck.pageflip-sync{
+  scroll-behavior:auto!important;
+  scroll-snap-type:none!important;
+}
+.article-visual.pageflip-active{
+  overflow:visible;
+  z-index:3;
+}
+.article-page.pageflip-active-page .reaction-list{
+  position:relative;
+  z-index:1;
+}
+
+/* v1.1.31 experiment: mirror only the temporary moving copy to simulate
+   the printed verso of the sheet. Static leaves are never mirrored. */
+.mamina-pageflip-host [data-stf-clone] .article-turn-sheet-clone{
+  transform:scaleX(-1);
+  transform-origin:center center;
+}
+
+/* v1.1.31: comments stack from the edge farthest from the newest message. */
+.pageflip-comments-stacking .reaction,
+.pageflip-comments-stacking .empty{
+  opacity:0;
+  transform:translateY(var(--comment-entry-y,0));
+  will-change:transform,opacity;
+}
+.pageflip-comments-stacking-run .reaction,
+.pageflip-comments-stacking-run .empty{
+  animation:mamina-comment-drop 560ms cubic-bezier(.22,.72,.22,1) forwards;
+  animation-delay:calc(var(--comment-step,0) * 72ms);
+}
+@keyframes mamina-comment-drop{
+  0%{opacity:0;transform:translateY(var(--comment-entry-y,0)) scale(.985)}
+  72%{opacity:1;transform:translateY(3px) scale(1)}
+  100%{opacity:1;transform:translateY(0) scale(1)}
+}
+@media (prefers-reduced-motion:reduce){
+  .pageflip-comments-stacking .reaction,
+  .pageflip-comments-stacking .empty{
+    opacity:1!important;
+    transform:none!important;
+    animation:none!important;
+  }
+}

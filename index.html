@@ -123,6 +123,8 @@
         <option value="desc">Récentes → anciennes</option>
       </select>
 
+      <label class="check-row settings-check"><input id="pageTurnEnabled" type="checkbox" checked> Animation rotation de pages</label>
+
       <p class="subtle">MamiNa travaille d’abord depuis le cache local. Les deux dernières revues restent disponibles hors connexion. Un commentaire texte par article peut rester en attente puis partir automatiquement.</p>
     </section>
 
@@ -131,6 +133,20 @@
       <div class="settings-version">Version <strong id="appVersion">0.8.0</strong></div>
       <button id="forceUpdate" type="button">Forcer la mise à jour</button>
       <div id="updateStatus" class="status"></div>
+      <div class="settings-menu-actions">
+        <button id="changeGroupSettings" type="button" class="secondary">Changer de discussion Telegram</button>
+        <button id="chooseAvatarSettings" type="button" class="secondary">Choix de l’avatar</button>
+      </div>
+      <div id="settingsActionStatus" class="status"></div>
+    </section>
+
+    <section class="panel guide-menu-panel">
+      <h2>Guides</h2>
+      <p class="subtle">Assistants pas à pas pour préparer un groupe ou découvrir les fonctions de MamiNa.</p>
+      <div class="guide-menu-actions">
+        <button id="openAdminGroupGuide" type="button">🛠️ Créer un nouveau groupe</button>
+        <button id="startUserTutorial" type="button" class="secondary">👋 Découvrir MamiNa</button>
+      </div>
     </section>
 
     <section class="panel">
@@ -169,15 +185,6 @@
         <div><span>À transmettre</span><strong id="pendingSettings">0</strong></div>
       </div>
       <p class="subtle">Touchez la pastille de connexion dans l’en-tête pour forcer une reconnexion et l’envoi des messages en attente.</p>
-    </section>
-
-    <section class="panel guide-menu-panel">
-      <h2>Guides</h2>
-      <p class="subtle">Assistants pas à pas pour préparer un groupe ou découvrir les fonctions de MamiNa.</p>
-      <div class="guide-menu-actions">
-        <button id="openAdminGroupGuide" type="button">🛠️ Créer un nouveau groupe</button>
-        <button id="startUserTutorial" type="button" class="secondary">👋 Découvrir MamiNa</button>
-      </div>
     </section>
 
     <details id="adminPanel" class="panel admin-panel">
@@ -477,6 +484,19 @@
     <div id="colorRow" class="color-row" hidden></div>
   </div>
 </div>
+
+<dialog id="groupSwitchModal" class="auth-dialog">
+  <form method="dialog" onsubmit="return false">
+    <h2>Discussion Telegram</h2>
+    <p class="subtle">Choisis le groupe familial à utiliser. La session Telegram reste connectée.</p>
+    <select id="groupSwitchSelect"></select>
+    <div id="groupSwitchStatus" class="status"></div>
+    <div class="dialog-actions">
+      <button type="button" id="groupSwitchCancel" class="secondary">Annuler</button>
+      <button type="button" id="groupSwitchConfirm">Utiliser ce groupe</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="telegramAuthModal" class="auth-dialog">
   <form method="dialog" id="telegramAuthForm">

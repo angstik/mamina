@@ -431,6 +431,26 @@ export class UserMaminaService {
     return rows.map(TelegramGateway.dialogModel).filter(x=>x.isForum)
   }
 
+  async forumDialogChoices() {
+    if(!this.gateway)throw new Error('Telegram non initialisé.')
+    const current=String(await settings.get('groupId','')||'')
+    const models=await this.listForumDialogs()
+    return models.map(model=>{
+      const id=String(idOfPeer(model.dialog.peer))
+      return {id,title:model.title,selected:id===current}
+    })
+  }
+
+  async selectForumDialog(groupId) {
+    if(!this.gateway)throw new Error('Telegram non initialisé.')
+    const wanted=String(groupId||'')
+    const models=await this.listForumDialogs()
+    const model=models.find(x=>String(idOfPeer(x.dialog.peer))===wanted)
+    if(!model)throw new Error('Discussion Telegram introuvable.')
+    await this.selectDialog(model)
+    return {id:wanted,title:model.title}
+  }
+
   async restoreOrSelectDialog(dialogModel=null) {
     const rows=await this.gateway.dialogs()
     const models=rows.map(TelegramGateway.dialogModel).filter(x=>x.isForum)
@@ -1485,6 +1505,7 @@ export class UserMaminaService {
     return {
       reactionOrder:await settings.get('reactionOrder','asc'),
       articleOrderMode:await settings.get('articleOrderMode','magazine'),
+      pageTurnEnabled:await settings.get('pageTurnEnabled',true),
       recentColors:await settings.get('recentColors',[]),
       appTitle:await settings.get('appTitle','MamiNa'),
       theme:await settings.get('theme','system'),
@@ -1497,6 +1518,9 @@ export class UserMaminaService {
   async setReactionOrder(order) {
     if(!['asc','desc'].includes(order))throw new Error('Ordre invalide.')
     await settings.set('reactionOrder',order)
+  }
+  async setPageTurnEnabled(enabled) {
+    await settings.set('pageTurnEnabled',Boolean(enabled))
   }
   async setTheme(theme) {
     if(!['system','light','dark'].includes(theme)) throw new Error('Thème invalide.')

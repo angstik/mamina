@@ -1,8 +1,9 @@
 import './styles.css'
+import './page-turn.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.30'
+const APP_VERSION='1.1.31'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -10,7 +11,9 @@ const $=id=>document.getElementById(id)
 const service=new UserMaminaService()
 
 let magazines=[],currentModel=null,displayArticles=[],currentArticleIndex=0
-let reactionOrder='asc',articleOrderMode='magazine',appName='MamiNa'
+let reactionOrder='asc',articleOrderMode='magazine',pageTurnEnabled=true,appName='MamiNa'
+let pageTurnMode='page',pageTurnAnimating=false
+let pageFlipModulePromise=null,pageFlipSession=null,pageFlipGeneration=0
 let composerArticleKey=null,safetyTimer=null,reconnectTimer=null,connectionClock=null,readTimer=null
 let telegramState='offline',reconnecting=false,lastConnectedAt=Number(localStorage.getItem('MAMINA_LAST_CONNECTED_AT')||0)
 let currentColor='#000000',savedRange=null,lastArticleCopy={text:'',at:0}
@@ -45,6 +48,7 @@ const preparedSoundUrls=new Map(),preparingSoundUrls=new Map()
 
 const status=(id,text,ok=null)=>{const e=$(id);if(!e)return;e.textContent=text;e.className='status'+(ok===true?' ok':ok===false?' error':'')}
 const debug=e=>logError('ui',e?.stack||e?.message||String(e),e)
+
 const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')
 const objectUrl=(blob,bucket)=>{const u=URL.createObjectURL(blob);bucket.push(u);return u}
 const freeUrls=b=>{while(b.length)URL.revokeObjectURL(b.pop())}
@@ -87,10 +91,13 @@ async function loadSettings(){
   const c=await service.getSettings()
   reactionOrder=c.reactionOrder
   articleOrderMode=c.articleOrderMode
+  pageTurnEnabled=c.pageTurnEnabled!==false
+  pageTurnMode=pageTurnEnabled&&!matchMedia('(prefers-reduced-motion: reduce)').matches?'page':'slide'
   applyTheme(c.theme)
   setAppName(c.appTitle)
   $('reactionOrder').value=reactionOrder
   $('themeSelect').value=c.theme
+  $('pageTurnEnabled').checked=pageTurnEnabled
   $('adminAppTitle').value=c.appTitle
   $('adminStoragePassword').checked=Boolean(c.storagePassword)
   soundCatalog=Array.isArray(c.sounds)?c.sounds:[]
@@ -543,28 +550,71 @@ function closeAvatarPopup(){freeUrls(avatarChoiceUrls);$('avatarPopup').hidden=t
 $('avatarPopupClose').onclick=closeAvatarPopup
 $('avatarPopup').addEventListener('click',e=>{if(e.target===$('avatarPopup'))closeAvatarPopup()})
 function waitForImage(img,timeout=3500){return new Promise(resolve=>{if(img?.complete&&img.naturalWidth)return resolve(img);let done=false;const end=()=>{if(done)return;done=true;clearTimeout(timer);resolve(img?.naturalWidth?img:null)};const timer=setTimeout(end,timeout);img?.addEventListener('load',end,{once:true});img?.addEventListener('error',end,{once:true})})}
-async function fillAvatarChoiceImage(button,article,index){
-  try{await loadVisual(index);const img=await waitForImage(articleImg(index));if(!img||$('avatarPopup').hidden)return;const url=cropImage(img,article.avatarBounds);if(!url)return;const placeholder=button.querySelector('.avatar-placeholder');if(placeholder){const pic=document.createElement('img');pic.alt=`Avatar ${article.authorName||''}`;pic.src=url;placeholder.replaceWith(pic);avatarChoiceUrls.push(url)}}catch(e){debug(e)}
-}
-async function maybeOfferFamileoAvatar(){
-  if(!currentModel||!['connected','updating'].includes(service.connectionState())||!$('avatarPopup').hidden)return
+async function fillAvatarChoiceImage(button,article){
   try{
-    const state=await service.avatarAssociationState();if(state.own)return
-    const assigned=new Set((state.assignedNames||[]).map(x=>String(x).trim().toLocaleLowerCase('fr'))),seen=new Set(),choices=[]
-    for(let i=0;i<displayArticles.length;i++){
-      const a=displayArticles[i],name=String(a.authorName||'').trim(),key=name.toLocaleLowerCase('fr')
+    const result=await service.getArticleImageInfo(article.articleKey)
+    if($('avatarPopup').hidden)return
+    const sourceUrl=URL.createObjectURL(result.blob);avatarChoiceUrls.push(sourceUrl)
+    const source=new Image();source.src=sourceUrl
+    const img=await waitForImage(source)
+    if(!img||$('avatarPopup').hidden)return
+    const url=cropImage(img,article.avatarBounds);if(!url)return
+    const placeholder=button.querySelector('.avatar-placeholder')
+    if(placeholder){const pic=document.createElement('img');pic.alt=`Avatar ${article.authorName||''}`;pic.src=url;placeholder.replaceWith(pic)}
+  }catch(e){debug(e)}
+}
+async function showFamileoAvatarChooser({force=false,model=currentModel,articles=displayArticles}={}){
+  if(!model||!articles?.length||!['connected','updating'].includes(service.connectionState())||!$('avatarPopup').hidden)return false
+  try{
+    const state=await service.avatarAssociationState()
+    if(state.own&&!force)return false
+    const assigned=new Set(
+      Object.values(state.profiles||{})
+        .filter(x=>Number(x?.telegramUserId)!==Number(state.userId))
+        .map(x=>String(x?.famileoName||'').trim().toLocaleLowerCase('fr'))
+        .filter(Boolean)
+    )
+    const seen=new Set(),choices=[]
+    for(const a of articles){
+      const name=String(a.authorName||'').trim(),key=name.toLocaleLowerCase('fr')
       if(!name||!a.avatarBounds||seen.has(key)||assigned.has(key))continue
-      seen.add(key);choices.push({name,article:a,index:i})
+      seen.add(key);choices.push({name,article:a})
     }
-    if(!choices.length)return
+    if(!choices.length)return false
+    $('avatarPopupTitle').textContent=force?'Choix de l’avatar Famileo':'Ton avatar dans les magazines'
     const host=$('avatarPopupGrid');host.innerHTML='';freeUrls(avatarChoiceUrls)
+    const ownName=String(state.own?.famileoName||'').trim().toLocaleLowerCase('fr')
     for(const choice of choices){
-      const b=document.createElement('button');b.type='button';b.className='avatar-choice';b.innerHTML=`<div class="avatar-placeholder">${esc(choice.name.slice(0,1).toUpperCase())}</div><span>${esc(choice.name)}</span>`
-      b.onclick=async()=>{for(const x of host.querySelectorAll('button'))x.disabled=true;status('avatarPopupStatus','Association…');try{await service.assignFamileoAvatar(choice.name);status('avatarPopupStatus','Avatar associé.',true);setTimeout(closeAvatarPopup,280)}catch(err){debug(err);status('avatarPopupStatus','Erreur : '+(err.message||err),false);for(const x of host.querySelectorAll('button'))x.disabled=false}}
-      host.appendChild(b);fillAvatarChoiceImage(b,choice.article,choice.index)
+      const b=document.createElement('button');b.type='button';b.className='avatar-choice'
+      if(choice.name.toLocaleLowerCase('fr')===ownName)b.classList.add('selected')
+      b.innerHTML=`<div class="avatar-placeholder">${esc(choice.name.slice(0,1).toUpperCase())}</div><span>${esc(choice.name)}</span>`
+      b.onclick=async()=>{
+        for(const x of host.querySelectorAll('button'))x.disabled=true
+        status('avatarPopupStatus','Association…')
+        try{await service.assignFamileoAvatar(choice.name);status('avatarPopupStatus','Avatar associé.',true);setTimeout(closeAvatarPopup,280)}
+        catch(err){debug(err);status('avatarPopupStatus','Erreur : '+(err.message||err),false);for(const x of host.querySelectorAll('button'))x.disabled=false}
+      }
+      host.appendChild(b);fillAvatarChoiceImage(b,choice.article)
     }
     $('avatarPopup').hidden=false
-  }catch(e){debug(e)}
+    return true
+  }catch(e){debug(e);return false}
+}
+async function maybeOfferFamileoAvatar(){return showFamileoAvatarChooser({force:false})}
+async function chooseAvatarFromSettings(){
+  try{
+    status('settingsActionStatus','Préparation des avatars…')
+    if(!service.hasGateway()||!service.hasDialog()||!['connected','updating'].includes(service.connectionState()))throw new Error('Connexion Telegram requise.')
+    let model=currentModel,articles=displayArticles
+    if(!model){
+      const first=magazines[0]
+      if(!first)throw new Error('Aucune revue locale disponible pour proposer les avatars.')
+      model=await service.openMagazineLocalFirst(first.magazineId)
+      articles=orderArticles(model.articles)
+    }
+    const opened=await showFamileoAvatarChooser({force:true,model,articles})
+    status('settingsActionStatus',opened?'Choisis ton profil Famileo.':'Aucun avatar Famileo disponible dans les revues locales.',opened?true:false)
+  }catch(e){debug(e);status('settingsActionStatus','Erreur : '+(e.message||e),false)}
 }
 async function rebuild(key){
   displayArticles=orderArticles(currentModel.articles)
@@ -954,7 +1004,7 @@ async function renderReader(){
   displayArticles.forEach((a,i)=>{
     const p=document.createElement('section');p.className='article-page';p.dataset.index=i
     const v=document.createElement('div');v.className='article-visual'
-    v.innerHTML=`<div class="subtle">Chargement…</div><span class="article-source-badge" hidden></span><div class="article-actions"><button class="article-float add-sound" title="Son">🎶</button><button class="article-float add-motion" title="Réaction animée">♥</button><button class="article-float add-message" title="Ajouter">＋</button></div><svg class="motion-draw-layer" hidden aria-hidden="true"><path class="motion-draw-path"></path></svg><div class="motion-play-layer" aria-hidden="true"></div>`
+    v.innerHTML=`<div class="article-turn-sheet"><div class="subtle">Chargement…</div><svg class="motion-draw-layer" hidden aria-hidden="true"><path class="motion-draw-path"></path></svg><div class="motion-play-layer" aria-hidden="true"></div></div><span class="article-source-badge" hidden></span><div class="article-actions"><button class="article-float add-sound" title="Son">🎶</button><button class="article-float add-motion" title="Réaction animée">♥</button><button class="article-float add-message" title="Ajouter">＋</button></div>`
     p.appendChild(v)
     const list=document.createElement('div');list.className='reaction-list';renderComments(a,list);p.appendChild(list);installReactionSwipe(list)
     d.appendChild(p)
@@ -967,7 +1017,7 @@ async function renderReader(){
   requestAnimationFrame(()=>{
     d.scrollLeft=currentArticleIndex*d.clientWidth
     activate(currentArticleIndex)
-    requestAnimationFrame(()=>{d.scrollLeft=currentArticleIndex*d.clientWidth;d.classList.remove('aligning')})
+    requestAnimationFrame(()=>{d.scrollLeft=currentArticleIndex*d.clientWidth;d.classList.remove('aligning');schedulePageFlipPrepare(120)})
   })
 }
 function renderComments(a,list){
@@ -1002,18 +1052,21 @@ function fitArticleVisual(v,img){
   if(Number.isFinite(desired)&&desired>180)v.style.flexBasis=`${Math.round(desired)}px`
 }
 async function loadVisual(i){
-  const p=$('articleDeck').querySelector(`[data-index="${i}"]`),v=p?.querySelector('.article-visual')
-  if(!v||v.querySelector('img'))return
+  const p=$('articleDeck').querySelector(`[data-index="${i}"]`),v=p?.querySelector('.article-visual'),sheet=v?.querySelector('.article-turn-sheet')
+  if(!v||!sheet||sheet.querySelector(':scope > img'))return
   try{
     const result=await service.getArticleImageInfo(displayArticles[i].articleKey)
     const img=document.createElement('img')
+    img.className='article-sheet-image'
     img.src=objectUrl(result.blob,readerUrls)
+    img.alt=''
+    img.draggable=false
     img.onload=()=>{
       fitArticleVisual(v,img)
       v._pz?.apply()
       if(i===currentArticleIndex){const deck=$('articleDeck');deck.scrollLeft=i*deck.clientWidth}
     }
-    v.querySelector('.subtle')?.remove()
+    sheet.querySelector('.subtle')?.remove()
     const badge=v.querySelector('.article-source-badge')
     if(badge){
       clearTimeout(badge._hideTimer)
@@ -1021,7 +1074,7 @@ async function loadVisual(i){
       badge.hidden=false
       badge._hideTimer=setTimeout(()=>{badge.hidden=true},1800)
     }
-    v.prepend(img);v._pz?.apply()
+    sheet.prepend(img);v._pz?.apply()
   }catch(e){debug(e)}
 }
 let articleLayoutResizeTimer=null
@@ -1031,7 +1084,7 @@ window.addEventListener('resize',()=>{
     for(const v of document.querySelectorAll('.article-visual')){
       const img=v.querySelector('img');if(img)fitArticleVisual(v,img)
     }
-    const d=$('articleDeck');if(d&&!$('reader').hidden)d.scrollLeft=currentArticleIndex*d.clientWidth
+    const d=$('articleDeck');if(d&&!$('reader').hidden){d.scrollLeft=currentArticleIndex*d.clientWidth;schedulePageFlipPrepare(160)}
   },120)
 })
 
@@ -1064,8 +1117,343 @@ function activate(i,{soundMode='scheduled'}={}){
   else scheduleArticleSound(a,i,1000)
 }
 let scrollTimer
-$('articleDeck').onscroll=()=>{if(!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{const d=$('articleDeck'),i=Math.max(0,Math.min(displayArticles.length-1,Math.round(d.scrollLeft/d.clientWidth))),left=i*d.clientWidth;if(Math.abs(d.scrollLeft-left)>1)d.scrollTo({left,behavior:'auto'});if(i!==currentArticleIndex)activate(i)},90)}
-function goArticle(delta){if(!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return;const next=Math.max(0,Math.min(displayArticles.length-1,currentArticleIndex+delta));if(next===currentArticleIndex)return;const d=$('articleDeck');activate(next,{soundMode:'gesture'});d.scrollTo({left:next*d.clientWidth,behavior:'smooth'})}
+$('articleDeck').onscroll=()=>{if(pageTurnAnimating||!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return;clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{const d=$('articleDeck'),i=Math.max(0,Math.min(displayArticles.length-1,Math.round(d.scrollLeft/d.clientWidth))),left=i*d.clientWidth;if(Math.abs(d.scrollLeft-left)>1)d.scrollTo({left,behavior:'auto'});if(i!==currentArticleIndex){activate(i);schedulePageFlipPrepare()}},90)}
+
+function destroyPageFlip(){
+  const s=pageFlipSession
+  pageFlipSession=null
+  pageTurnAnimating=false
+  if(!s)return
+  try{s.flip?.cancelTurn?.()}catch{}
+  try{s.flip?.destroy?.()}catch{}
+  try{s.host?.remove()}catch{}
+  try{s.visual?.classList.remove('pageflip-active')}catch{}
+  try{s.page?.classList.remove('pageflip-active-page')}catch{}
+}
+
+function ensurePageFlipModule(){
+  if(pageTurnMode!=='page'||matchMedia('(prefers-reduced-motion: reduce)').matches)return Promise.resolve(null)
+  if(!pageFlipModulePromise){
+    pageFlipModulePromise=import('@gullabs/flipbook-core').catch(e=>{
+      debug(e)
+      pageTurnMode='slide'
+      destroyPageFlip()
+      return null
+    })
+  }
+  return pageFlipModulePromise
+}
+
+function waitArticleImage(index,timeout=3500){
+  return new Promise(async resolve=>{
+    if(index<0||index>=displayArticles.length)return resolve(null)
+    await loadVisual(index)
+    const v=$('articleDeck').querySelector(`[data-index="${index}"] .article-visual`),img=v?.querySelector('.article-turn-sheet > img')
+    if(img?.complete&&img.naturalWidth)return resolve(img)
+    if(!img)return resolve(null)
+    let done=false
+    const finish=()=>{if(done)return;done=true;clearTimeout(timer);resolve(img.naturalWidth?img:null)}
+    const timer=setTimeout(finish,timeout)
+    img.addEventListener('load',finish,{once:true})
+    img.addEventListener('error',finish,{once:true})
+  })
+}
+
+function commentsFadeOut(index=currentArticleIndex){
+  const list=$('articleDeck').querySelector(`[data-index="${index}"] .reaction-list`)
+  if(list)list.classList.add('pageflip-comments-out')
+}
+
+function commentsReveal(index=currentArticleIndex){
+  const list=$('articleDeck').querySelector(`[data-index="${index}"] .reaction-list`)
+  if(!list)return
+  list.classList.remove('pageflip-comments-out','pageflip-comments-stacking')
+  const rows=[...list.querySelectorAll('.reaction,.empty')]
+  if(!rows.length)return
+  // Newest is at the bottom in asc, at the top in desc. Start from the opposite
+  // edge and settle one row after another so the stack visibly builds up.
+  const fromTop=reactionOrder==='asc'
+  const listHeight=Math.max(1,list.clientHeight)
+  rows.forEach((row,i)=>{
+    const targetTop=row.offsetTop
+    const targetBottom=targetTop+row.offsetHeight
+    const delta=fromTop?-targetBottom:(listHeight-targetTop)
+    const order=fromTop?i:(rows.length-1-i)
+    row.style.setProperty('--comment-entry-y',`${Math.round(delta)}px`)
+    row.style.setProperty('--comment-step',String(Math.min(order,18)))
+  })
+  // Force the initial transformed state to exist for one frame before animation.
+  list.classList.add('pageflip-comments-stacking')
+  requestAnimationFrame(()=>list.classList.add('pageflip-comments-stacking-run'))
+  setTimeout(()=>{
+    list.classList.remove('pageflip-comments-stacking','pageflip-comments-stacking-run')
+    rows.forEach(row=>{
+      row.style.removeProperty('--comment-entry-y')
+      row.style.removeProperty('--comment-step')
+    })
+  },1600)
+}
+
+function pageFlipCornerFromPointer(){
+  return 'bottom'
+}
+
+async function preparePageFlipForCurrent(){
+  const generation=++pageFlipGeneration
+  destroyPageFlip()
+  const mod=await ensurePageFlipModule()
+  if(!mod||generation!==pageFlipGeneration||$('reader').hidden)return false
+  const current=currentArticleIndex
+  const indices=[current-1,current,current+1].filter(i=>i>=0&&i<displayArticles.length)
+  if(indices.length<2)return false
+  await Promise.all(indices.map(waitArticleImage))
+  if(generation!==pageFlipGeneration)return false
+
+  const currentVisual=$('articleDeck').querySelector(`[data-index="${current}"] .article-visual`)
+  const currentSheet=currentVisual?.querySelector('.article-turn-sheet')
+  if(!currentVisual||!currentSheet)return false
+  const rect=currentSheet.getBoundingClientRect()
+  if(rect.width<40||rect.height<40)return false
+
+  const sourceSheets=indices.map(i=>$('articleDeck').querySelector(`[data-index="${i}"] .article-turn-sheet`))
+  if(sourceSheets.some(x=>!x?.querySelector(':scope > img')))return false
+
+  const host=document.createElement('div')
+  host.className='mamina-pageflip-host'
+  currentVisual.appendChild(host)
+  const startPage=Math.max(0,indices.indexOf(current))
+  const PageFlip=mod.PageFlip
+  if(!PageFlip){host.remove();pageTurnMode='slide';return false}
+
+  const leaves=sourceSheets.map((sourceSheet,slot)=>{
+    const leaf=document.createElement('div')
+    leaf.className='mamina-pageflip-leaf'
+    leaf.dataset.slot=String(slot)
+    const inner=document.createElement('div')
+    inner.className='mamina-pageflip-leaf-inner'
+    const sheet=sourceSheet.cloneNode(true)
+    sheet.classList.add('article-turn-sheet-clone')
+    for(const node of sheet.querySelectorAll('[id]'))node.removeAttribute('id')
+    inner.appendChild(sheet)
+    leaf.appendChild(inner)
+    host.appendChild(leaf)
+    return leaf
+  })
+
+  let flip
+  try{
+    flip=new PageFlip(host,{
+      width:Math.max(1,Math.round(rect.width)),
+      height:Math.max(1,Math.round(rect.height)),
+      sizing:'fixed',
+      autoSize:false,
+      drawShadow:true,
+      maxShadowOpacity:.38,
+      flippingTime:680,
+      usePortrait:true,
+      hardCovers:false,
+      allowTouchScroll:false,
+      // Disable the engine's velocity/time based "quick swipe" shortcut.
+      // MamiNa commits by finger position at release; velocity is irrelevant.
+      swipeDistance:Math.max(1000,Math.round(rect.width*3)),
+      respectInteractiveContent:true,
+      pointerInput:['touch','pen','mouse'],
+      foldCornerOnHover:false,
+      flipOnClick:'never',
+      useKeyboard:false,
+      controls:'none',
+      readingDirection:'ltr',
+      initialPage:startPage,
+      pageBackground:'var(--bg,#fff)',
+      respectReducedMotion:true
+    })
+    flip.loadFromHTML(leaves)
+    const orientation=flip.getOrientation?.()
+    if(orientation&&orientation!=='portrait')throw new Error(`PageFlip: orientation inattendue ${orientation}`)
+  }catch(e){
+    debug(e);host.remove();pageTurnMode='slide';return false
+  }
+
+  const currentPage=currentVisual.closest('.article-page')
+  const symbolOn=(object,description)=>{
+    for(let proto=object;proto;proto=Object.getPrototypeOf(proto)){
+      const symbol=Object.getOwnPropertySymbols(proto).find(s=>s.description===description)
+      if(symbol)return symbol
+    }
+    return null
+  }
+  const getFlipSymbol=symbolOn(flip,'flipbook.getFlip')
+  const getUiSymbol=symbolOn(flip,'flipbook.getUI')
+  const controller=getFlipSymbol?flip[getFlipSymbol]():null
+  const flipUi=getUiSymbol?flip[getUiSymbol]():null
+  const dropPointerSymbol=flipUi?symbolOn(flipUi,'flipbook.dropPointerGesture'):null
+  const session={flip,host,visual:currentVisual,page:currentPage,sheet:currentSheet,indices,startPage,current,changed:false,flipping:false,pointer:null,controller,flipUi,dropPointerSymbol,settleTime:680}
+  pageFlipSession=session
+  currentVisual.classList.add('pageflip-active')
+  currentPage?.classList.add('pageflip-active-page')
+
+  // The finger position AT RELEASE decides the outcome. Only the farthest
+  // quarter commits the turn; otherwise the same curl returns. Velocity is irrelevant.
+  //
+  // The fork deliberately keeps these engine seams symbol-keyed. This beta uses
+  // reflection only to continue the live fold without restarting it from a
+  // corner; production can vendor the tiny release-threshold hook if retained.
+  host.addEventListener('pointerdown',e=>{
+    if(pageFlipSession!==session||session.pointer)return
+    if(e.pointerType==='mouse'&&e.button!==0)return
+    const r=host.getBoundingClientRect()
+    session.pointer={id:e.pointerId,startX:e.clientX,left:r.left,width:Math.max(1,r.width),blocked:false}
+  },{capture:true})
+  host.addEventListener('pointermove',e=>{
+    const p=session.pointer
+    if(pageFlipSession!==session||!p||p.id!==e.pointerId||p.blocked)return
+    const dx=e.clientX-p.startX
+    if(Math.abs(dx)<10)return
+    const wantsPrev=dx>0
+    const impossible=(wantsPrev&&session.current<=0)||(!wantsPrev&&session.current>=displayArticles.length-1)
+    if(!impossible)return
+
+    // Do not let the engine reinterpret an impossible "previous" gesture as
+    // "next" (notably on the first article). Abort as soon as direction is clear.
+    p.blocked=true
+    e.preventDefault()
+    e.stopPropagation()
+    try{flip.cancelTurn?.()}catch(err){debug(err)}
+    pageTurnAnimating=false
+    const list=$('articleDeck').querySelector(`[data-index="${session.current}"] .reaction-list`)
+    list?.classList.remove('pageflip-comments-out')
+  },{capture:true,passive:false})
+  host.addEventListener('pointerup',e=>{
+    const p=session.pointer
+    if(pageFlipSession!==session||!p||p.id!==e.pointerId)return
+    session.pointer=null
+    if(p.blocked){
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+    const dx=e.clientX-p.startX
+    if(Math.abs(dx)<8)return
+
+    const wantsPrev=dx>0
+    const impossible=(wantsPrev&&session.current<=0)||(!wantsPrev&&session.current>=displayArticles.length-1)
+    const releaseX=(e.clientX-p.left)/p.width
+    // Commit only when the finger is released inside the farthest quarter.
+    const crossedFarQuarter=!impossible&&(dx<0?releaseX<=.25:releaseX>=.75)
+    const controller=session.controller
+    const calc=controller?.getCalculation?.()
+    const animate=controller?.animateFlippingTo
+
+    // If the installed engine shape ever changes, leave its native release path
+    // intact rather than breaking navigation.
+    if(!calc||typeof animate!=='function')return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    // Native pointerup no longer reaches the engine, so unwind both halves of
+    // its gesture bookkeeping before starting the settle animation.
+    try{
+      const block=flip.getBlockElement()
+      const br=block.getBoundingClientRect()
+      const sx=block.offsetWidth>0&&br.width>0?br.width/block.offsetWidth:1
+      const sy=block.offsetHeight>0&&br.height>0?br.height/block.offsetHeight:1
+      flip.userStop({x:(e.clientX-br.left)/sx,y:(e.clientY-br.top)/sy},true)
+      if(session.flipUi&&session.dropPointerSymbol)session.flipUi[session.dropPointerSymbol]()
+    }catch(err){debug(err)}
+
+    const bounds=flip.getBoundsRect()
+    const from=calc.getPosition()
+    const y=calc.getCorner()===mod.FlipCorner.BOTTOM?bounds.height:0
+
+    // Return is intentionally slower. animateFlippingTo scales duration by
+    // remaining distance, therefore this remains a constant-speed return rather
+    // than an ease/acceleration effect.
+    session.settleTime=crossedFarQuarter?680:1000
+    try{flip.updateSettings({flippingTime:session.settleTime})}catch(err){debug(err)}
+    try{
+      animate.call(controller,from,{x:crossedFarQuarter?-bounds.pageWidth:bounds.pageWidth,y},crossedFarQuarter)
+    }catch(err){
+      debug(err)
+      try{flip.cancelTurn?.()}catch(cancelErr){debug(cancelErr)}
+    }
+  },{capture:true})
+  host.addEventListener('pointercancel',()=>{session.pointer=null},{capture:true})
+
+  flip.on('changeState',e=>{
+    if(pageFlipSession!==session)return
+    const state=String(e?.data?.state??e?.data??'')
+    if(state==='user_fold'||state==='fold_corner'||state==='flipping'){
+      session.flipping=true
+      pageTurnAnimating=true
+      commentsFadeOut(session.current)
+    }else if(state==='read'){
+      if(session.settleTime!==680){
+        session.settleTime=680
+        try{flip.updateSettings({flippingTime:680})}catch(err){debug(err)}
+      }
+      pageTurnAnimating=false
+      if(!session.changed){
+        const list=$('articleDeck').querySelector(`[data-index="${session.current}"] .reaction-list`)
+        list?.classList.remove('pageflip-comments-out')
+      }
+    }
+  })
+  flip.on('flip',e=>{
+    if(pageFlipSession!==session)return
+    const slot=Number(e?.data?.page??e?.data)
+    const target=session.indices[slot]
+    if(!Number.isInteger(target)||target===currentArticleIndex)return
+    session.changed=true
+    pageTurnAnimating=true
+    const d=$('articleDeck')
+    // The curl is the ONLY transition. Temporarily disable the deck's smooth
+    // scroll/snap while its logical article index catches up with PageFlip.
+    d.classList.add('pageflip-sync')
+    d.scrollLeft=target*d.clientWidth
+    activate(target,{soundMode:'gesture'})
+    requestAnimationFrame(()=>commentsReveal(target))
+    setTimeout(()=>{
+      d.scrollLeft=target*d.clientWidth
+      d.classList.remove('pageflip-sync')
+      schedulePageFlipPrepare()
+    },180)
+  })
+  flip.on?.('turnRejected',()=>{
+    if(pageFlipSession!==session)return
+    pageTurnAnimating=false
+    const list=$('articleDeck').querySelector(`[data-index="${session.current}"] .reaction-list`)
+    list?.classList.remove('pageflip-comments-out')
+  })
+  return true
+}
+
+let pageFlipPrepareTimer=null
+function schedulePageFlipPrepare(delay=80){
+  if(pageTurnMode!=='page')return
+  clearTimeout(pageFlipPrepareTimer)
+  pageFlipPrepareTimer=setTimeout(()=>preparePageFlipForCurrent().catch(debug),delay)
+}
+
+function goArticle(delta){
+  if(pageTurnAnimating||!$('composerModal').hidden||!$('motionComposer').hidden||!$('soundComposer').hidden)return
+  const next=Math.max(0,Math.min(displayArticles.length-1,currentArticleIndex+delta))
+  if(next===currentArticleIndex)return
+  const s=pageFlipSession
+  if(pageTurnMode==='page'&&s?.flip&&s.current===currentArticleIndex){
+    commentsFadeOut(currentArticleIndex)
+    pageTurnAnimating=true
+    try{
+      if(delta>0)s.flip.flipNext(pageFlipCornerFromPointer())
+      else s.flip.flipPrev(pageFlipCornerFromPointer())
+      return
+    }catch(e){debug(e);pageTurnAnimating=false}
+  }
+  const d=$('articleDeck')
+  activate(next,{soundMode:'gesture'})
+  d.scrollTo({left:next*d.clientWidth,behavior:'smooth'})
+}
+
 function installReactionSwipe(list){
   let start=null
   list.addEventListener('touchstart',e=>{
@@ -1076,11 +1464,10 @@ function installReactionSwipe(list){
     if(!start||!e.changedTouches?.length)return
     const t=e.changedTouches[0],dx=t.clientX-start.x,dy=t.clientY-start.y
     start=null
-    if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.15)goArticle(dx<0?1:-1)
+    if(pageTurnMode!=='page'&&Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.15)goArticle(dx<0?1:-1)
   },{passive:true})
   list.addEventListener('touchcancel',()=>{start=null},{passive:true})
 }
-
 
 function clampPan(container,img,scale,tx,ty){
   if(!img||scale<=1)return {tx:0,ty:0}
@@ -1106,6 +1493,7 @@ function installArticleGestures(container,index){
   container._pz={get scale(){return st.scale},reset,apply,snapshot:()=>({...st}),setState}
 
   container.addEventListener('touchstart',e=>{
+    if(pageTurnMode==='page'&&e.target.closest?.('.mamina-pageflip-host'))return
     if(motionDraw?.v===container)return
     if(e.target.closest('button'))return
     if(raf)cancelAnimationFrame(raf)
@@ -1157,6 +1545,20 @@ function installArticleGestures(container,index){
 function motionPage(index=currentArticleIndex){return $('articleDeck').querySelector(`[data-index="${index}"]`)}
 function motionVisual(index=currentArticleIndex){return motionPage(index)?.querySelector('.article-visual')}
 function motionImage(index=currentArticleIndex){return motionVisual(index)?.querySelector('img')}
+function motionPlaybackTarget(index=currentArticleIndex){
+  const s=pageFlipSession
+  if(pageTurnMode==='page'&&s?.host){
+    const slot=s.indices?.indexOf(index)
+    if(Number.isInteger(slot)&&slot>=0){
+      const leaf=s.host.querySelector(`.mamina-pageflip-leaf[data-slot="${slot}"] .mamina-pageflip-leaf-inner`)
+      const img=leaf?.querySelector('.article-sheet-image')
+      const layer=leaf?.querySelector('.motion-play-layer')
+      if(leaf&&img&&layer)return {v:leaf,img,layer}
+    }
+  }
+  const v=motionVisual(index),img=motionImage(index),layer=v?.querySelector('.motion-play-layer')
+  return {v,img,layer}
+}
 function clamp01Motion(n){return Math.max(0,Math.min(1,Number(n)||0))}
 function codepointsToString(value){
   if(typeof value!=='string')return''
@@ -1375,7 +1777,7 @@ function createTapMotionAt(index,clientX,clientY){
 function motionParticleEmoji(emojis,i){return emojis[i%emojis.length]}
 function motionPlaybackDuration(motion){return Math.max(1200,Math.min(4500,(Number(motion?.duration)||2200)*1.18))}
 function playExplosionMotion(motion,index,{delay=0}={}){
-  const v=motionVisual(index),img=motionImage(index),layer=v?.querySelector('.motion-play-layer')
+  const {v,img,layer}=motionPlaybackTarget(index)
   if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
   const emojis=(motion.emoji||[]).map(codepointsToString).filter(Boolean);if(!emojis.length)return Promise.resolve()
   const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(96,(Number(motion.size)||.075)*rect.width)),duration=motionPlaybackDuration(motion)
@@ -1383,7 +1785,7 @@ function playExplosionMotion(motion,index,{delay=0}={}){
   return new Promise(resolve=>{const start=performance.now()+delay;const frame=now=>{if(now<start){requestAnimationFrame(frame);return}const t=Math.min(1,(now-start)/duration),ease=1-Math.pow(1-t,3),pt=motionPointAt(motion.curve,t),cx=rect.left+pt[0]*rect.width,cy=rect.top+pt[1]*rect.height,burst=Math.min(rect.width,rect.height)*(.05+.19*Math.sin(Math.min(1,t/.72)*Math.PI/2))*ease;for(let i=0;i<spans.length;i++){const angle=(Math.PI*2*i/spans.length)-Math.PI/2,wobble=Math.sin((t*3+i)*Math.PI)*burst*.10,r=burst*(.82+((i%3)*.12)),x=cx+Math.cos(angle)*r+Math.cos(angle+Math.PI/2)*wobble,y=cy+Math.sin(angle)*r+Math.sin(angle+Math.PI/2)*wobble,sc=.38+1.42*Math.sin(Math.min(1,t/.55)*Math.PI/2),opacity=t>.84?Math.max(0,(1-t)/.16):1;spans[i].style.opacity=String(opacity);spans[i].style.transform=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`}if(t<1&&spans.some(e=>document.body.contains(e)))requestAnimationFrame(frame);else{spans.forEach(e=>e.remove());resolve()}};requestAnimationFrame(frame)})
 }
 function playRainMotion(motion,index,{delay=0}={}){
-  const v=motionVisual(index),img=motionImage(index),layer=v?.querySelector('.motion-play-layer');if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
+  const {v,img,layer}=motionPlaybackTarget(index);if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
   const emojis=(motion.emoji||[]).map(codepointsToString).filter(Boolean);if(!emojis.length)return Promise.resolve()
   const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(96,(Number(motion.size)||.075)*rect.width)),duration=motionPlaybackDuration(motion)
   const count=7
@@ -1391,7 +1793,7 @@ function playRainMotion(motion,index,{delay=0}={}){
   return new Promise(resolve=>{const start=performance.now()+delay;const frame=now=>{if(now<start){requestAnimationFrame(frame);return}const t=Math.min(1,(now-start)/duration),ease=1-Math.pow(1-t,2),opacity=t>.82?Math.max(0,(1-t)/.18):1;for(let i=0;i<spans.length;i++){const seed=(i+.5)/count,pt=motionPointAt(motion.curve,seed),d=motionDerivatives(motion.curve,seed,rect),travel=Math.min(rect.width,rect.height)*(.10+.25*ease)*(0.88+(i%3)*.08),along=Math.sin(t*Math.PI)*Math.min(rect.width,rect.height)*.025,x=rect.left+pt[0]*rect.width+d.nx*travel+d.tx*along,y=rect.top+pt[1]*rect.height+d.ny*travel+d.ty*along,sc=.55+1.05*Math.sin(Math.min(1,t/.6)*Math.PI/2);spans[i].style.opacity=String(opacity);spans[i].style.transform=`translate3d(${x-size/2}px,${y-size/2}px,0) scale(${sc})`}if(t<1&&spans.some(e=>document.body.contains(e)))requestAnimationFrame(frame);else{spans.forEach(e=>e.remove());resolve()}};requestAnimationFrame(frame)})
 }
 function playCloudMotion(motion,index,{delay=0}={}){
-  const v=motionVisual(index),img=motionImage(index),layer=v?.querySelector('.motion-play-layer');if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
+  const {v,img,layer}=motionPlaybackTarget(index);if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
   const emojis=(motion.emoji||[]).map(codepointsToString).filter(Boolean);if(!emojis.length)return Promise.resolve()
   const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(96,(Number(motion.size)||.075)*rect.width)),duration=motionPlaybackDuration(motion)
   const specs=Array.from({length:7},(_,i)=>({start:.08+i*.10,end:(i%2?1:-1)*(.16+.06*i),amp:Math.min(rect.width,rect.height)*(.05+.015*i),phase:(i+1)*1.3,side:i%2?1:-1}))
@@ -1411,7 +1813,7 @@ function curveMotionMetrics(curve,rect){
   return {length,turn,roundish:Math.abs(turn)>1.15&&length/chord>1.25}
 }
 function playRandomMotion(motion,index,{delay=0}={}){
-  const v=motionVisual(index),img=motionImage(index),layer=v?.querySelector('.motion-play-layer');if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
+  const {v,img,layer}=motionPlaybackTarget(index);if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
   const emojis=(motion.emoji||[]).map(codepointsToString).filter(Boolean);if(!emojis.length)return Promise.resolve()
   const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(96,(Number(motion.size)||.075)*rect.width)),duration=motionPlaybackDuration(motion),metrics=curveMotionMetrics(motion.curve,rect)
   const center=motionPointAt(motion.curve,.5),cx=rect.left+center[0]*rect.width,cy=rect.top+center[1]*rect.height,base=Math.max(48,Math.min(metrics.length*.58,Math.hypot(rect.width,rect.height)*.72)),rotationSign=metrics.turn>=0?1:-1
@@ -1424,7 +1826,7 @@ function playMotion(motion,index,{preview=false,delay=0}={}){
   if(motion?.scale==='rain')return playRainMotion(motion,index,{delay})
   if(motion?.scale==='cloud')return playCloudMotion(motion,index,{delay})
   if(motion?.scale==='random')return playRandomMotion(motion,index,{delay})
-  const v=motionVisual(index),img=motionImage(index),layer=v?.querySelector('.motion-play-layer');if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
+  const {v,img,layer}=motionPlaybackTarget(index);if(!v||!img||!layer||!motion?.curve)return Promise.resolve()
   const emojis=(motion.emoji||[]).map(codepointsToString).filter(Boolean);if(!emojis.length)return Promise.resolve()
   const spanA=document.createElement('span'),spanB=document.createElement('span');spanA.className='motion-play-emoji blend';spanB.className='motion-play-emoji blend';spanA.textContent=emojis[0];spanB.textContent='';layer.append(spanA,spanB)
   const rect=imageRectInContainer(v,img),size=Math.max(22,Math.min(96,(Number(motion.size)||.075)*rect.width)),duration=motionPlaybackDuration(motion),mode=motion.scale||'stable';spanA.style.fontSize=`${size}px`;spanB.style.fontSize=`${size}px`
@@ -1954,6 +2356,42 @@ $('refreshStorageStats').onclick=refreshStorageStats
 $('clearStoredMaminaPassword').onclick=async()=>{localStorage.removeItem(STORED_PASSWORD_KEY);$('password').value='';await loadSettings();status('storageStatus','Mot de passe MamiNa supprimé de cet appareil.',true)}
 $('themeSelect').onchange=async()=>{applyTheme($('themeSelect').value);await service.setTheme($('themeSelect').value)}
 $('reactionOrder').onchange=async()=>{reactionOrder=$('reactionOrder').value;await service.setReactionOrder(reactionOrder);if(currentModel)await rebuild(currentArticle()?.articleKey)}
+$('pageTurnEnabled').onchange=async()=>{
+  pageTurnEnabled=$('pageTurnEnabled').checked
+  await service.setPageTurnEnabled(pageTurnEnabled)
+  pageTurnMode=pageTurnEnabled&&!matchMedia('(prefers-reduced-motion: reduce)').matches?'page':'slide'
+  if(pageTurnMode==='slide')destroyPageFlip()
+  else{pageFlipModulePromise=null;schedulePageFlipPrepare(0)}
+}
+$('chooseAvatarSettings').onclick=chooseAvatarFromSettings
+$('changeGroupSettings').onclick=async()=>{
+  const modal=$('groupSwitchModal'),select=$('groupSwitchSelect')
+  try{
+    status('groupSwitchStatus','Recherche des discussions…')
+    const rows=await service.forumDialogChoices()
+    select.innerHTML=''
+    for(const row of rows){const o=document.createElement('option');o.value=row.id;o.textContent=row.title;if(row.selected)o.selected=true;select.appendChild(o)}
+    if(!rows.length)throw new Error('Aucune discussion Telegram avec sujets disponible.')
+    status('groupSwitchStatus','')
+    modal.showModal()
+  }catch(e){debug(e);status('settingsActionStatus','Erreur : '+(e.message||e),false)}
+}
+$('groupSwitchCancel').onclick=()=>$('groupSwitchModal').close()
+$('groupSwitchConfirm').onclick=async()=>{
+  const button=$('groupSwitchConfirm'),id=$('groupSwitchSelect').value
+  if(!id)return
+  try{
+    button.disabled=true;status('groupSwitchStatus','Changement de discussion et synchronisation…')
+    const chosen=await service.selectForumDialog(id)
+    clearReaderState();stopArticleSound();freeUrls(readerUrls);zoomStates.clear();clearPreparedSoundUrls()
+    currentModel=null;displayArticles=[];currentArticleIndex=0
+    await service.syncAll();await localHome()
+    status('groupSwitchStatus',`Discussion active : ${chosen.title}`,true)
+    status('settingsActionStatus',`Discussion Telegram : ${chosen.title}`,true)
+    setTimeout(()=>$('groupSwitchModal').close(),350)
+  }catch(e){debug(e);status('groupSwitchStatus','Erreur : '+(e.message||e),false)}
+  finally{button.disabled=false}
+}
 $('forceUpdate').onclick=async()=>{
   try{
     $('forceUpdate').disabled=true
@@ -1980,8 +2418,8 @@ function renderLogs(){$('techLogs').textContent=formatLogs()||'Aucun journal.'}
 onLog(renderLogs)
 $('clearLogs').onclick=()=>{clearTechLogs();renderLogs()}
 $('copyLogs').onclick=()=>navigator.clipboard.writeText(formatLogs())
-$('verboseLogs').checked=Number(localStorage.getItem('MTCUTE_LOG_LEVEL')||2)>=4
-$('verboseLogs').onchange=()=>localStorage.setItem('MTCUTE_LOG_LEVEL',$('verboseLogs').checked?'4':'2')
+$('verboseLogs').checked=Number(localStorage.getItem('MAMINA_MTCUTE_LOG_LEVEL')||2)>=4
+$('verboseLogs').onchange=()=>localStorage.setItem('MAMINA_MTCUTE_LOG_LEVEL',$('verboseLogs').checked?'4':'2')
 
 let adminGroups=[],adminTopics=[],lastAdminErrorText=''
 function rememberAdminError(e,context='Administration'){

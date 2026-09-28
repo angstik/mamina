@@ -211,3 +211,7 @@ Validation locale effectuée : goldens n°42 et n°43 strictement reproduits par
 - détail de diagnostic ajouté aux erreurs A11/A12 ;
 - purge automatique des données publication/outbox lorsqu'on change de groupe familial ;
 - conservation de la session Telegram, des réglages et de l'avatar utilisateur.
+
+## Dépendance page-turn
+
+MamiNa utilise `@gullabs/flipbook-core` 3.2.1 pour l’animation de rotation des pages. Cette dépendance est distribuée sous licence MPL-2.0.
