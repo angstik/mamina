@@ -3,7 +3,7 @@ import './page-turn.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.34'
+const APP_VERSION='1.1.35'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -1336,14 +1336,21 @@ async function preparePageFlipForCurrent(){
     const dx=e.clientX-p.startX
     if(Math.abs(dx)<8)return
 
-    const wantsPrev=dx>0
-    const impossible=(wantsPrev&&session.current<=0)||(!wantsPrev&&session.current>=displayArticles.length-1)
     const releaseX=(e.clientX-p.left)/p.width
-    // Commit only when the finger is released inside the farthest quarter.
-    const crossedFarQuarter=!impossible&&(dx<0?releaseX<=.25:releaseX>=.75)
     const controller=session.controller
     const calc=controller?.getCalculation?.()
     const animate=controller?.animateFlippingTo
+    const foldDirection=calc?.getDirection?.()
+    const turnsForward=foldDirection===mod.FlipDirection.FORWARD
+    const turnsBack=foldDirection===mod.FlipDirection.BACK
+    const impossible=(turnsBack&&session.current<=0)||(turnsForward&&session.current>=displayArticles.length-1)
+    // Validate only in the quarter OPPOSITE the edge actually peeled by the
+    // engine. In LTR portrait: FORWARD peels the right edge -> left quarter;
+    // BACK peels the left edge -> right quarter. Finger trajectory is irrelevant.
+    const crossedFarQuarter=!impossible&&(
+      (turnsForward&&releaseX<=.25)||
+      (turnsBack&&releaseX>=.75)
+    )
 
     // If the installed engine shape ever changes, leave its native release path
     // intact rather than breaking navigation.
