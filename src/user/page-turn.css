@@ -97,3 +97,8 @@
     animation:none!important;
   }
 }
+
+/* v1.1.32: allow MamiNa's tap/pinch layer to own the article when needed. */
+.mamina-pageflip-host.article-gesture-owns-input{
+  pointer-events:none;
+}

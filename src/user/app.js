@@ -3,7 +3,7 @@ import './page-turn.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.31'
+const APP_VERSION='1.1.32'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -1487,13 +1487,14 @@ function installArticleGestures(container,index){
     const im=img();if(!im)return
     const c=clampPan(container,im,st.scale,st.tx,st.ty);st.tx=c.tx;st.ty=c.ty
     im.style.transform=`translate(${st.tx}px,${st.ty}px) scale(${st.scale})`;persist()
+    const s=pageFlipSession
+    if(pageTurnMode==='page'&&s?.current===index&&s.host)s.host.classList.toggle('article-gesture-owns-input',st.scale>1)
   }
   const reset=()=>{st={scale:1,tx:0,ty:0};apply()}
   const setState=next=>{st={scale:Math.max(1,Math.min(4,Number(next?.scale)||1)),tx:Number(next?.tx)||0,ty:Number(next?.ty)||0};apply()}
   container._pz={get scale(){return st.scale},reset,apply,snapshot:()=>({...st}),setState}
 
   container.addEventListener('touchstart',e=>{
-    if(pageTurnMode==='page'&&e.target.closest?.('.mamina-pageflip-host'))return
     if(motionDraw?.v===container)return
     if(e.target.closest('button'))return
     if(raf)cancelAnimationFrame(raf)
@@ -1501,7 +1502,16 @@ function installArticleGestures(container,index){
       const t=e.touches[0];start={x:t.clientX,y:t.clientY,tx:st.tx,ty:st.ty,time:performance.now()}
       lastMove={x:t.clientX,y:t.clientY,time:performance.now(),vx:0,vy:0}
     }else if(e.touches.length===2){
-      const[a,b]=e.touches;pinch={d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),scale:st.scale}
+      const[a,b]=e.touches
+      pinch={d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),scale:st.scale}
+      start=null
+      const s=pageFlipSession
+      if(pageTurnMode==='page'&&s?.current===index){
+        try{s.flip?.cancelTurn?.()}catch(err){debug(err)}
+        pageTurnAnimating=false
+        const list=$('articleDeck').querySelector(`[data-index="${index}"] .reaction-list`)
+        list?.classList.remove('pageflip-comments-out')
+      }
     }
   },{passive:true})
   container.addEventListener('touchmove',e=>{
@@ -1694,6 +1704,7 @@ function openMotionComposer(index){
   clearTimeout(motionPlaybackTimer)
   motionPrevZoom=v._pz?.snapshot?.()||{scale:1,tx:0,ty:0}
   motionDraft={articleKey:a.articleKey,index,emoji:[],curve:null,size:.08,scale:'stable',duration:2200}
+  pageFlipSession?.host?.classList.add('article-gesture-owns-input')
   populateMotionEmoji(true);renderMotionSelection();updateMotionPanel()
   $('motionSize').value='8';$('motionSizeLabel').textContent='8';$('motionScaleMode').value='stable';$('motionStatus').textContent=''
   $('motionComposer').hidden=false
@@ -1701,6 +1712,7 @@ function openMotionComposer(index){
   v.classList.add('motion-mode')
 }
 function closeMotionComposer({restoreZoom=true}={}){
+  pageFlipSession?.host?.classList.remove('article-gesture-owns-input')
   if(!motionDraft)return
   const v=motionVisual(motionDraft.index)
   stopMotionDrawing()
