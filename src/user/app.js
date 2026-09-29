@@ -3,7 +3,7 @@ import './page-turn.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.35'
+const APP_VERSION='1.1.36'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -1341,8 +1341,11 @@ async function preparePageFlipForCurrent(){
     const calc=controller?.getCalculation?.()
     const animate=controller?.animateFlippingTo
     const foldDirection=calc?.getDirection?.()
-    const turnsForward=foldDirection===mod.FlipDirection.FORWARD
-    const turnsBack=foldDirection===mod.FlipDirection.BACK
+    // flipbook-core 3.2.1 keeps FlipDirection internal: FORWARD=0, BACK=1.
+    // The calculation object exposes that value, but the package root does not
+    // export the enum itself.
+    const turnsForward=foldDirection===0
+    const turnsBack=foldDirection===1
     const impossible=(turnsBack&&session.current<=0)||(turnsForward&&session.current>=displayArticles.length-1)
     // Validate only in the quarter OPPOSITE the edge actually peeled by the
     // engine. In LTR portrait: FORWARD peels the right edge -> left quarter;
