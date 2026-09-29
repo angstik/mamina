@@ -3,7 +3,7 @@ import './page-turn.css'
 import { UserMaminaService } from '../backend/user-service.js'
 import { clearLogs as clearTechLogs, formatLogs, onLog, info, error as logError } from '../backend/log.js'
 
-const APP_VERSION='1.1.36'
+const APP_VERSION='1.1.37'
 const READER_STATE_KEY='MAMINA_READER_STATE'
 const HEARTBEAT_KEY='MAMINA_HEARTBEAT'
 const STORED_PASSWORD_KEY='MAMINA_STORED_PASSWORD'
@@ -2342,7 +2342,30 @@ async function ensureTutorialReader(){
   await openMagazine(magazines[0].magazineId,null,false)
   return Boolean(currentModel)
 }
+function resetTutorialScroll(screen){
+  if(screen==='home'){
+    try{document.scrollingElement.scrollTop=0}catch{}
+    try{scrollTo({top:0,left:0,behavior:'auto'})}catch{}
+  }else if(screen==='settings'){
+    $('settingsView').scrollTop=0
+  }else if(['reader','comment','motion','motionTap','motionDraw'].includes(screen)){
+    const list=$('articleDeck')?.querySelector(`[data-index="${currentArticleIndex}"] .reaction-list`)
+    if(list)list.scrollTop=0
+  }
+}
+function placeTutorialCoach(target){
+  const card=$('tutorialCoach').querySelector('.tutorial-card')
+  if(!card)return
+  card.classList.remove('tutorial-card-top')
+  if(!target)return
+  const r=target.getBoundingClientRect()
+  const vh=visualViewport?.height||innerHeight
+  // Keep the coach away from the highlighted area. A target in the lower half
+  // moves the coach to the top; upper-half targets keep the coach at the bottom.
+  if((r.top+r.bottom)/2>vh/2)card.classList.add('tutorial-card-top')
+}
 async function tutorialScreen(screen){
+  resetTutorialScroll(screen)
   if(screen==='home'){
     closeTutorialTransient()
     $('settingsView').hidden=true;$('adminGuideView').hidden=true
@@ -2392,17 +2415,19 @@ async function showTutorialStep(index){
   $('tutorialPrev').disabled=tutorialIndex===0
   $('tutorialNext').textContent=tutorialIndex===tutorialSteps.length-1?'Terminer':'Suivant →'
   $('tutorialCoach').hidden=false
-  requestAnimationFrame(()=>{
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
     const target=document.querySelector(step.selector)
-    if(!target)return
+    if(!target){placeTutorialCoach(null);return}
     tutorialHighlighted=target
     target.classList.add('tutorial-highlight')
-    target.scrollIntoView?.({behavior:'smooth',block:'center',inline:'nearest'})
-  })
+    target.scrollIntoView?.({behavior:'auto',block:'nearest',inline:'nearest'})
+    requestAnimationFrame(()=>placeTutorialCoach(target))
+  }))
 }
 function stopTutorial(){
   clearTutorialHighlight()
   closeTutorialTransient()
+  $('tutorialCoach').querySelector('.tutorial-card')?.classList.remove('tutorial-card-top')
   $('tutorialCoach').hidden=true
 }
 $('startUserTutorial').onclick=()=>showTutorialStep(0)
@@ -2953,11 +2978,13 @@ function openComposer(k,{focus=true}={}){
     forceSaveSelection()
     syncTypingStateFromCaret()
     updateToolbar()
-    requestAnimationFrame(positionComposer)
   }else{
     savedRange=null
     updateToolbar()
   }
+  // Position is required even without focus (notably the tutorial). Without
+  // this, the fixed sheet keeps its static-position fallback below the article.
+  requestAnimationFrame(positionComposer)
 }
 function closeComposer(){
   $('composerModal').hidden=true

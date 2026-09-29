@@ -207,12 +207,13 @@ button,input,select{font:inherit}button{cursor:pointer}
 .admin-guide-nav button{flex:1}
 @keyframes guide-step-in{from{opacity:.2;transform:translateY(5px)}to{opacity:1;transform:none}}
 .tutorial-coach{position:fixed;inset:0;z-index:3000;pointer-events:none}
-.tutorial-card{position:absolute;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));margin:auto;max-width:560px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:15px;box-shadow:0 10px 40px #0006;pointer-events:auto}
+.tutorial-card{position:absolute;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));top:auto;margin:auto;max-width:560px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:15px;box-shadow:0 10px 40px #0006;pointer-events:auto}
+.tutorial-card.tutorial-card-top{top:max(14px,env(safe-area-inset-top));bottom:auto}
 .tutorial-card strong{font-size:1.08rem}.tutorial-card p{margin:.55rem 0 .8rem}
 .tutorial-counter{font-size:.76rem;opacity:.65;margin-bottom:3px}
 .tutorial-actions{display:grid;grid-template-columns:auto auto 1fr;gap:7px}
 .tutorial-highlight{position:relative!important;z-index:2990!important;outline:4px solid color-mix(in srgb,var(--accent) 85%,white);outline-offset:4px;border-radius:12px;box-shadow:0 0 0 9999px #0005!important}
-@media (orientation:landscape) and (min-width:700px){.tutorial-card{left:auto;right:20px;bottom:20px;width:min(420px,45vw)}}
+@media (orientation:landscape) and (min-width:700px){.tutorial-card{left:auto;right:20px;width:min(420px,45vw)}.tutorial-card:not(.tutorial-card-top){bottom:20px}.tutorial-card.tutorial-card-top{top:20px}}
 
 .help-button{min-height:38px;padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:inherit;font-weight:700}
 .help-button:active{transform:scale(.97)}
