@@ -8,6 +8,57 @@
 
 
 
+## v1.1.37
+**Tutoriel fiabilisé et éditeur correctement positionné en mode démonstration.**
+
+Le tutoriel remet désormais les surfaces concernées dans une position de défilement déterministe lorsqu’il change d’écran. La carte d’explication se place automatiquement à l’opposé de la zone surlignée afin de limiter les recouvrements entre le texte d’aide et l’interface montrée.
+
+L’ouverture de l’éditeur de commentaire en mode tutoriel appelle maintenant systématiquement son calcul de position, même lorsqu’il est ouvert sans focus clavier. Cela corrige le cas où la zone d’édition apparaissait juste sous l’article au lieu d’être ancrée correctement dans le viewport.
+
+## v1.1.36
+**Validation du retournement de page rétablie après la régression de v1.1.35.**
+
+La v1.1.35 utilisait la direction interne calculée par `flipbook-core`, mais référençait par erreur un enum `FlipDirection` non exporté par le paquet public. L’erreur se produisait au `pointerup` et empêchait toute page de terminer son retournement.
+
+La v1.1.36 conserve la logique « quart opposé au bord décollé » mais utilise directement les valeurs internes documentées par le source de `@gullabs/flipbook-core 3.2.1` : `FORWARD=0`, `BACK=1`.
+
+## v1.1.35
+**Le seuil de validation du page-turn dépend désormais du bord réellement décollé.**
+
+La validation ne se base plus seulement sur la direction globale du déplacement du doigt. Elle interroge la direction réelle du pli calculée par le moteur afin de n’accepter que le quart opposé au bord de départ : bord droit décollé → quart gauche ; bord gauche décollé → quart droit.
+
+Cette version a introduit une régression empêchant la validation du retournement, due à l’utilisation d’un enum interne non exporté. Elle est corrigée en v1.1.36.
+
+## v1.1.34
+**Le swipe de changement de page est correctement réinitialisé après un zoom.**
+
+Lorsqu’un pinch démarre, MamiNa efface maintenant explicitement l’état de pointeur utilisé pour décider du retournement et libère la capture interne de PageFlip. Un premier doigt utilisé avant l’arrivée du second ne peut donc plus rester mémorisé après le zoom.
+
+Après retour à l’échelle 1:1, le swipe suivant repart avec un état propre et le seuil de validation du page-turn fonctionne de nouveau normalement.
+
+## v1.1.33
+**Zoom visible sur la feuille PageFlip et retour automatique après 30 secondes d’inactivité.**
+
+Le zoom et le déplacement de l’article sont désormais appliqués simultanément à l’image source et à la copie réellement visible dans la feuille PageFlip. Le `transform:none!important` qui neutralisait le zoom sur cette copie est remplacé par un transform piloté par MamiNa.
+
+Tant que le zoom est supérieur à 1, la rotation de page est neutralisée afin de réserver les gestes au déplacement de l’article. Toute interaction réarme un délai d’inactivité ; après 30 secondes sans action, le zoom revient automatiquement à 1, les translations sont remises à zéro et le page-turn redevient disponible.
+
+## v1.1.32
+**Interactions tactiles restaurées avec le nouveau moteur de rotation de pages.**
+
+La couche PageFlip n’empêche plus l’initialisation des gestes historiques de l’article. Le simple toucher utilisé par l’animation emoji simplifiée, le double-tap photo/texte et le pinch à deux doigts retrouvent donc leur chemin normal.
+
+Dès qu’un second doigt apparaît, un éventuel pli de page est annulé et le zoom MamiNa prend la main. Lorsque l’article est zoomé, ou lorsqu’un mode d’interaction directe avec l’article le nécessite, la couche PageFlip cesse temporairement de capter les pointeurs afin d’éviter les conflits de gestes.
+
+## v1.1.31
+**Rotation de pages déployée en production et nouveaux réglages utilisateur.**
+
+Le moteur de retournement testé en bêta est intégré au lecteur principal via `@gullabs/flipbook-core 3.2.1`, chargé dynamiquement. L’article entier devient une feuille souple : seuil de validation au dernier quart, retour ralenti lorsqu’un geste est annulé, verso miroir expérimental, fondu des commentaires et réapparition progressive, avec animations visuelles intégrées à la feuille pendant sa rotation.
+
+Le réglage « Animation rotation de pages » est ajouté dans Affichage et activé par défaut. Si l’option est désactivée, si la réduction des animations est demandée par le système ou si la bibliothèque ne peut pas être chargée, MamiNa conserve le swipe horizontal classique comme fallback.
+
+Le bloc Application des paramètres ajoute « Changer de discussion Telegram » et « Choix de l’avatar ». Le changement de discussion conserve la session Telegram, purge les données locales liées à l’ancien groupe puis synchronise le nouveau. Le choix d’avatar permet de rouvrir l’association Famileo même lorsqu’un avatar existe déjà. Le bloc Guides est remonté juste sous ce cadre.
+
 ## v1.1.30
 **Tutoriel enrichi, accès Aide direct et fiche imprimable.**
 
